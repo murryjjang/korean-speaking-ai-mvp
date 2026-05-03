@@ -1,26 +1,90 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ─── 브랜드 색상 팔레트 ─── */
+@theme {
+  /* Primary: 교육기관형 네이비 블루 */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+
+  /* Success */
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-500: #22c55e;
+  --color-success-700: #15803d;
+
+  /* Warning */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #f59e0b;
+  --color-warning-700: #b45309;
+
+  /* Danger */
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-500: #ef4444;
+  --color-danger-700: #b91c1c;
 }
 
+/* ─── 시맨틱 CSS 변수 (라이트 모드) ─── */
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+
+  --surface: #f8fafc;
+  --surface-raised: #ffffff;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+}
+
+/* ─── Tailwind 토큰 매핑 ─── */
 @theme inline {
+  /* 기존 */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  /* 시맨틱 서피스 */
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  /* 시맨틱 텍스트 */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  /* 폰트 */
+  --font-sans: var(--font-noto-sans-kr);
   --font-mono: var(--font-geist-mono);
 }
 
+/* ─── 다크 모드 ─── */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
-    --foreground: #ededed;
+    --foreground: #f1f5f9;
+
+    --surface: #0f172a;
+    --surface-raised: #1e293b;
+    --border: #334155;
+    --border-strong: #475569;
+
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }

@@ -4,6 +4,63 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 1 — 디자인 시스템 & 공통 레이아웃 (Design System & Layout)
+
+**날짜**: 2026-05-03
+**목표**: 전문적이고 수정이 쉬운 UI/UX 기반 — 디자인 토큰, 공통 컴포넌트, AppShell, 역할별 대시보드 초안
+
+### 생성 파일
+
+**디자인 시스템**
+- `app/globals.css` — 수정: Tailwind v4 `@theme` 기반 Primary(네이비 블루)/Success/Warning/Danger 팔레트, 시맨틱 CSS 변수(`--surface`, `--border`, `--text-*`), 다크모드 지원
+- `app/layout.tsx` — 수정: Geist Sans → Noto Sans KR(`next/font/google`), Geist Mono 유지
+
+**공통 UI 컴포넌트 (`src/components/ui/`)**
+- `button.tsx` — variant(primary/secondary/ghost/danger), size(sm/md/lg), loading spinner
+- `card.tsx` — Card / CardHeader / CardBody / CardFooter 4종 슬롯 구조
+- `badge.tsx` — variant(default/success/warning/danger/info/outline), size(sm/md)
+- `score-bar.tsx` — 점수 진행 바 (60/80 컷오프 색상 자동)
+- `score-badge.tsx` — 숫자 점수 뱃지 (동일 색상 로직)
+- `risk-badge.tsx` — RiskLevel(low/medium/high) → 색상 뱃지
+- `data-table.tsx` — 제네릭 DataTable, 정렬 지원 (Client Component)
+- `filter-panel.tsx` — 필터 패널, select 기반 (Client Component)
+- `stat-card.tsx` — 숫자 지표 카드 (value + label + trend)
+- `page-header.tsx` — 페이지 헤더 (title + description + action 슬롯)
+- `empty-state.tsx` — 빈 상태 표시
+- `index.ts` — barrel export
+
+**AppShell 레이아웃 (`src/components/layout/`)**
+- `app-shell.tsx` — Topbar + Sidebar + main 래퍼, `role`/`navItems` props
+- `sidebar.tsx` — 역할별 navItems 렌더링, `usePathname` 기반 active (Client Component)
+- `topbar.tsx` — 로고, 플랫폼명, 역할 뱃지
+- `index.ts` — barrel export
+
+**역할별 레이아웃 (신규)**
+- `app/student/layout.tsx` — 학습자 AppShell, navItems 4개 (말하기 평가·미션 대화·대회 disabled)
+- `app/teacher/layout.tsx` — 교수자 AppShell, navItems 4개 (학생 관리·제출 내역·루브릭 disabled)
+- `app/admin/layout.tsx` — 관리자 AppShell, navItems 5개 (반·학생·콘텐츠·리포트 disabled)
+
+**역할별 대시보드 페이지 (수정)**
+- `app/page.tsx` — 역할 선택 랜딩 페이지 (학습자/교수자/관리자 3종 진입 카드)
+- `app/student/page.tsx` — 학습자 대시보드: StatCard 3개 + 제출 내역 DataTable (mock 연결)
+- `app/teacher/page.tsx` — 교수자 대시보드: StatCard 4개 + 전체 제출 DataTable + 위험도 뱃지 (mock 연결)
+- `app/admin/page.tsx` — 관리자 대시보드: StatCard 4개 + 반별 현황 + 어권별 분포 DataTable 2개 (mock 연결)
+
+**타입 수정**
+- `src/types/data.ts` — `ErrorTagType`에 `'grammar'` 추가 (mock 데이터 일치 버그 수정)
+
+### 테스트 결과
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+
+### 메모
+- 모든 컴포넌트는 Phase 0 디자인 토큰(`--surface`, `--border`, `--text-*`)을 기반으로 Tailwind 유틸리티 사용
+- 아이콘은 외부 라이브러리 없이 인라인 SVG로 처리 (lucide-react 미설치)
+- 말하기 평가 기능, 인증, DB 연동, 차트는 이번 Phase 제외
+- 모바일 사이드바(햄버거 메뉴)는 Phase 미구현 — md: breakpoint에서 표시
+
+---
+
 ## Phase 0 — 기반 설정 (Foundation)
 
 **날짜**: 2026-05-03

@@ -6,7 +6,7 @@ export type RiskLevel = 'low' | 'medium' | 'high'
 
 export type ModuleType = 'assessment' | 'contest' | 'mission'
 
-export type ErrorTagType = 'particle' | 'ending' | 'tense' | 'pronunciation' | 'fluency' | 'task'
+export type ErrorTagType = 'particle' | 'ending' | 'tense' | 'pronunciation' | 'fluency' | 'task' | 'grammar'
 
 export type ErrorTag = {
   type: ErrorTagType
