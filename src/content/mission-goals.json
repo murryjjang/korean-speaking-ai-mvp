@@ -1,0 +1,163 @@
+[
+  {
+    "scenarioId": "sc-restaurant-01",
+    "title": "식당에서 주문하기",
+    "situation": "한국 식당에 처음 방문했습니다.",
+    "location": "한국 음식점",
+    "persona": {
+      "id": "persona-restaurant-staff",
+      "name": "김민지",
+      "role": "식당 직원",
+      "greetingMessage": "어서 오세요! 몇 분이세요?"
+    },
+    "goals": [
+      { "id": "rg-01", "description": "직원에게 인원 수 알리기",  "achievedAtTurn": 1, "order": 1 },
+      { "id": "rg-02", "description": "음식 2가지 주문하기",       "achievedAtTurn": 3, "order": 2 },
+      { "id": "rg-03", "description": "총 금액 확인하기",          "achievedAtTurn": 5, "order": 3 }
+    ],
+    "successCriteria": {
+      "type": "intent",
+      "values": ["order_food", "confirm_price"]
+    },
+    "expectedTurns": 6,
+    "difficulty": "beginner",
+    "estimatedMinutes": 3,
+    "isActive": true,
+    "rubric": {
+      "dimensions": [
+        { "id": "r-mission", "label": "미션 달성률",  "description": "설정된 목표를 달성한 비율",          "maxScore": 100 },
+        { "id": "r-natural", "label": "대화 자연성",  "description": "자연스러운 대화 흐름과 속도",        "maxScore": 100 },
+        { "id": "r-task",    "label": "과제 수행",    "description": "상황에 맞는 언어 과제 수행도",       "maxScore": 100 },
+        { "id": "r-expr",    "label": "표현 적절성",  "description": "상황에 적합한 어휘·표현 사용 정확도", "maxScore": 100 }
+      ]
+    },
+    "sampleResponses": [
+      { "turn": 1, "text": "두 명이요." },
+      { "turn": 2, "text": "메뉴 좀 볼게요." },
+      { "turn": 3, "text": "비빔밥 하나 주세요." },
+      { "turn": 4, "text": "삼겹살도 주세요." },
+      { "turn": 5, "text": "얼마예요?" },
+      { "turn": 6, "text": "카드로 낼게요. 감사합니다." }
+    ],
+    "mockEvaluation": {
+      "conversationNaturalness": 72,
+      "expressionAppropriateness": 68,
+      "strengths": [
+        "자연스러운 주문 표현을 사용했습니다.",
+        "인원 안내를 명확하게 전달했습니다."
+      ],
+      "improvements": [
+        "가격 관련 어휘를 다양화하면 좋겠습니다.",
+        "의문형 어미 정확도를 높여보세요."
+      ]
+    }
+  },
+  {
+    "scenarioId": "sc-hospital-01",
+    "title": "병원 접수하기",
+    "situation": "몸이 아파서 병원에 왔습니다.",
+    "location": "병원 접수처",
+    "persona": {
+      "id": "persona-hospital-receptionist",
+      "name": "이수진",
+      "role": "병원 접수원",
+      "greetingMessage": "안녕하세요, 어디가 불편하세요?"
+    },
+    "goals": [
+      { "id": "hg-01", "description": "아픈 증상 설명하기",        "achievedAtTurn": 2, "order": 1 },
+      { "id": "hg-02", "description": "언제부터 아팠는지 말하기",  "achievedAtTurn": 4, "order": 2 },
+      { "id": "hg-03", "description": "진료 예약 요청하기",        "achievedAtTurn": 6, "order": 3 },
+      { "id": "hg-04", "description": "예약 날짜·시간 확인하기",   "achievedAtTurn": 7, "order": 4 }
+    ],
+    "successCriteria": {
+      "type": "intent",
+      "values": ["describe_symptoms", "make_appointment"]
+    },
+    "expectedTurns": 8,
+    "difficulty": "intermediate",
+    "estimatedMinutes": 5,
+    "isActive": true,
+    "rubric": {
+      "dimensions": [
+        { "id": "r-mission", "label": "미션 달성률",  "description": "설정된 목표를 달성한 비율",          "maxScore": 100 },
+        { "id": "r-natural", "label": "대화 자연성",  "description": "자연스러운 대화 흐름과 속도",        "maxScore": 100 },
+        { "id": "r-task",    "label": "과제 수행",    "description": "상황에 맞는 언어 과제 수행도",       "maxScore": 100 },
+        { "id": "r-expr",    "label": "표현 적절성",  "description": "상황에 적합한 어휘·표현 사용 정확도", "maxScore": 100 }
+      ]
+    },
+    "sampleResponses": [
+      { "turn": 1, "text": "머리가 아파요." },
+      { "turn": 2, "text": "어제부터요." },
+      { "turn": 3, "text": "열은 없어요." },
+      { "turn": 4, "text": "오늘 진료 받을 수 있어요?" },
+      { "turn": 5, "text": "오후 3시 괜찮아요." },
+      { "turn": 6, "text": "예약됐어요?" },
+      { "turn": 7, "text": "5월 5일 3시 맞죠?" },
+      { "turn": 8, "text": "감사합니다." }
+    ],
+    "mockEvaluation": {
+      "conversationNaturalness": 65,
+      "expressionAppropriateness": 70,
+      "strengths": [
+        "증상 표현이 구체적이고 명확했습니다.",
+        "예약 요청 문장이 적절했습니다."
+      ],
+      "improvements": [
+        "시간 표현 정확도를 높여보세요.",
+        "존댓말을 더 일관성 있게 사용해보세요."
+      ]
+    }
+  },
+  {
+    "scenarioId": "sc-transport-01",
+    "title": "버스 타기",
+    "situation": "서울 시내에서 버스를 타려고 합니다.",
+    "location": "버스 정류장",
+    "persona": {
+      "id": "persona-bus-driver",
+      "name": "박철수",
+      "role": "버스 기사",
+      "greetingMessage": "어서 오세요. 어디 가세요?"
+    },
+    "goals": [
+      { "id": "tg-01", "description": "목적지 말하기",      "achievedAtTurn": 1, "order": 1 },
+      { "id": "tg-02", "description": "버스 번호 확인하기", "achievedAtTurn": 2, "order": 2 },
+      { "id": "tg-03", "description": "하차 의사 표현하기", "achievedAtTurn": 4, "order": 3 }
+    ],
+    "successCriteria": {
+      "type": "keyword",
+      "values": ["버스", "몇 번", "내립니다"]
+    },
+    "expectedTurns": 5,
+    "difficulty": "beginner",
+    "estimatedMinutes": 3,
+    "isActive": true,
+    "rubric": {
+      "dimensions": [
+        { "id": "r-mission", "label": "미션 달성률",  "description": "설정된 목표를 달성한 비율",          "maxScore": 100 },
+        { "id": "r-natural", "label": "대화 자연성",  "description": "자연스러운 대화 흐름과 속도",        "maxScore": 100 },
+        { "id": "r-task",    "label": "과제 수행",    "description": "상황에 맞는 언어 과제 수행도",       "maxScore": 100 },
+        { "id": "r-expr",    "label": "표현 적절성",  "description": "상황에 적합한 어휘·표현 사용 정확도", "maxScore": 100 }
+      ]
+    },
+    "sampleResponses": [
+      { "turn": 1, "text": "강남역 가려고요." },
+      { "turn": 2, "text": "153번 맞아요?" },
+      { "turn": 3, "text": "얼마나 걸려요?" },
+      { "turn": 4, "text": "다음 정류장에서 내릴게요." },
+      { "turn": 5, "text": "감사합니다!" }
+    ],
+    "mockEvaluation": {
+      "conversationNaturalness": 80,
+      "expressionAppropriateness": 75,
+      "strengths": [
+        "간결하고 명확하게 목적지를 전달했습니다.",
+        "하차 표현이 자연스러웠습니다."
+      ],
+      "improvements": [
+        "버스 노선 관련 어휘를 보강하면 좋겠습니다.",
+        "의문형 억양을 연습해보세요."
+      ]
+    }
+  }
+]
