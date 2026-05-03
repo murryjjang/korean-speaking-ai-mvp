@@ -1,0 +1,53 @@
+[
+  {
+    "id": "sc-restaurant-01",
+    "personaId": "persona-restaurant-staff",
+    "name": "식당에서 주문하기",
+    "situation": "한국 식당에 처음 방문했습니다.",
+    "location": "한국 음식점",
+    "mission": "메뉴를 확인하고 음식 2가지를 주문한 후 가격을 확인하세요.",
+    "successCriteria": {
+      "type": "intent",
+      "values": ["order_food", "confirm_price"]
+    },
+    "maxTurns": 6,
+    "difficulty": "beginner",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "sc-hospital-01",
+    "personaId": "persona-hospital-receptionist",
+    "name": "병원 접수하기",
+    "situation": "몸이 아파서 병원에 왔습니다.",
+    "location": "병원 접수처",
+    "mission": "증상을 설명하고 진료 예약을 완료하세요.",
+    "successCriteria": {
+      "type": "intent",
+      "values": ["describe_symptoms", "make_appointment"]
+    },
+    "maxTurns": 8,
+    "difficulty": "intermediate",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "sc-transport-01",
+    "personaId": "persona-bus-driver",
+    "name": "버스 타기",
+    "situation": "서울 시내에서 버스를 타려고 합니다.",
+    "location": "버스 정류장",
+    "mission": "목적지까지 가는 버스 번호를 확인하고 탑승하세요.",
+    "successCriteria": {
+      "type": "keyword",
+      "values": ["버스", "몇 번", "내립니다"]
+    },
+    "maxTurns": 5,
+    "difficulty": "beginner",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  }
+]

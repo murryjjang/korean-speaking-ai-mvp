@@ -1,0 +1,44 @@
+[
+  {
+    "id": "qs-diagnostic-01",
+    "name": "진단평가 세트 A",
+    "description": "수업 시작 전 학습자 수준을 파악하기 위한 평가",
+    "purpose": "diagnostic",
+    "questions": [
+      { "questionId": "q-001", "order": 1 },
+      { "questionId": "q-003", "order": 2 },
+      { "questionId": "q-007", "order": 3 }
+    ],
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "qs-practice-01",
+    "name": "연습평가 세트 A",
+    "description": "수업 중 연습용 평가 세트",
+    "purpose": "practice",
+    "questions": [
+      { "questionId": "q-002", "order": 1 },
+      { "questionId": "q-005", "order": 2 },
+      { "questionId": "q-007", "order": 3 }
+    ],
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "qs-post-01",
+    "name": "사후평가 세트 A",
+    "description": "수업 종료 후 학습 성과를 측정하는 평가",
+    "purpose": "post",
+    "questions": [
+      { "questionId": "q-002", "order": 1 },
+      { "questionId": "q-006", "order": 2 },
+      { "questionId": "q-008", "order": 3 }
+    ],
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  }
+]

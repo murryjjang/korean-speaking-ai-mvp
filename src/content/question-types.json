@@ -1,0 +1,34 @@
+[
+  {
+    "id": "qt-self-intro",
+    "name": "자기소개",
+    "description": "자신을 소개하는 말하기",
+    "icon": "user",
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "qt-picture",
+    "name": "그림 묘사",
+    "description": "제시된 그림을 설명하는 말하기",
+    "icon": "image",
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "qt-situation",
+    "name": "상황 대응",
+    "description": "주어진 상황에서 적절히 말하기",
+    "icon": "message-circle",
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "qt-opinion",
+    "name": "의견 말하기",
+    "description": "주제에 대한 자신의 의견 말하기",
+    "icon": "mic",
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  }
+]

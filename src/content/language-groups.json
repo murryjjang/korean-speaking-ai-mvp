@@ -1,0 +1,74 @@
+[
+  {
+    "id": "lg-ko",
+    "code": "ko",
+    "nameKo": "한국어",
+    "nameNative": "한국어",
+    "languageGroup": "korean",
+    "direction": "ltr",
+    "isActive": true
+  },
+  {
+    "id": "lg-en",
+    "code": "en",
+    "nameKo": "영어",
+    "nameNative": "English",
+    "languageGroup": "european",
+    "direction": "ltr",
+    "isActive": true
+  },
+  {
+    "id": "lg-vi",
+    "code": "vi",
+    "nameKo": "베트남어",
+    "nameNative": "Tiếng Việt",
+    "languageGroup": "southeast-asian",
+    "direction": "ltr",
+    "isActive": true
+  },
+  {
+    "id": "lg-th",
+    "code": "th",
+    "nameKo": "태국어",
+    "nameNative": "ภาษาไทย",
+    "languageGroup": "southeast-asian",
+    "direction": "ltr",
+    "isActive": true
+  },
+  {
+    "id": "lg-zh",
+    "code": "zh",
+    "nameKo": "중국어",
+    "nameNative": "中文",
+    "languageGroup": "east-asian",
+    "direction": "ltr",
+    "isActive": true
+  },
+  {
+    "id": "lg-ja",
+    "code": "ja",
+    "nameKo": "일본어",
+    "nameNative": "日本語",
+    "languageGroup": "east-asian",
+    "direction": "ltr",
+    "isActive": true
+  },
+  {
+    "id": "lg-ar",
+    "code": "ar",
+    "nameKo": "아랍어",
+    "nameNative": "العربية",
+    "languageGroup": "arabic",
+    "direction": "rtl",
+    "isActive": true
+  },
+  {
+    "id": "lg-other",
+    "code": "other",
+    "nameKo": "기타",
+    "nameNative": "Other",
+    "languageGroup": "other",
+    "direction": "ltr",
+    "isActive": true
+  }
+]

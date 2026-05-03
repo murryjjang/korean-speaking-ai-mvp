@@ -1,0 +1,42 @@
+[
+  {
+    "id": "ft-particle-error",
+    "errorType": "particle",
+    "template": "조사 사용에 주의하세요. '{error}'는 '{correction}'으로 써야 합니다.",
+    "example": "'학교에 가다'에서 '에'는 장소를 나타내는 조사입니다.",
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "ft-ending-error",
+    "errorType": "ending",
+    "template": "어미 사용을 확인하세요. '{error}'는 '{correction}'으로 써야 합니다.",
+    "example": "'-았/었-'은 과거를, '-겠-'은 미래/추측을 나타냅니다.",
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "ft-pronunciation-error",
+    "errorType": "pronunciation",
+    "template": "'{word}' 발음을 다시 연습해 보세요. 특히 '{phoneme}' 부분에 주의하세요.",
+    "example": "한국어에서 'ㅓ'와 'ㅗ'는 다른 소리입니다.",
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "ft-fluency-tip",
+    "errorType": "fluency",
+    "template": "말하기 속도를 조절해 보세요. 자연스러운 끊어 읽기를 연습하면 유창성이 향상됩니다.",
+    "example": "문장 단위로 끊어 말하기를 연습하세요.",
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "ft-task-incomplete",
+    "errorType": "task",
+    "template": "과제의 모든 요소를 포함했는지 확인하세요. '{missing}' 부분이 빠져 있습니다.",
+    "example": "자기소개에는 이름, 국적, 한국어 학습 이유가 포함되어야 합니다.",
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  }
+]

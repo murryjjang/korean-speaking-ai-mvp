@@ -1,0 +1,98 @@
+[
+  {
+    "id": "q-001",
+    "typeId": "qt-self-intro",
+    "title": "자기소개 (기본)",
+    "prompt": "자신을 소개해 보세요. 이름, 나라, 한국어를 배우는 이유를 포함해서 이야기해 주세요.",
+    "prepTimeSec": 30,
+    "responseTimeSec": 60,
+    "difficulty": "beginner",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "q-002",
+    "typeId": "qt-self-intro",
+    "title": "자기소개 (심화)",
+    "prompt": "자신을 소개하고, 한국에서의 생활이나 경험에 대해서도 이야기해 보세요.",
+    "prepTimeSec": 30,
+    "responseTimeSec": 90,
+    "difficulty": "intermediate",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "q-003",
+    "typeId": "qt-picture",
+    "title": "그림 묘사 (일상)",
+    "prompt": "그림을 보고 어떤 상황인지 설명해 보세요. (그림: 공원에서 운동하는 사람들)",
+    "prepTimeSec": 45,
+    "responseTimeSec": 90,
+    "difficulty": "beginner",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "q-004",
+    "typeId": "qt-picture",
+    "title": "그림 묘사 (비교)",
+    "prompt": "두 그림을 비교하여 설명해 보세요. (그림: 주말/평일 거리 풍경 비교)",
+    "prepTimeSec": 45,
+    "responseTimeSec": 120,
+    "difficulty": "intermediate",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "q-005",
+    "typeId": "qt-situation",
+    "title": "친구에게 길 안내",
+    "prompt": "친구가 길을 잃었습니다. 전화로 현재 위치에서 약속 장소까지 가는 방법을 설명해 주세요.",
+    "prepTimeSec": 30,
+    "responseTimeSec": 90,
+    "difficulty": "beginner",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "q-006",
+    "typeId": "qt-situation",
+    "title": "불편 사항 전달",
+    "prompt": "호텔에서 불편한 점이 있습니다. 직원에게 문제를 설명하고 해결을 요청해 보세요.",
+    "prepTimeSec": 30,
+    "responseTimeSec": 90,
+    "difficulty": "intermediate",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "q-007",
+    "typeId": "qt-opinion",
+    "title": "한국 음식 추천",
+    "prompt": "외국인 친구에게 한국 음식을 추천해 보세요. 이유와 함께 설명해 주세요.",
+    "prepTimeSec": 45,
+    "responseTimeSec": 90,
+    "difficulty": "beginner",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "q-008",
+    "typeId": "qt-opinion",
+    "title": "환경 문제와 해결책",
+    "prompt": "현재 가장 심각한 환경 문제 하나를 선택하고, 그 해결 방법에 대한 자신의 의견을 말해 보세요.",
+    "prepTimeSec": 45,
+    "responseTimeSec": 120,
+    "difficulty": "advanced",
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "rubric-speaking-01",
+    "name": "한국어 말하기 평가 루브릭 v1",
+    "description": "말하기 평가의 기본 루브릭. 발음·유창성·어휘·문법·과제수행 5개 항목.",
+    "items": [
+      {
+        "id": "ri-pronunciation",
+        "label": "발음",
+        "description": "자음·모음의 정확도, 억양, 강세",
+        "maxScore": 20,
+        "weight": 0.2
+      },
+      {
+        "id": "ri-fluency",
+        "label": "유창성",
+        "description": "말하기의 속도, 유창함, 자연스러운 쉬기",
+        "maxScore": 20,
+        "weight": 0.2
+      },
+      {
+        "id": "ri-vocabulary",
+        "label": "어휘",
+        "description": "다양하고 적절한 어휘 사용",
+        "maxScore": 20,
+        "weight": 0.2
+      },
+      {
+        "id": "ri-grammar",
+        "label": "문법",
+        "description": "조사, 어미, 시제 등 문법적 정확성",
+        "maxScore": 20,
+        "weight": 0.2
+      },
+      {
+        "id": "ri-task",
+        "label": "과제 수행",
+        "description": "과제 지시 이해와 내용의 충실도",
+        "maxScore": 20,
+        "weight": 0.2
+      }
+    ],
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-01-01T00:00:00Z"
+  }
+]
