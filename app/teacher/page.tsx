@@ -58,6 +58,7 @@ export default function TeacherDashboardPage() {
       studentName: student?.name ?? s.studentId,
       classId: s.classId,
       className: classNameMap[s.classId] ?? s.classId,
+      nativeLanguage: student?.nativeLanguage ?? "—",
       langGroup: student
         ? (languageGroupLabels[student.languageGroup] ?? student.languageGroup)
         : "—",

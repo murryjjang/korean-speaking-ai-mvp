@@ -4,6 +4,90 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 5 — 교수자 채점 UI (Teacher Grading UI)
+
+**날짜**: 2026-05-04
+**목표**: 교수자 제출 목록 화면(`/teacher/submissions`)과 3단 채점 위저드(`/teacher/submissions/[id]`) 구현. mock 데이터·모듈 레벨 스토어만 사용. 실제 DB·API 연동 없음.
+
+### 생성 파일
+
+**타입 (`src/types/`)**
+- `src/types/grading.ts` — `GradingWizardData`, `TeacherEvalDraft`, `RubricItemScore` 3종
+
+**Mock 스토어 (`src/lib/mock/`)**
+- `src/lib/mock/teacher-grading-store.ts` — 교수자 평가 초안·확정 메모리 스토어 (`getDraft`, `saveDraft`, `finalize`, `getStatusOverride`)
+
+**제출 목록 페이지 (`app/teacher/submissions/`)**
+- `app/teacher/submissions/page.tsx` — Server Component: mock 데이터 조합 → `TeacherSubmissionRow[]` 생성, `SubmissionsClient`에 전달. `getStatusOverride`로 서버 내 채점 확정 상태 반영. `force-dynamic` 설정.
+- `app/teacher/submissions/submissions-client.tsx` — Client Component: 반·모국어·어권·유형·위험도·상태 6종 필터(AND 조건), StatCard 4개(전체·채점 대기·확정·평균 점수), 주의 학생 경고 배너, `TeacherSubmissionsTable` 렌더링.
+
+**채점 위저드 (`app/teacher/submissions/[id]/`)**
+- `app/teacher/submissions/[id]/page.tsx` — Server Component: submission·student·class·aiEval·riskFlag·rubricItems·question 조합 → `GradingWizardData` 전달. 404 처리 포함.
+- `app/teacher/submissions/[id]/grading-wizard.tsx` — Client Component: 3단 위저드 상태 머신(1단계 보기→2단계 점수 조정→3단계 확정), `useTransition` + Server Action 연결.
+- `app/teacher/submissions/[id]/wizard-step-indicator.tsx` — 진행 단계 표시 컴포넌트 (완료·활성·대기 시각화).
+- `app/teacher/submissions/[id]/step-submission-view.tsx` — 1단계: 학생 정보·제출 정보·문항 내용·STT 전사문·AI 평가 요약·오류 태그·위험도 사유 표시.
+- `app/teacher/submissions/[id]/step-rubric-adjust.tsx` — 2단계: 루브릭별 AI 점수 대비 교수자 점수 입력 테이블, 변동량(±delta) 색상 표시, 조정 이유 태그 선택, 내부 메모 입력.
+- `app/teacher/submissions/[id]/step-final-feedback.tsx` — 3단계: 최종 점수 비교(AI vs 교수자), 학습자 공개 피드백·강점·보완점·다음 추천 활동 입력, 확정 버튼. 확정 후 readonly 전환.
+- `app/teacher/submissions/[id]/actions.ts` — Server Action: `saveTeacherDraft`, `finalizeTeacherEvaluation`. mock 스토어 직접 호출.
+
+### 수정 파일
+
+**타입 (`src/types/`)**
+- `src/types/data.ts` — `TeacherEvaluation`에 `strengths?`, `improvements?`, `nextActivity?` 3개 optional 필드 추가.
+
+**테이블 컴포넌트 (`app/teacher/`)**
+- `app/teacher/submissions-table.tsx` — `TeacherSubmissionRow` 타입에 `nativeLanguage: string` 추가. `studentName` 열에 `/teacher/submissions/[id]` Link 추가.
+- `app/teacher/page.tsx` — 대시보드 row 빌드 시 `nativeLanguage` 필드 추가.
+
+**채점 상세 페이지**
+- `app/teacher/submissions/[id]/page.tsx` — `questionsJson.find()` 결과를 `Question` 타입으로 캐스팅하여 TS 오류 수정.
+
+### 라우팅 구조
+
+| 경로 | 렌더링 | 설명 |
+|------|--------|------|
+| `/teacher/submissions` | Dynamic | 제출 목록 (6종 필터, 통계 요약) |
+| `/teacher/submissions/[id]` | Dynamic | 3단 채점 위저드 |
+
+### 데이터 플로우
+
+```
+/teacher/submissions
+  → Server: mockSubmissions × mockStudents × mockAIEvaluations × getStatusOverride()
+  → SubmissionsClient: 6종 필터 (useMemo, AND 조건)
+  → TeacherSubmissionsTable: 학생명 → Link('/teacher/submissions/[id]')
+
+/teacher/submissions/[id]
+  → Server: GradingWizardData 조합 (submission·student·class·aiEval·riskFlag·rubricItems·question)
+  → GradingWizard (client): 3단 상태 머신
+      Step 1: 제출물·AI 평가 확인
+      Step 2: 루브릭 점수 조정 + 이유 선택 + 메모
+      Step 3: 최종 점수 확인 + 피드백 작성 → finalizeTeacherEvaluation (Server Action)
+```
+
+### 설계 메모
+
+- 스토어는 모듈 레벨 Map으로 서버 재시작 시 초기화. Phase 9에서 Supabase로 교체 예정.
+- `force-dynamic`: `getStatusOverride` 호출로 인해 SSR 강제. 스토어 갱신이 목록에 즉시 반영됨.
+- `questionsJson` → `Question` 타입 캐스팅: JSON 파일 내 `difficulty`가 `string` 타입으로 추론되어 union 불일치 발생. `as Question` 캐스팅으로 해소.
+- 6종 필터는 모두 클라이언트 사이드 AND 필터 (`useMemo`). 서버 API 호출 없음.
+- 채점 확정 후: 입력 필드 `readOnly`, 버튼 비활성화, "채점 확정 완료" 배지 표시.
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (11개 라우트, `/teacher/submissions` · `/teacher/submissions/[id]` 신규)
+
+### 브라우저 테스트 주소 (npm run dev 후)
+
+- `/teacher/submissions` — 제출 목록 (6종 필터, 채점 대기 배너)
+- `/teacher/submissions/sub-001` — teacher_reviewed 상태 채점 위저드 (기존 초안 존재)
+- `/teacher/submissions/sub-002` — ai_evaluated 상태 채점 위저드 (AI 평가 완료, 미채점)
+- `/teacher/submissions/sub-003` — finalized 상태 채점 위저드 (확정 완료, readonly)
+
+---
+
 ## Phase 3 — 학습자 말하기 평가 플로우 (Speaking Assessment Flow)
 
 **날짜**: 2026-05-04

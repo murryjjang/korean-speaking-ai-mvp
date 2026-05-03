@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   DataTable,
   ScoreBadge,
@@ -15,6 +16,7 @@ export type TeacherSubmissionRow = Record<string, unknown> & {
   studentName: string;
   classId: string;
   className: string;
+  nativeLanguage: string;
   langGroup: string;
   languageGroupRaw: string;
   submittedAt: string;
@@ -35,15 +37,29 @@ const statusConfig: Record<
 };
 
 const columns: Column<TeacherSubmissionRow>[] = [
-  { key: "studentName", label: "학생", sortable: true },
-  { key: "className", label: "반" },
-  { key: "langGroup", label: "어권" },
-  { key: "submittedAt", label: "제출일", sortable: true },
-  { key: "moduleType", label: "유형" },
+  {
+    key: "studentName",
+    label: "학생",
+    sortable: true,
+    className: "whitespace-nowrap",
+    render: (v, row) => (
+      <Link
+        href={`/teacher/submissions/${row.id}`}
+        className="font-medium text-primary-700 hover:underline"
+      >
+        {v as string}
+      </Link>
+    ),
+  },
+  { key: "className", label: "반", className: "whitespace-nowrap" },
+  { key: "langGroup", label: "어권", className: "whitespace-nowrap" },
+  { key: "submittedAt", label: "제출일", sortable: true, className: "whitespace-nowrap" },
+  { key: "moduleType", label: "유형", className: "whitespace-nowrap" },
   {
     key: "aiScore",
     label: "AI 점수",
     sortable: true,
+    className: "whitespace-nowrap",
     render: (v) =>
       v !== null ? (
         <ScoreBadge score={v as number} />
@@ -54,6 +70,7 @@ const columns: Column<TeacherSubmissionRow>[] = [
   {
     key: "status",
     label: "상태",
+    className: "whitespace-nowrap",
     render: (v) => {
       const cfg = statusConfig[v as string] ?? {
         label: String(v),
@@ -65,6 +82,7 @@ const columns: Column<TeacherSubmissionRow>[] = [
   {
     key: "risk",
     label: "위험도",
+    className: "whitespace-nowrap",
     render: (v) => <RiskBadge level={v as RiskLevel} />,
   },
 ];

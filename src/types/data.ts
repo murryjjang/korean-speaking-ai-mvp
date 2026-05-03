@@ -88,6 +88,9 @@ export type TeacherEvaluation = {
   isFinalized: boolean
   finalizedAt?: string
   createdAt: string
+  strengths?: string
+  improvements?: string
+  nextActivity?: string
 }
 
 export type RiskFlag = {
