@@ -13,7 +13,10 @@ import type { RiskLevel } from "@/src/types/data";
 export type TeacherSubmissionRow = Record<string, unknown> & {
   id: string;
   studentName: string;
+  classId: string;
+  className: string;
   langGroup: string;
+  languageGroupRaw: string;
   submittedAt: string;
   moduleType: string;
   aiScore: number | null;
@@ -33,6 +36,7 @@ const statusConfig: Record<
 
 const columns: Column<TeacherSubmissionRow>[] = [
   { key: "studentName", label: "학생", sortable: true },
+  { key: "className", label: "반" },
   { key: "langGroup", label: "어권" },
   { key: "submittedAt", label: "제출일", sortable: true },
   { key: "moduleType", label: "유형" },

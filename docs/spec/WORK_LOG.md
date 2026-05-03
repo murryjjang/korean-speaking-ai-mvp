@@ -4,6 +4,81 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 2 — Mock 대시보드 정교화 (Dashboard Refinement)
+
+**날짜**: 2026-05-03
+**목표**: Phase 1 AppShell·컴포넌트를 기반으로 학습자·교수자·관리자 대시보드를 실제 서비스처럼 정교화. mock 데이터만 사용, 실제 API·DB 연동 없음.
+
+### 생성 파일
+
+**학습자 대시보드 (`app/student/`)**
+- `today-tasks.tsx` — 오늘의 연습 과제 카드 리스트 (questionSet 기반, 완료/미완료 구분)
+- `score-breakdown.tsx` — 루브릭 항목별 점수 시각화 (ScoreBar × 5항목, 피드백 표시)
+- `recommended-activity.tsx` — 다음 추천 활동 placeholder (말하기 평가·미션·TTS 섀도잉)
+
+**교수자 대시보드 (`app/teacher/`)**
+- `dashboard-client.tsx` — `"use client"` 필터 상태 관리 컴포넌트 (classId·어권·유형·상태·위험도 5종 필터)
+- `class-summary-cards.tsx` — 반별 현황 요약 카드 (학생 수·제출 수·평균 점수·채점 대기·주의 학생)
+
+**관리자 대시보드 (`app/admin/`)**
+- `content-sets-table.tsx` — 콘텐츠 세트 현황 테이블 (문항 수·제출 건수·평균 점수)
+- `provider-status-card.tsx` — STT·TTS·발음평가·LLM 제공자 설정 상태 카드 (mock 표시)
+
+### 수정 파일
+
+**타입 (`src/types/`)**
+- `src/types/data.ts` — `RiskFlag`, `ContentSetSummary`, `ProviderStatus` 타입 3개 추가
+
+**Mock 데이터 (`src/lib/mock/`)**
+- `src/lib/mock/data.ts` — 학생 3명 추가(→8명), 제출 10건 추가(→18건), AI 평가 6건 추가(→11건)
+  - `mockRiskFlags` export 추가 (3건 — medium×2, high×1)
+  - `mockContentSets` export 추가 (3건 — 진단·연습·사후평가 세트 현황)
+  - `mockProviderStatus` export 추가 (4건 — STT/TTS/발음/LLM 모두 mock)
+  - `mockData` 오브젝트에 위 3종 추가
+
+**학습자 대시보드 (`app/student/`)**
+- `page.tsx` — 오늘의 과제·루브릭 점수 breakdown·학생 정보(모국어/어권)·추천 활동 섹션 추가
+
+**교수자 대시보드 (`app/teacher/`)**
+- `page.tsx` — 서버에서 전체 데이터 계산 후 `TeacherDashboard` 클라이언트에 전달하는 구조로 재구성
+  - `mockRiskFlags` 반영하여 위험도 계산 (점수 기반 + 플래그 기반 중 높은 것 적용)
+- `submissions-table.tsx` — `classId`, `className`, `languageGroupRaw` 필드 추가, "반" 열 추가
+
+**관리자 대시보드 (`app/admin/`)**
+- `page.tsx` — 콘텐츠 세트 현황 + Provider 설정 상태 섹션 추가
+
+### 필터 구조 (교수자 대시보드)
+
+| 필터 | 키 | 옵션 |
+|------|-----|------|
+| 반 | `classId` | 전체 / class-01 / class-02 |
+| 어권 | `languageGroup` | 전체 / 동아시아 / 동남아시아 / 아랍어권 / 유럽 / 기타 |
+| 유형 | `contentType` | 전체 / 말하기 평가 / 미션 대화 / 말하기 대회 |
+| 상태 | `evaluationStatus` | 전체 / 채점 대기 / AI 평가 완료 / 교수자 검토 / 확정 |
+| 위험도 | `riskLevel` | 전체 / 주의 / 보통 / 정상 |
+
+필터 조합: AND 조건, 클라이언트 사이드 순수 계산 (`useMemo` 활용)
+
+### 설계 메모
+
+- 교수자 페이지: 서버 컴포넌트가 전체 데이터 계산 → `TeacherDashboard` (클라이언트) props로 전달.
+  향후 "AI 평가 보며 최종 채점하는 3단 UI"는 Phase 3에서 별도 라우트(`/teacher/review/[submissionId]`)로 구현 예정.
+- 학습자 오늘의 과제: 해당 학생이 아직 제출하지 않은 questionSet을 "미완료 과제"로 표시.
+- `RiskFlag` 데이터가 있는 학생은 점수 기반 위험도보다 높은 레벨로 표시 (`high` 우선).
+- `ContentSetSummary`는 question-sets.json 기반의 런타임 집계 뷰로, Phase 9에서 Supabase 집계 쿼리로 교체 예정.
+
+### 테스트 결과
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (8개 정적 페이지 생성)
+
+### 브라우저 테스트 주소 (npm run dev 후)
+- `/student` — 학습자 대시보드
+- `/teacher` — 교수자 대시보드 (필터 5종 동작)
+- `/admin` — 관리자 대시보드 (콘텐츠 세트 + Provider 상태)
+
+---
+
 ## Phase 1 — 디자인 시스템 & 공통 레이아웃 (Design System & Layout)
 
 **날짜**: 2026-05-03

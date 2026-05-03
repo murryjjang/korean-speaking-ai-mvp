@@ -10,6 +10,8 @@ import {
   mockStudents,
   mockSubmissions,
   mockAIEvaluations,
+  mockContentSets,
+  mockProviderStatus,
 } from "@/src/lib/mock/data";
 import {
   ClassDataTable,
@@ -17,6 +19,8 @@ import {
   type ClassRow,
   type LanguageRow,
 } from "./data-tables";
+import { ContentSetsTable } from "./content-sets-table";
+import { ProviderStatusCard } from "./provider-status-card";
 
 const languageGroupLabels: Record<string, string> = {
   "east-asian": "동아시아",
@@ -124,7 +128,7 @@ export default function AdminDashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <Card>
           <CardHeader title="반별 현황" description="반 단위 학생 및 제출 통계" />
           <CardBody noPadding>
@@ -138,6 +142,20 @@ export default function AdminDashboardPage() {
             <LangDataTable rows={langRows} />
           </CardBody>
         </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader
+            title="콘텐츠 세트 현황"
+            description="문항 세트별 제출 및 평균 점수"
+          />
+          <CardBody noPadding>
+            <ContentSetsTable rows={mockContentSets} />
+          </CardBody>
+        </Card>
+
+        <ProviderStatusCard providers={mockProviderStatus} />
       </div>
     </div>
   );

@@ -1,20 +1,15 @@
-import {
-  PageHeader,
-  StatCard,
-  Card,
-  CardHeader,
-  CardBody,
-} from "@/src/components/ui";
+import { PageHeader } from "@/src/components/ui";
 import {
   mockSubmissions,
   mockStudents,
   mockAIEvaluations,
+  mockClasses,
+  mockRiskFlags,
 } from "@/src/lib/mock/data";
 import type { RiskLevel } from "@/src/types/data";
-import {
-  TeacherSubmissionsTable,
-  type TeacherSubmissionRow,
-} from "./submissions-table";
+import { TeacherDashboard } from "./dashboard-client";
+import type { TeacherSubmissionRow } from "./submissions-table";
+import type { ClassSummary } from "./class-summary-cards";
 
 function calcRisk(score: number | undefined): RiskLevel {
   if (score === undefined) return "medium";
@@ -32,42 +27,85 @@ const languageGroupLabels: Record<string, string> = {
   other: "기타",
 };
 
+const classNameMap: Record<string, string> = {
+  "class-01": "A반 (중급)",
+  "class-02": "B반 (초급)",
+};
+
 export default function TeacherDashboardPage() {
   const evalMap = new Map(
     mockAIEvaluations.map((e) => [e.submissionId, e.normalizedScore])
   );
   const studentMap = new Map(mockStudents.map((s) => [s.id, s]));
-
-  const pending = mockSubmissions.filter(
-    (s) => s.status === "ai_evaluated"
+  const riskFlagMap = new Map(
+    mockRiskFlags.map((r) => [r.studentId, r.riskLevel])
   );
-  const highRiskCount = mockSubmissions.filter((s) => {
-    const score = evalMap.get(s.id);
-    return calcRisk(score) === "high";
-  }).length;
 
-  const allScores = mockAIEvaluations.map((e) => e.normalizedScore);
-  const avgScore =
-    allScores.length > 0
-      ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
-      : 0;
-
-  const rows: TeacherSubmissionRow[] = mockSubmissions.map((s) => {
+  const allRows: TeacherSubmissionRow[] = mockSubmissions.map((s) => {
     const student = studentMap.get(s.studentId);
-    const score = evalMap.get(s.id) ?? null;
+    const aiScore = evalMap.get(s.id) ?? null;
+    const flaggedRisk = student ? riskFlagMap.get(student.id) : undefined;
+    const scoreRisk = calcRisk(aiScore ?? undefined);
+    const risk: RiskLevel =
+      flaggedRisk === "high" || scoreRisk === "high"
+        ? "high"
+        : flaggedRisk === "medium" || scoreRisk === "medium"
+          ? "medium"
+          : "low";
+
     return {
       id: s.id,
       studentName: student?.name ?? s.studentId,
+      classId: s.classId,
+      className: classNameMap[s.classId] ?? s.classId,
       langGroup: student
         ? (languageGroupLabels[student.languageGroup] ?? student.languageGroup)
         : "—",
+      languageGroupRaw: student?.languageGroup ?? "",
       submittedAt: new Date(s.submittedAt).toLocaleDateString("ko-KR"),
-      moduleType: s.moduleType === "assessment" ? "말하기 평가" : "미션 대화",
-      aiScore: score,
+      moduleType:
+        s.moduleType === "assessment"
+          ? "말하기 평가"
+          : s.moduleType === "mission"
+            ? "미션 대화"
+            : "말하기 대회",
+      aiScore,
       status: s.status,
-      risk: calcRisk(score ?? undefined),
+      risk,
     };
   });
+
+  // 반별 현황 집계
+  const classSummaries: ClassSummary[] = mockClasses.map((cls) => {
+    const classStudents = mockStudents.filter((s) => s.classId === cls.id);
+    const classSubs = allRows.filter((r) => r.classId === cls.id);
+    const classScores = classSubs
+      .map((r) => r.aiScore)
+      .filter((v): v is number => v !== null);
+    const avg =
+      classScores.length > 0
+        ? Math.round(classScores.reduce((a, b) => a + b, 0) / classScores.length)
+        : null;
+    const pendingCount = classSubs.filter(
+      (r) => r.status === "ai_evaluated"
+    ).length;
+    const highRiskCount = classSubs.filter((r) => r.risk === "high").length;
+
+    return {
+      id: cls.id,
+      name: cls.name,
+      studentCount: classStudents.length,
+      submissionCount: classSubs.length,
+      avgScore: avg,
+      pendingCount,
+      highRiskCount,
+    };
+  });
+
+  const classOptions = [
+    { value: "all", label: "전체 반" },
+    ...mockClasses.map((c) => ({ value: c.id, label: c.name })),
+  ];
 
   return (
     <div>
@@ -75,39 +113,11 @@ export default function TeacherDashboardPage() {
         title="채점 관리"
         description="학생 제출 현황을 확인하고 AI 평가를 검토하세요."
       />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="채점 대기"
-          value={pending.length}
-          description="AI 평가 완료, 검토 필요"
-        />
-        <StatCard
-          label="전체 학생"
-          value={mockStudents.length}
-          description="등록된 학습자"
-        />
-        <StatCard
-          label="평균 AI 점수"
-          value={avgScore > 0 ? avgScore : "—"}
-          description="전체 제출 기준"
-        />
-        <StatCard
-          label="주의 학생"
-          value={highRiskCount}
-          description="점수 60점 미만"
-        />
-      </div>
-
-      <Card>
-        <CardHeader
-          title="전체 제출 목록"
-          description="학생별 제출 내역 및 평가 현황"
-        />
-        <CardBody noPadding>
-          <TeacherSubmissionsTable rows={rows} />
-        </CardBody>
-      </Card>
+      <TeacherDashboard
+        allRows={allRows}
+        classSummaries={classSummaries}
+        classOptions={classOptions}
+      />
     </div>
   );
 }

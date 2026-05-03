@@ -89,3 +89,31 @@ export type TeacherEvaluation = {
   finalizedAt?: string
   createdAt: string
 }
+
+export type RiskFlag = {
+  id: string
+  studentId: string
+  classId: string
+  riskLevel: RiskLevel
+  reasons: string[]
+  detectedAt: string
+  isResolved: boolean
+}
+
+export type ContentSetSummary = {
+  id: string
+  name: string
+  purpose: 'diagnostic' | 'practice' | 'post'
+  questionCount: number
+  submissionCount: number
+  avgScore: number | null
+  isActive: boolean
+}
+
+export type ProviderStatus = {
+  type: 'stt' | 'tts' | 'pronunciation' | 'llm-eval'
+  name: string
+  isConfigured: boolean
+  isMock: boolean
+  note: string
+}
