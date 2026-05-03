@@ -4,6 +4,78 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 3 — 학습자 말하기 평가 플로우 (Speaking Assessment Flow)
+
+**날짜**: 2026-05-04
+**목표**: 학습자가 평가 세트/문항을 선택하고, 준비 단계를 거쳐 mock 녹음 제출, AI 평가 결과까지 확인하는 전체 플로우 구현. mock provider + 모듈 레벨 메모리 스토어만 사용. 실제 녹음·STT·DB 연동 없음.
+
+### 생성 파일
+
+**Mock 스토어 (`src/lib/mock/`)**
+- `src/lib/mock/speaking-store.ts` — Phase 3 제출·평가 결과 메모리 스토어 (Map 기반, 서버 재시작 시 초기화. Phase 9에서 Supabase로 교체 예정)
+
+**Server Action (`app/student/speaking/`)**
+- `app/student/speaking/actions.ts` — `submitSpeaking(questionId, questionSetId)`: mock STT·발음평가·LLM 평가를 병렬 호출하고 결과를 스토어에 저장 후 submissionId 반환
+
+**말하기 평가 세트/문항 선택 (`app/student/speaking/`)**
+- `app/student/speaking/page.tsx` — Server Component: 활성 평가 세트와 문항을 question-sets.json/questions.json에서 로드하여 정적 렌더링. 각 문항에 `/student/speaking/[questionId]?setId=...` 링크 제공
+
+**문항 상세 + 녹음 UI (`app/student/speaking/[questionId]/`)**
+- `app/student/speaking/[questionId]/page.tsx` — Server Component: params/searchParams await(Next.js 16 방식), 문항 정보 로드 후 SpeakingClient에 데이터 props로 전달. setId 없으면 첫 번째 포함 세트 사용.
+- `app/student/speaking/[questionId]/speaking-client.tsx` — Client Component: 4단계 상태 머신(prep→recording→review→submitting). 준비 타이머(카운트다운), mock 녹음 UI(경과 시간 표시·자동 종료), 제출 버튼(Server Action 직접 import·useRouter 리다이렉트). effect body 직접 setState 없이 setTimeout 콜백 내에서만 phase 전환.
+
+**평가 결과 화면 (`app/student/speaking/[questionId]/result/`)**
+- `app/student/speaking/[questionId]/result/page.tsx` — Server Component: submissionId로 스토어 조회. 스토어 미스(서버 재시작)시 안내 메시지 표시. 총점·루브릭별 ScoreBar·AI 피드백(강점/보완점/오류 유형)·STT 전사문·발음 단어별 점수·다음 추천 활동 placeholder 렌더링.
+
+### 수정 파일
+
+**학습자 레이아웃 (`app/student/`)**
+- `app/student/layout.tsx` — "말하기 평가" nav item href `/student/assessment` → `/student/speaking`, `disabled` 제거
+- `app/student/today-tasks.tsx` — "시작하기" Button → Link(`/student/speaking`)로 교체
+
+### 라우팅 구조
+
+| 경로 | 렌더링 | 설명 |
+|------|--------|------|
+| `/student/speaking` | Static | 평가 세트·문항 목록 |
+| `/student/speaking/[questionId]` | Dynamic | 문항 상세·녹음 UI |
+| `/student/speaking/[questionId]/result` | Dynamic | 평가 결과 (STT·AI·발음) |
+
+### 데이터 플로우
+
+```
+학습자 선택 → /student/speaking/[questionId]?setId=...
+  → SpeakingClient: 준비 타이머 → 녹음 UI → 제출
+  → Server Action: submitSpeaking(questionId, questionSetId)
+      → mock STT / mock 발음평가 / mock LLM 평가 병렬 실행
+      → SpeakingEvalRecord를 evalStore(Map)에 저장
+      → return { submissionId }
+  → router.push('/student/speaking/[questionId]/result?sub=[submissionId]')
+  → Result Page: getSpeakingEval(submissionId) → 결과 렌더링
+```
+
+### 설계 메모
+
+- SpeakingEvalRecord는 Submission + AIEvaluation 데이터를 통합. Phase 5 교수자 채점 UI에서 연결 가능하도록 questionId·questionSetId·submittedAt 포함.
+- Server Component → Client Component 간 함수 직접 props 전달 없음. Server Action은 별도 `actions.ts`('use server' 파일)에서 client에 직접 import.
+- nativeLanguage·languageGroup·uiSupportLanguage 필드는 Student 타입에 유지되나, 이번 Phase에서는 다국어 UI 미구현.
+- 스토어는 모듈 레벨 Map. 서버 재시작 시 초기화되며, 결과 페이지에서 미스 처리(graceful error)로 안내.
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (9개 페이지 생성, 3개 신규 라우트 포함)
+
+### 브라우저 테스트 주소 (npm run dev 후)
+
+- `/student/speaking` — 평가 세트·문항 선택
+- `/student/speaking/q-001?setId=qs-diagnostic-01` — 자기소개(기본) 녹음 화면
+- `/student/speaking/q-005?setId=qs-practice-01` — 상황 대응 녹음 화면
+- `/student/speaking/q-001/result?sub=[submissionId]` — 평가 결과 (제출 후 자동 리다이렉트)
+
+---
+
 ## Phase 2 — Mock 대시보드 정교화 (Dashboard Refinement)
 
 **날짜**: 2026-05-03

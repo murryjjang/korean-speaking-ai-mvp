@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardHeader, CardBody, Badge, Button } from "@/src/components/ui";
 
 export type TodayTask = {
@@ -53,13 +54,18 @@ export function TodayTasks({ tasks }: { tasks: TodayTask[] }) {
                   </p>
                 </div>
               </div>
-              <Button
-                variant={task.isAvailable ? "primary" : "ghost"}
-                size="sm"
-                disabled={!task.isAvailable}
-              >
-                {task.isAvailable ? "시작하기" : "준비 중"}
-              </Button>
+              {task.isAvailable ? (
+                <Link
+                  href="/student/speaking"
+                  className="inline-flex items-center justify-center gap-2 font-medium transition-colors px-3 py-1.5 text-xs rounded bg-primary-700 text-white hover:bg-primary-800 border border-primary-700"
+                >
+                  시작하기
+                </Link>
+              ) : (
+                <Button variant="ghost" size="sm" disabled>
+                  준비 중
+                </Button>
+              )}
             </li>
           ))}
         </ul>
