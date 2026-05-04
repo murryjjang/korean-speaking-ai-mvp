@@ -6,9 +6,15 @@ import { getPronunciationProvider } from '@/src/providers/pronunciation'
 import { saveSpeakingEval } from '@/src/lib/mock/speaking-store'
 import { getEvaluationRepository } from '@/src/lib/repositories'
 
+export interface SpeakingSubmitMeta {
+  hasRecording?: boolean
+  recordingDurationSec?: number
+}
+
 export async function submitSpeaking(
   questionId: string,
   questionSetId: string,
+  meta?: SpeakingSubmitMeta,
 ): Promise<{ submissionId: string }> {
   const sttProvider = getSTTProvider()
   const llmProvider = getLLMEvalProvider()
@@ -33,6 +39,11 @@ export async function submitSpeaking(
     sttResult,
     llmEvalResult,
     pronunciationResult,
+    meta: {
+      hasRecording: meta?.hasRecording ?? false,
+      recordingDurationSec: meta?.recordingDurationSec ?? 0,
+      audioUrl: null,
+    },
   }
 
   // Always save to mock store — result page reads from here regardless of provider.

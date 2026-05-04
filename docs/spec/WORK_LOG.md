@@ -4,6 +4,120 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 7-B-main — 브라우저 마이크 녹음 최소 구현
+
+**날짜**: 2026-05-05  
+**목표**: 브라우저 MediaRecorder API를 사용해 학습자 말하기 평가 화면에 실제 녹음 기능을 최소 구현한다. 녹음 파일은 브라우저 메모리 Blob URL로만 관리하며 서버 업로드 없음. 기존 mock 제출 흐름 완전 유지.
+
+### 생성 파일
+
+- `src/hooks/use-audio-recorder.ts` — `useAudioRecorder` 커스텀 훅.
+  - `RecorderState`: `'idle' | 'requesting' | 'recording' | 'stopped' | 'error'`
+  - `RecorderErrorType`: `'not-supported' | 'permission-denied' | 'permission-dismissed' | 'unknown'`
+  - `startRecording()`: `navigator.mediaDevices.getUserMedia` 호출 → MediaRecorder 시작. MIME 우선순위: `audio/webm;codecs=opus` → `audio/webm` → `audio/mp4` → 기본값 (Safari 대응)
+  - `stopRecording()`: MediaRecorder 정지 → `onstop` 콜백에서 Blob 조합 → `URL.createObjectURL()` → `blobUrl` 상태 갱신
+  - `reset()`: 진행 중 녹음 중지 + 스트림 트랙 release + `URL.revokeObjectURL()` (메모리 누수 방지)
+  - `durationSec`: 1초 interval 카운터
+  - unmount 시 자동 cleanup (clearInterval + stopStream + revokeObjectURL)
+
+### 수정 파일
+
+- `app/student/speaking/[questionId]/speaking-client.tsx` — 녹음 UI 전면 연결.
+  - `useAudioRecorder` 훅 import 및 사용
+  - `recording` phase 진입 시 `setTimeout(() => recorder.startRecording(), 0)` 로 MediaRecorder 시작 (effect 내 직접 setState 규칙 준수)
+  - recorder.state `'stopped'` / `'error'` 감지 시 `setTimeout(() => setPhase('review'), 0)` 전환
+  - `responseTimeSec` 도달 시 `recorder.stopRecording()` 자동 호출
+  - `recording` phase 화면: `requesting` → 권한 요청 중 메시지 | `recording` → 녹음 중 타이머 + 완료 버튼 | `error` → 오류 메시지 + mock fallback 안내
+  - `review` phase 화면: blobUrl 있으면 `<audio controls>` 재생기 표시 + 녹음 길이 표시
+  - `review` phase: recorder.state `'error'`면 warning 배너 표시 (mock 제출 가능 안내)
+  - 다시 녹음: `recorder.reset()` 호출 → 기존 Blob URL revoke 후 `recording` phase 재진입
+  - 마이크 오류 메시지: `RECORDER_ERROR_MESSAGES` 맵으로 한국어 안내문 표시
+  - 버튼 모두 min-h-[44px] (Button 컴포넌트 기본 적용)
+
+- `app/student/speaking/actions.ts` — metadata 파라미터 추가.
+  - `SpeakingSubmitMeta` 인터페이스 export (`hasRecording?`, `recordingDurationSec?`)
+  - `submitSpeaking(questionId, questionSetId, meta?)` — 3번째 파라미터 optional 추가
+  - `record.meta` 에 `{ hasRecording, recordingDurationSec, audioUrl: null }` 포함
+  - 기존 mock 제출 흐름 완전 유지. Supabase 저장 경로 변경 없음.
+
+- `docs/spec/WORK_LOG.md` — Phase 7-B-main 항목 추가 (이 문서)
+
+### 녹음 UI 플로우
+
+```
+[prep phase]
+  준비 시작 버튼 클릭 → 카운트다운 → 자동으로 recording phase
+  또는 "준비 완료 — 바로 시작" 클릭 → recording phase
+
+[recording phase]
+  마운트 시 recorder.startRecording() 호출
+    → requesting: 권한 요청 중 메시지 표시
+    → recording: 타이머 + "녹음 완료" 버튼
+      ├─ "녹음 완료" 버튼 클릭 → recorder.stopRecording() → review phase
+      └─ responseTimeSec 경과 → auto recorder.stopRecording() → review phase
+    → error: 오류 메시지 표시 → review phase (mock fallback)
+
+[review phase]
+  blobUrl 있으면 <audio controls> 재생기 표시
+  error 상태면 warning 배너 + mock 제출 가능 안내
+  "다시 녹음" → recorder.reset() + recording phase 재진입 (기존 blobUrl revoke)
+  "제출하기" → submitSpeaking(questionId, questionSetId, { hasRecording, recordingDurationSec })
+                → result page 리다이렉트
+```
+
+### submitSpeaking 파라미터 변경
+
+| 파라미터 | 타입 | 비고 |
+|---|---|---|
+| `questionId` | string | 기존과 동일 |
+| `questionSetId` | string | 기존과 동일 |
+| `meta?` | `SpeakingSubmitMeta` | **신규 optional** — hasRecording, recordingDurationSec |
+
+- `meta`는 optional이므로 기존 호출처 영향 없음
+- Supabase 저장 로직 변경 없음 (meta는 in-memory record에만 포함)
+- audio_url은 여전히 null
+
+### 기존 제출 흐름 영향
+
+- `submitSpeaking` Server Action 시그니처: optional 파라미터 추가만 — 기존 호출은 모두 정상 동작
+- mock store (`saveSpeakingEval`) 및 Supabase 저장 경로 변경 없음
+- result page 읽기 경로 변경 없음
+- 경로 `/student/speaking`, `/student/speaking/q-001`, `/student/speaking/q-001/result` 모두 유지
+
+### 모바일 확인 방법
+
+1. `npm run dev` 실행 후 개발 서버 URL 확인
+2. 같은 네트워크의 모바일 기기에서 `http://<개발 PC IP>:3000/student/speaking/q-001?setId=qs-diagnostic-01` 접속
+3. "준비 시작" → 카운트다운 → recording phase 진입 시 마이크 권한 팝업 확인
+4. Android Chrome: MediaRecorder 정상 동작 확인
+5. iOS Safari: MediaRecorder 지원 제한으로 오류 메시지 → mock fallback 동작 확인 (Known Issue)
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (14개 라우트, 기존과 동일)
+
+### Known Issues (Phase 7-B-main 기준)
+
+| 이슈 | 영향 | 해소 예정 |
+|---|---|---|
+| **iOS Safari MediaRecorder 지원 제한** — iOS 14.3 이하에서 MediaRecorder 미지원, 일부 iOS 버전에서 `audio/webm` 미지원 | 중 | Phase 8-A 또는 iOS 전용 대안 검토 |
+| **녹음 파일 서버 미업로드** — blobUrl은 브라우저 메모리에만 존재, 페이지 이탈 시 소멸 | 중 | Phase 8-B (Supabase Storage 연동) |
+| **audio_url null** — Supabase `speaking_submissions.audio_url` 저장 안 됨 | 중 | Phase 8-B |
+| **STT 미연동** — 실제 녹음 파일을 STT에 전달하지 않고 mock transcript 사용 | 중 | Phase 8-A |
+| 기존 Phase 7-A-lite, 6-B5 known issues 모두 유지 | — | 해당 Phase 참고 |
+
+### 다음 단계 제안 (Phase 8-A)
+
+| 항목 | 내용 |
+|---|---|
+| **Phase 8-A** | ETRI 또는 Whisper STT 실제 API 최소 연동 — 녹음 Blob을 FormData로 서버 Route Handler에 전달 → STT 결과 반환. mock transcript 대체. |
+| **Phase 8-B** | Supabase Storage 업로드 — 녹음 Blob을 presigned URL 또는 anon upload로 Storage에 저장, `audio_url` DB 업데이트 |
+| **Phase 8-C** | iOS Safari 대응 — MediaRecorder 미지원 환경 감지 후 대안 안내 (녹음 없이 텍스트 입력 또는 외부 도구 안내) |
+
+---
+
 ## Phase 7-A-lite — 학습자 화면 모바일 반응형 보완 (레이아웃 & 터치 타깃)
 
 **날짜**: 2026-05-04  
