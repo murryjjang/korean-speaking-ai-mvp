@@ -4,6 +4,63 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 6-B1 — Supabase 클라이언트 초기화 및 Provider 선택 구조
+
+**날짜**: 2026-05-04  
+**목표**: `@supabase/supabase-js` 설치, Supabase 클라이언트 안전 초기화, `REPOSITORY_PROVIDER` 분기 구조 완성. 실제 DB 호출 없음. mock fallback 완전 유지.
+
+### 생성 파일
+
+- `src/lib/supabase/client.ts` — Supabase 클라이언트 싱글턴. `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` 미설정 시 `null` 반환. 앱 즉시 종료 없음.
+- `.env.local.example` — 환경변수 키 이름만 기재. 값 없음. `.env.local` 설정 가이드용.
+
+### 수정 파일
+
+- `src/lib/repositories/index.ts` — `getSupabaseClient()` import 추가. `resolvedProvider()` 함수로 `REPOSITORY_PROVIDER` 환경변수 + Supabase 클라이언트 가용성 동시 판별. Phase 6-B2~4 구현 전까지 `'supabase'` 선택 시 console.warn 후 mock fallback. 기존 6개 factory 함수 시그니처·반환 타입 변경 없음.
+- `package.json` — `@supabase/supabase-js: ^2.105.1` dependencies 추가 (npm install 자동 기재).
+
+### Provider 분기 동작 요약
+
+| REPOSITORY_PROVIDER | Supabase env 설정 | 동작 |
+|---|---|---|
+| `mock` (기본값) | 무관 | Mock 구현체 반환 (기존 동작 그대로) |
+| `supabase` | 미설정 | console.warn 후 Mock fallback |
+| `supabase` | 설정됨 | console.warn(미구현) 후 Mock fallback (Phase 6-B2+ 전까지) |
+
+### 환경변수 정리 (.env.local.example 기준)
+
+```
+NEXT_PUBLIC_SUPABASE_URL=       # Supabase 프로젝트 URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=  # Supabase anon (public) key
+REPOSITORY_PROVIDER=mock        # mock | supabase (기본값: mock)
+STT_PROVIDER=mock
+TTS_PROVIDER=mock
+PRONUNCIATION_PROVIDER=mock
+LLM_EVAL_PROVIDER=mock
+```
+
+### 설계 원칙
+
+- `REPOSITORY_PROVIDER` 기본값 없음 → 환경변수 미설정 시 `process.env.REPOSITORY_PROVIDER !== 'supabase'` 조건으로 mock 선택됨
+- `getSupabaseClient()` 는 모듈 레벨 싱글턴. 같은 process 내에서 최초 1회만 생성. 개발 서버 재시작 시 초기화.
+- `warnNotImplemented()` 는 repository 이름별로 최초 1회만 경고 출력 (`Set<string>` 기반 dedup)
+- 기존 Server Action, Server Component, Client Component 전부 수정 없음
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (14개 라우트, 기존과 동일)
+
+### 다음 단계 (Phase 6-B2)
+
+1. Supabase Dashboard에서 `docs/spec/SUPABASE_SCHEMA.sql` 실행
+2. 임시 RLS 정책 적용 (speaking_submissions, ai_evaluations)
+3. `src/lib/repositories/supabase-submission-repository.ts` 구현
+4. `src/lib/repositories/index.ts` — `getSubmissionRepository()` / `getEvaluationRepository()` Supabase 분기 활성화
+
+---
+
 ## Phase 6-A — Supabase 저장소 추상화 (Database Schema & Repository Abstraction)
 
 **날짜**: 2026-05-04  
