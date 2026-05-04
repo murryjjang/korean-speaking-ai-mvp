@@ -23,6 +23,7 @@ import {
   SupabaseSubmissionRepository,
   SupabaseEvaluationRepository,
 } from './supabase-submission-repository'
+import { SupabaseTeacherReviewRepository } from './supabase-teacher-review-repository'
 import { getSupabaseClient } from '@/src/lib/supabase/client'
 import type {
   SubmissionRepository,
@@ -74,8 +75,9 @@ export function getEvaluationRepository(): EvaluationRepository {
 }
 
 export function getTeacherReviewRepository(): TeacherReviewRepository {
-  // Phase 6-B3: replace with SupabaseTeacherReviewRepository when available
-  if (resolvedProvider() === 'supabase') warnNotImplemented('TeacherReviewRepository')
+  if (resolvedProvider() === 'supabase') {
+    return new SupabaseTeacherReviewRepository(getSupabaseClient()!)
+  }
   return new MockTeacherReviewRepository()
 }
 

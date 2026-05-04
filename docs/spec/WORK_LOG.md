@@ -4,6 +4,92 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 6-B3 — 교수자 채점 Supabase 저장 연동
+
+**날짜**: 2026-05-04  
+**목표**: 교수자가 채점 상세 화면에서 루브릭 점수·피드백을 확정했을 때 Supabase `teacher_reviews` 테이블에 저장. REPOSITORY_PROVIDER=mock 기존 동작 완전 유지.
+
+### 생성 파일
+
+- `src/lib/repositories/supabase-teacher-review-repository.ts` — `SupabaseTeacherReviewRepository` 구현체. `saveDraft` / `finalizeReview` → `teacher_reviews` INSERT or UPDATE. 실패 시 throw (caller가 catch). 모든 에러는 secrets 없이 로그.
+
+### 수정 파일
+
+- `src/lib/repositories/index.ts` — `getTeacherReviewRepository()` 에서 REPOSITORY_PROVIDER=supabase일 때 `SupabaseTeacherReviewRepository` 반환. `SupabaseTeacherReviewRepository` import 추가. `warnNotImplemented('TeacherReviewRepository')` 제거.
+- `app/teacher/submissions/[id]/actions.ts` — `saveTeacherDraft` / `finalizeTeacherEvaluation` 모두: mock store 항상 먼저 기록 + REPOSITORY_PROVIDER=supabase일 때 `getTeacherReviewRepository()` 로 Supabase 저장 시도. 성공 시 `[supabase] teacher_review saved: <uuid>`, 실패 시 `[supabase] teacher_review save failed` 출력. .env.local 값 절대 미출력.
+- `docs/spec/WORK_LOG.md` — Phase 6-B3 항목 추가.
+
+### teacher_reviews 저장 흐름 요약
+
+```
+finalizeTeacherEvaluation(submissionId, aiEvaluationId, draft)   ← Server Action (grading-wizard.tsx)
+  │
+  ├─ [항상] storeFinalize(...)         → mock store (page read path 의존)
+  │
+  └─ [REPOSITORY_PROVIDER=supabase일 때만]
+       getTeacherReviewRepository()     → SupabaseTeacherReviewRepository
+         └─ finalizeReview(...)
+              ├─ _reviewIdCache.get(submissionId)
+              │   ├─ hit  → UPDATE teacher_reviews SET ... WHERE id = <cached>
+              │   └─ miss → INSERT teacher_reviews (submission_id: randomUUID(), ...)
+              │              _reviewIdCache.set(submissionId, row.id)
+              └─ return TeacherEvaluation
+```
+
+### Upsert 전략 (unique constraint 없는 테이블)
+
+`teacher_reviews`에 (submission_id, teacher_id) unique constraint가 없으므로 DB 레벨 upsert 불가.  
+대신 module-level `_reviewIdCache: Map<mockSubmissionId, dbReviewId>` 로 서버 프로세스 내 row UUID를 캐시:
+- 최초 write → INSERT → row.id 캐시
+- 이후 write → UPDATE WHERE id = cached
+
+캐시는 서버 재시작 시 초기화됨 → 재시작 후 같은 제출에 대한 새 INSERT 발생. 파일럿 단계에서 허용.
+
+### submission_id 처리
+
+`teacher_reviews.submission_id`는 `uuid NOT NULL`이지만 **FK constraint 없음**.  
+Mock submission ID(sub-001 등)는 UUID가 아니므로, INSERT 시 `randomUUID()`로 생성한 placeholder UUID를 사용.  
+이 UUID는 `speaking_submissions` 테이블과 연결되지 않음 — 파일럿 Known Issue.
+
+### REPOSITORY_PROVIDER=mock일 때 영향
+
+**영향 없음.** Supabase 저장 블록은 `process.env.REPOSITORY_PROVIDER === 'supabase'` 조건으로 완전 분기. mock 모드에서는 `storeSaveDraft` / `storeFinalize` 직접 호출만 실행.
+
+### REPOSITORY_PROVIDER=supabase 전환 후 테스트 방법
+
+1. `.env.local`에서 `REPOSITORY_PROVIDER=supabase` 확인 (SUPABASE URL/KEY 설정 완료 전제)
+2. `npm run dev` 실행
+3. `/teacher/submissions/sub-002` 접속 → 루브릭 점수 조정 → "최종 확정 ✓" 버튼 클릭
+4. 서버 콘솔에서 확인:
+   ```
+   [supabase] teacher_review saved: <uuid>
+   ```
+5. Supabase Dashboard → Table Editor → `teacher_reviews` 에서 새 row 확인:
+   - `is_finalized: true`, `finalized_at` 기록됨
+   - `scores` JSONB에 루브릭별 점수 확인
+6. sub-001 (이미 teacher_reviewed 상태)에서도 확정 가능 — 두 번째 클릭 시 UPDATE 확인
+7. sub-003 (finalized) → 위저드가 readonly — 저장 시도 없음
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (14개 라우트, 기존과 동일)
+
+### Known Issues
+
+1. **submission_id UUID ↔ mock ID 불일치**: `teacher_reviews.submission_id`는 placeholder UUID. `speaking_submissions` 테이블과 연결되지 않음. Phase 7(Auth + 실제 제출 흐름 통합) 후 교체 필요.
+2. **ai_evaluation_id null**: Mock AI eval ID가 Supabase ai_evaluations에 없으므로 null 저장. Phase 6-B2로 생성된 실제 AI eval UUID를 연결하려면 별도 매핑 구조 필요.
+3. **캐시 휘발성**: 서버 재시작 시 `_reviewIdCache` 초기화 → 같은 mock submission에 대한 새 INSERT. 구DB row는 잔류. 파일럿 수용 범위.
+4. **saveTeacherDraft UI 미연결**: actions.ts에 구현됐으나 현재 grading-wizard.tsx가 호출하지 않음 (초안 저장 버튼 없음). finalizeTeacherEvaluation만 실제 동작.
+
+### 다음 단계 제안 (Phase 6-B4)
+
+1. `mission_submissions` / `MissionRepository` Supabase 구현 (`SupabaseMissionRepository`)
+2. Teacher 제출 목록을 Supabase에서 읽어오는 read 경로 구현 (현재는 mock data.ts 직독)
+
+---
+
 ## Phase 6-B2 — 말하기 평가 Supabase 저장 연동
 
 **날짜**: 2026-05-04  
