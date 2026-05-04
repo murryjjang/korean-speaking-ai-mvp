@@ -164,14 +164,13 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
     setSubmitError(false)
     setPhase('submitting')
     try {
-      await submitMission(sessionId)
-      // 결과 화면은 Phase 4-C 구현 예정이므로 목록으로 이동
-      router.push('/student/mission')
+      const { submissionId } = await submitMission(sessionId)
+      router.push(`/student/mission/${scenario.scenarioId}/result?sub=${submissionId}`)
     } catch {
       setSubmitError(true)
       setPhase('complete')
     }
-  }, [sessionId, router])
+  }, [sessionId, router, scenario.scenarioId])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -408,12 +407,8 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
                   <p className="text-sm font-medium text-text-primary mb-1">
                     대화가 종료되었습니다.
                   </p>
-                  <p className="text-xs text-text-muted mb-1">
-                    제출하면 mock AI 평가가 완료됩니다.
-                  </p>
                   <p className="text-xs text-text-muted mb-4">
-                    [known issue] 결과 화면(/student/mission/[id]/result)은 Phase 4-C에서 구현
-                    예정입니다. 제출 후 미션 목록으로 이동합니다.
+                    제출하면 mock AI 평가 결과를 확인할 수 있습니다.
                   </p>
                   {submitError && (
                     <p className="text-xs text-red-500 mb-3">
