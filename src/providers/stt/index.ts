@@ -21,21 +21,49 @@ class MockSTTProvider implements STTProvider {
   }
 }
 
-// Placeholder for OpenAI Whisper — requires OPENAI_API_KEY.
-// Throws so the /api/stt route falls back to mock.
-// Phase 8-B: implement actual Whisper API call here.
+// OpenAI Whisper STT — requires OPENAI_API_KEY.
+// Throws on missing key or API failure so /api/stt falls back to mock.
 class WhisperSTTProvider implements STTProvider {
-  async transcribe(_: Blob): Promise<STTResult> {
-    if (!process.env.OPENAI_API_KEY) {
+  async transcribe(blob: Blob): Promise<STTResult> {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
       throw new Error('WhisperSTTProvider: OPENAI_API_KEY not set')
     }
-    throw new Error('WhisperSTTProvider: not yet implemented (Phase 8-B)')
+
+    const startMs = Date.now()
+
+    // Dynamic import keeps openai out of the client bundle
+    const { default: OpenAI, toFile } = await import('openai')
+    const client = new OpenAI({ apiKey })
+
+    const arrayBuffer = await blob.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    const audioFile = await toFile(buffer, 'audio.webm', {
+      type: blob.type || 'audio/webm',
+    })
+
+    const response = await client.audio.transcriptions.create({
+      file: audioFile,
+      model: 'whisper-1',
+      language: 'ko',
+    })
+
+    const latencyMs = Date.now() - startMs
+
+    return {
+      transcript: response.text,
+      confidence: 1.0,
+      providerName: 'whisper',
+      providerVersion: 'whisper-1',
+      latencyMs,
+    }
   }
 }
 
 export function getSTTProvider(): STTProvider {
   const providerName = process.env.STT_PROVIDER ?? 'mock'
   switch (providerName) {
+    case 'openai':
     case 'whisper':
       return new WhisperSTTProvider()
     case 'mock':

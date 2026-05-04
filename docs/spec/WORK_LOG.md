@@ -4,6 +4,125 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 8-B — OpenAI Whisper STT 실제 API provider 최소 연동
+
+**날짜**: 2026-05-05  
+**목표**: `STT_PROVIDER=openai` 또는 `whisper` 환경에서 OpenAI Whisper API(`whisper-1`)를 실제로 호출한다. API key 미설정 또는 호출 실패 시 기존 mock fallback 흐름을 그대로 유지한다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/providers/stt/index.ts` | `WhisperSTTProvider.transcribe()` 실제 구현 (OpenAI SDK 동적 import) |
+| `.env.local.example` | `OPENAI_API_KEY=` 및 `STT_PROVIDER` 설명 추가 |
+| `package.json` / `package-lock.json` | `openai ^6.36.0` 의존성 추가 |
+| `docs/spec/WORK_LOG.md` | Phase 8-B 항목 추가 (이 문서) |
+
+### OpenAI STT provider 구조
+
+```
+STT_PROVIDER=openai 또는 whisper
+  └─ WhisperSTTProvider.transcribe(blob)
+       1. OPENAI_API_KEY 없으면 throw → /api/stt 에서 mock fallback
+       2. openai 패키지 동적 import (서버 전용 유지, 클라이언트 번들 제외)
+       3. Blob → Buffer → toFile() 변환
+       4. client.audio.transcriptions.create({ model: 'whisper-1', language: 'ko' })
+       5. 성공 → STTResult { transcript, confidence: 1.0, providerName: 'whisper', ... }
+       6. 예외 throw → /api/stt 에서 mock fallback
+
+STT_PROVIDER=mock (기본값)
+  └─ MockSTTProvider (기존과 완전 동일)
+```
+
+### /api/stt fallback 흐름 (기존, 변경 없음)
+
+```
+provider.transcribe() 성공
+  → Response.json({ transcript, providerName: 'whisper', source: 'stt' })
+
+provider.transcribe() throw
+  → console.error('[provider_events] stt.error', err)
+  → Response.json({ transcript: MOCK_TRANSCRIPT, providerName: 'mock', source: 'mock-fallback' })
+```
+
+### 환경변수 설정 방법
+
+`.env.local`:
+```
+STT_PROVIDER=openai   # 또는 whisper (동일)
+OPENAI_API_KEY=sk-...  # 서버 전용 — NEXT_PUBLIC_ 접두사 절대 사용 금지
+```
+
+mock 유지 시:
+```
+STT_PROVIDER=mock     # 기본값 — OPENAI_API_KEY 불필요
+```
+
+### mock fallback 조건
+
+| 조건 | 결과 |
+|---|---|
+| `STT_PROVIDER=mock` (기본값) | MockSTTProvider 직접 사용 — OpenAI 호출 없음 |
+| `STT_PROVIDER=openai\|whisper` + `OPENAI_API_KEY` 미설정 | throw → `/api/stt` mock fallback |
+| `STT_PROVIDER=openai\|whisper` + API 호출 실패 (네트워크, 인증 등) | throw → `/api/stt` mock fallback |
+| 클라이언트 fetch `/api/stt` 실패 | speaking-client.tsx 비차단 처리 → `submitSpeaking` mock STT 사용 |
+
+### provider_events 기록
+
+- 성공: `console.info('[provider_events] stt.success provider=%s latency=%dms', ...)` (기존 route.ts, 변경 없음)
+- 실패: `console.error('[provider_events] stt.error', err)` (기존 route.ts, 변경 없음)
+- 실제 DB 기록은 Phase 8-C 이후 예정
+
+### 테스트 방법
+
+**mock 동작 확인 (API key 불필요):**
+1. `.env.local`: `STT_PROVIDER=mock` (기본값)
+2. `npm run dev` → `/student/speaking/q-001?setId=qs-diagnostic-01`
+3. 녹음 → 제출 → 결과 페이지 정상 도달 확인
+
+**Whisper 연동 확인 (API key 필요):**
+1. `.env.local`: `STT_PROVIDER=openai`, `OPENAI_API_KEY=sk-...`
+2. `npm run dev` → `/student/speaking/q-001?setId=qs-diagnostic-01`
+3. 녹음 후 제출 시 서버 콘솔에서 확인:
+   - 성공: `[provider_events] stt.success provider=whisper latency=Xms`
+   - 실패: `[provider_events] stt.error ...` + mock fallback으로 제출 정상 완료
+
+**fallback 확인:**
+1. `.env.local`: `STT_PROVIDER=whisper`, `OPENAI_API_KEY` 없음 (또는 잘못된 값)
+2. 제출 시 서버 콘솔에 `stt.error` 기록 확인
+3. 결과 페이지는 정상 도달 (mock transcript 사용)
+
+### Supabase 저장 흐름 영향
+
+없음. `submitSpeaking` Server Action은 `/api/stt` 응답의 `sttTranscript`를 그대로 전달받으며, Supabase 저장 경로(`REPOSITORY_PROVIDER=supabase`)는 기존과 동일.
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (15개 라우트, 기존과 동일)
+
+### Known Issues (Phase 8-B 기준)
+
+| 이슈 | 영향 | 해소 예정 |
+|---|---|---|
+| **word timings 미제공** — Whisper `whisper-1` 응답에서 word timestamps를 요청하지 않음 (단순 text만 수신) | 소 | 필요 시 `verbose_json` + `timestamp_granularities: ['word']` 추가 |
+| **confidence 고정값** — Whisper는 confidence를 반환하지 않아 `1.0` 고정 | 소 | 설계 수용 (Whisper API 제약) |
+| **audio_url null 유지** — Supabase Storage 미구현으로 audio_url은 여전히 null | 중 | Phase 8-C (Supabase Storage) |
+| **iOS Safari 대응 미완** — MediaRecorder 지원 제한으로 webm Blob이 생성 안 될 수 있음 | 중 | Phase 8-C (iOS 대응) |
+| 기존 Phase 8-A, 7-C-lite, 7-B-main known issues 모두 유지 | — | 해당 Phase 참고 |
+
+### 다음 단계 제안
+
+| 항목 | 내용 |
+|---|---|
+| **Phase 8-C** | Supabase Storage 최소 연동 — 녹음 Blob 업로드, `audio_url` DB 업데이트 |
+| **Phase 8-D** | iOS Safari 대응 — MediaRecorder 미지원 환경 감지 및 대안 안내 |
+| **Phase 8-E** | provider_events DB 기록 — STT 성공/실패를 `provider_events` 테이블에 저장 |
+| **Phase 9** | ETRI 발음평가 연동 또는 LLM 실제 채점 구현 |
+
+---
+
 ## Phase 7-C-lite — 학습자 화면 지원 언어 도움말 추가 (접기/펼치기)
 
 **날짜**: 2026-05-05  
