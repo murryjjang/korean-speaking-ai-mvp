@@ -4,6 +4,109 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 6-B4 — 학습자 미션 대화 Supabase 저장 연동
+
+**날짜**: 2026-05-04  
+**목표**: 학습자가 미션 대화를 완료·제출했을 때 Supabase `mission_submissions` + `ai_evaluations` 테이블에 저장. REPOSITORY_PROVIDER=mock 기존 동작 완전 유지.
+
+### 생성 파일
+
+- `src/lib/repositories/supabase-mission-repository.ts` — `SupabaseMissionRepository` 구현체.
+  - 세션 관리(`createSession` / `getSession` / `updateSession` / `getMissionSubmission`)는 in-memory mock store 위임 (세션은 여전히 임시 메모리 저장).
+  - `createMissionSubmission`: `ensurePilotClass` → `ensurePilotStudent` → `ensureScenario` 순서로 FK 앵커 보장 후 `mission_submissions` INSERT → `ai_evaluations` INSERT.
+  - 실패 시 throw 없이 `console.error('[supabase] mission_submission save failed')` 출력 후 early return.
+  - 성공 시 `console.info('[supabase] mission_submission saved: <uuid>')` 출력.
+
+### 수정 파일
+
+- `src/lib/repositories/index.ts`
+  - `SupabaseMissionRepository` import 추가.
+  - `getMissionRepository()` — REPOSITORY_PROVIDER=supabase일 때 `SupabaseMissionRepository` 반환.
+  - 더 이상 사용되지 않는 `warnNotImplemented` 함수·`_notImplementedWarned` Set 제거 (모든 repository에 Supabase 구현체 완비됨).
+- `app/student/mission/actions.ts`
+  - `getMissionRepository` import 추가.
+  - `submitMission` — mock store 항상 먼저 기록(`saveMissionSubmission`) + REPOSITORY_PROVIDER=supabase일 때 `getMissionRepository().createMissionSubmission(submission)` 추가 시도. 실패 시 repository 내부에서 처리. .env.local 값 절대 미출력.
+- `docs/spec/WORK_LOG.md` — Phase 6-B4 항목 추가.
+
+### mission_submissions 저장 흐름
+
+```
+submitMission(sessionId)   ← Server Action (mission-client.tsx)
+  │
+  ├─ [항상] saveMissionSubmission(submission)      → mock store (result page read path 의존)
+  │
+  └─ [REPOSITORY_PROVIDER=supabase일 때만]
+       getMissionRepository()                       → SupabaseMissionRepository
+         └─ createMissionSubmission(submission)
+              ├─ ensurePilotClass()                → classes 테이블 select-or-insert
+              ├─ ensurePilotStudent(classId)        → students 테이블 select-or-insert
+              ├─ ensureScenario(scenarioId)          → mission_scenarios 테이블 upsert (JSON 시드)
+              ├─ INSERT mission_submissions          → DB UUID 획득
+              │   console.info '[supabase] mission_submission saved: <uuid>'
+              └─ INSERT ai_evaluations              → submission_type='mission', scores JSONB에 평가 전체 포함
+```
+
+### 파일럿 컨텍스트 bootstrap 전략
+
+- 기존 `supabase-submission-repository.ts`와 동일한 패턴: PILOT_CLASS_NAME / PILOT_STUDENT_ANON_ID 고정.
+- module-level 캐시 변수 (`_pilotClassId`, `_pilotStudentId`, `_seededScenarioIds`) 독립 유지.
+- `mission_scenarios` FK: `mission-goals.json`에서 직접 upsert. onConflict: 'id' (text PK이므로 멱등).
+
+### ai_evaluations 저장 내용 (mission)
+
+| 컬럼 | 값 |
+|---|---|
+| `submission_id` | mission_submissions UUID |
+| `submission_type` | `'mission'` |
+| `scores` (jsonb) | `{ missionAchievementRate, taskCompletion, conversationNaturalness, expressionAppropriateness, strengths, improvements, metadata: { source: 'pilot', mockSubmissionId } }` |
+| `total_score` | `evaluation.overallScore` |
+| `normalized_score` | `evaluation.overallScore / 100` |
+| `feedback` | `'강점: ... | 보완: ...'` |
+| `provider_name` | `'mock'` |
+| `evaluated_at` | `evaluation.evaluatedAt` |
+
+### REPOSITORY_PROVIDER=mock일 때 영향
+
+**영향 없음.** Supabase 저장 블록은 `process.env.REPOSITORY_PROVIDER === 'supabase'` 조건으로 완전 분기. mock 모드에서는 기존 `saveMissionSubmission()` 경로만 실행.
+
+### REPOSITORY_PROVIDER=supabase 전환 후 테스트 방법
+
+1. `.env.local`에서 `REPOSITORY_PROVIDER=supabase` 확인 (SUPABASE URL/KEY 설정 완료 전제)
+2. `npm run dev` 실행
+3. `/student/mission/sc-restaurant-01` 접속 → 대화 완료 → "결과 보기" 버튼 클릭
+4. 서버 콘솔에서 확인:
+   ```
+   [supabase] mission_submission saved: <uuid>
+   ```
+5. Supabase Dashboard → Table Editor → `mission_submissions` 에서 새 row 확인:
+   - `scenario_id: 'sc-restaurant-01'`
+   - `status: 'submitted'`
+   - `turns` JSONB에 대화 전체 기록 확인
+   - `goals` JSONB에 목표 달성 여부 확인
+6. `ai_evaluations` → `submission_type='mission'` row 확인:
+   - `total_score`, `scores` JSONB에 평가 결과 확인
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (14개 라우트, 기존과 동일)
+
+### Known Issues
+
+1. **세션 미저장**: `createSession` / `updateSession` 은 여전히 mock store에만 저장. 서버 재시작 시 진행 중 세션 소실. Phase 9+에서 Supabase로 교체 예정.
+2. **result URL mock ID 사용**: Supabase UUID 대신 mock submissionId(`mission-sub-sc-restaurant-01-...`)가 result URL에 사용됨. result 페이지가 mock store에서 읽어야 실제 평가 결과가 보이므로, Supabase UUID로 교체하려면 result 페이지에 Supabase read 경로 추가 필요.
+3. **파일럿 student/class 단일 고정**: Auth 미구현으로 모든 미션 제출이 동일한 pilot student에 귀속됨. Phase 7(Auth) 후 교체 필요.
+4. **pilot 캐시 중복**: `supabase-submission-repository.ts`와 독립된 module-level 캐시 유지. 서버 재시작 시 두 모듈 모두 pilot class/student 재조회. 기능 동작에 영향 없음.
+
+### 다음 단계 제안 (Phase 6-C 또는 7-A)
+
+1. Teacher 제출 목록에서 미션 제출을 Supabase DB에서 읽어오는 read 경로 구현
+2. Supabase Auth 연동으로 실제 student_id 사용
+3. mission result 페이지에 Supabase read 경로 추가 (UUID 기반 URL 지원)
+
+---
+
 ## Phase 6-B3 — 교수자 채점 Supabase 저장 연동
 
 **날짜**: 2026-05-04  

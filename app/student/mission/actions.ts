@@ -8,6 +8,7 @@ import {
   updateSession,
   saveMissionSubmission,
 } from '@/src/lib/mock/mission-store'
+import { getMissionRepository } from '@/src/lib/repositories'
 import type {
   MissionSession,
   MissionGoalState,
@@ -200,7 +201,13 @@ export async function submitMission(sessionId: string): Promise<{
     submittedAt: new Date().toISOString(),
   }
 
+  // Always write to mock store — result page read path depends on it
   saveMissionSubmission(submission)
+
+  // Phase 6-B4: additionally persist to Supabase when configured
+  if (process.env.REPOSITORY_PROVIDER === 'supabase') {
+    await getMissionRepository().createMissionSubmission(submission)
+  }
 
   session.status = 'submitted'
   updateSession(session)

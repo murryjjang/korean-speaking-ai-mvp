@@ -24,6 +24,7 @@ import {
   SupabaseEvaluationRepository,
 } from './supabase-submission-repository'
 import { SupabaseTeacherReviewRepository } from './supabase-teacher-review-repository'
+import { SupabaseMissionRepository } from './supabase-mission-repository'
 import { getSupabaseClient } from '@/src/lib/supabase/client'
 import type {
   SubmissionRepository,
@@ -49,17 +50,6 @@ function resolvedProvider(): 'mock' | 'supabase' {
   return 'supabase'
 }
 
-// Emits a one-time console.warn per repository name when supabase is selected
-// but the implementation does not exist yet (Phase 6-B3+).
-const _notImplementedWarned = new Set<string>()
-function warnNotImplemented(name: string): void {
-  if (_notImplementedWarned.has(name)) return
-  _notImplementedWarned.add(name)
-  console.warn(
-    `[repository] Supabase${name} is not yet implemented (Phase 6-B3+). Falling back to mock.`,
-  )
-}
-
 export function getSubmissionRepository(): SubmissionRepository {
   if (resolvedProvider() === 'supabase') {
     return new SupabaseSubmissionRepository(getSupabaseClient()!)
@@ -82,8 +72,9 @@ export function getTeacherReviewRepository(): TeacherReviewRepository {
 }
 
 export function getMissionRepository(): MissionRepository {
-  // Phase 6-B4: replace with SupabaseMissionRepository when available
-  if (resolvedProvider() === 'supabase') warnNotImplemented('MissionRepository')
+  if (resolvedProvider() === 'supabase') {
+    return new SupabaseMissionRepository(getSupabaseClient()!)
+  }
   return new MockMissionRepository()
 }
 
