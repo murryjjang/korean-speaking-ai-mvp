@@ -21,9 +21,23 @@ class MockSTTProvider implements STTProvider {
   }
 }
 
+// Placeholder for OpenAI Whisper — requires OPENAI_API_KEY.
+// Throws so the /api/stt route falls back to mock.
+// Phase 8-B: implement actual Whisper API call here.
+class WhisperSTTProvider implements STTProvider {
+  async transcribe(_: Blob): Promise<STTResult> {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('WhisperSTTProvider: OPENAI_API_KEY not set')
+    }
+    throw new Error('WhisperSTTProvider: not yet implemented (Phase 8-B)')
+  }
+}
+
 export function getSTTProvider(): STTProvider {
   const providerName = process.env.STT_PROVIDER ?? 'mock'
   switch (providerName) {
+    case 'whisper':
+      return new WhisperSTTProvider()
     case 'mock':
     default:
       return new MockSTTProvider()

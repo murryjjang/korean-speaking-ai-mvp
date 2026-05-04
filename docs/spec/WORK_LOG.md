@@ -1201,3 +1201,84 @@ MVP에서 UI 다국어 병기를 구현하지 않는 이유:
 
 ### lint 결과
 - `npm run lint` → 에러 0, 경고 0
+
+---
+
+## Phase 8-A — STT Route 최소 연동
+
+**날짜**: 2026-05-05
+**목표**: 녹음된 음성을 서버 route로 전달하고, STT provider 구조를 통해 mock 또는 실제 STT 호출이 가능하도록 최소 연동. 실제 API 실패 시 mock fallback 유지.
+
+### 생성 파일
+- `app/api/stt/route.ts` — STT API route (POST, FormData 수신)
+
+### 수정 파일
+- `src/providers/stt/index.ts` — `WhisperSTTProvider` placeholder 추가 (STT_PROVIDER=whisper 분기)
+- `app/student/speaking/actions.ts` — `SpeakingSubmitMeta`에 `sttTranscript`, `sttProviderName` 추가; 클라이언트 제공 transcript 사용
+- `app/student/speaking/[questionId]/speaking-client.tsx` — `handleSubmit`에서 `/api/stt` 호출 후 transcript를 `submitSpeaking`에 전달
+
+### STT route 구조 (`app/api/stt/route.ts`)
+
+```
+POST /api/stt
+  Content-Type: multipart/form-data
+  Body: audio (Blob/File)
+
+Response:
+  { transcript, confidence, providerName, latencyMs, source: 'stt' | 'mock-fallback' }
+```
+
+- FormData에서 `audio` 필드를 추출해 `Blob`으로 변환
+- `getSTTProvider().transcribe(blob)` 호출
+- 성공 시 `[provider_events] stt.success` 콘솔 기록 (Phase 8-B+에서 DB 저장 예정)
+- 실패 시 mock transcript 반환 (`source: 'mock-fallback'`)
+
+### Provider 분기 방식 (`src/providers/stt/index.ts`)
+
+| STT_PROVIDER 값 | 동작 |
+|---|---|
+| `mock` (기본) | `MockSTTProvider` — 500ms 지연 후 고정 mock 문장 반환 |
+| `whisper` | `WhisperSTTProvider` — OPENAI_API_KEY 없으면 즉시 throw → route에서 mock fallback |
+| 기타 값 | `MockSTTProvider` (default case) |
+
+`WhisperSTTProvider`는 키가 없거나 구현 전이면 throw하도록 설계. `/api/stt` route의 try-catch가 mock fallback을 반환함.
+
+### 녹음 Blob 전달 방식
+
+1. 클라이언트: `recorder.blobUrl` (브라우저 메모리 Blob URL)
+2. `fetch(recorder.blobUrl)` → `response.blob()` 로 Blob 복원
+3. `FormData.append('audio', blob, 'recording.webm')` 로 래핑
+4. `fetch('/api/stt', { method: 'POST', body: formData })` 전송
+5. 서버: `request.formData().get('audio')` → `arrayBuffer()` → `Blob` 재구성
+
+### mock fallback 조건
+
+| 상황 | 동작 |
+|---|---|
+| `recorder.blobUrl` 없음 (녹음 실패/미진행) | STT 호출 건너뜀, `submitSpeaking`에서 mock STT 호출 |
+| `fetch(recorder.blobUrl)` 실패 | try-catch 내 무시, `sttTranscript=undefined`로 서버에 전달 |
+| `/api/stt` HTTP 오류 (`!sttRes.ok`) | `sttTranscript=undefined`로 서버에 전달 |
+| `/api/stt` 내 STT provider throw | route catch → `source: 'mock-fallback'` 반환 |
+| `meta?.sttTranscript` 없음 | `submitSpeaking` 서버에서 직접 mock STT 호출 |
+
+모든 경우에 사용자는 제출을 계속할 수 있음.
+
+### Supabase 저장 흐름 영향
+- 변경 없음. `saveSpeakingEvalRecord(record)` 호출 구조 동일.
+- `record.sttResult.transcript`에 클라이언트 제공 transcript가 들어감.
+- `REPOSITORY_PROVIDER=supabase`일 때 ai_evaluations에 실제 transcript 저장됨.
+
+### known issues
+- iOS Safari에서 `MediaRecorder`가 `audio/mp4`로 녹음됨. `/api/stt`는 MIME type을 그대로 전달하므로, Whisper 등 실제 STT 연동 시 iOS 녹음 파일 처리 여부를 확인해야 함.
+- `blobUrl`은 브라우저 메모리에만 존재. 페이지 이동/리로드 시 소멸. STT 호출은 review phase에서 "제출하기" 클릭 시 즉시 수행됨.
+- `WhisperSTTProvider`는 구현체 없음. Phase 8-B에서 실제 API 호출 구현 예정.
+
+### lint 결과
+- `npm run lint` → 에러 0, 경고 0
+
+### tsc 결과
+- `npx tsc --noEmit` → 에러 0
+
+### build 결과
+- `npm run build` → 빌드 성공
+- `/api/stt` 라우트가 `ƒ (Dynamic)` 서버 렌더 라우트로 등록됨

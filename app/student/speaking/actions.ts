@@ -5,10 +5,15 @@ import { getLLMEvalProvider } from '@/src/providers/llm-eval'
 import { getPronunciationProvider } from '@/src/providers/pronunciation'
 import { saveSpeakingEval } from '@/src/lib/mock/speaking-store'
 import { getEvaluationRepository } from '@/src/lib/repositories'
+import type { ProviderName, STTResult } from '@/src/types/providers'
 
 export interface SpeakingSubmitMeta {
   hasRecording?: boolean
   recordingDurationSec?: number
+  /** Transcript from /api/stt if available; omit to use mock STT fallback. */
+  sttTranscript?: string
+  /** Provider name that produced sttTranscript (e.g. 'mock', 'whisper'). */
+  sttProviderName?: string
 }
 
 export async function submitSpeaking(
@@ -16,17 +21,32 @@ export async function submitSpeaking(
   questionSetId: string,
   meta?: SpeakingSubmitMeta,
 ): Promise<{ submissionId: string }> {
-  const sttProvider = getSTTProvider()
   const llmProvider = getLLMEvalProvider()
   const pronunciationProvider = getPronunciationProvider()
 
-  const mockBlob = new Blob([], { type: 'audio/webm' })
-  const mockTranscript = '안녕하세요. 저는 한국어를 배우고 있습니다. 잘 부탁드립니다.'
+  // Use client-provided transcript when available (from /api/stt).
+  // Fall back to mock STT when no recording was sent or STT failed.
+  let sttResult: STTResult
+  if (meta?.sttTranscript !== undefined) {
+    sttResult = {
+      transcript: meta.sttTranscript,
+      confidence: 0.5,
+      providerName: (meta.sttProviderName ?? 'mock') as ProviderName,
+      providerVersion: '1.0.0',
+      latencyMs: 0,
+    }
+  } else {
+    const sttProvider = getSTTProvider()
+    const mockBlob = new Blob([], { type: 'audio/webm' })
+    sttResult = await sttProvider.transcribe(mockBlob)
+  }
 
-  const [sttResult, pronunciationResult, llmEvalResult] = await Promise.all([
-    sttProvider.transcribe(mockBlob),
-    pronunciationProvider.evaluate(mockBlob, mockTranscript),
-    llmProvider.evaluate(mockTranscript, 'rubric-speaking-01'),
+  const { transcript } = sttResult
+
+  const mockBlob = new Blob([], { type: 'audio/webm' })
+  const [pronunciationResult, llmEvalResult] = await Promise.all([
+    pronunciationProvider.evaluate(mockBlob, transcript),
+    llmProvider.evaluate(transcript, 'rubric-speaking-01'),
   ])
 
   const submissionId = `mock-${questionId}-${Date.now()}`

@@ -170,10 +170,34 @@ export function SpeakingClient({
   const handleSubmit = useCallback(async () => {
     setPhase('submitting')
     setSubmitError(false)
+
+    // Attempt STT via /api/stt — non-blocking, failure does not prevent submit.
+    let sttTranscript: string | undefined
+    let sttProviderName: string | undefined
+    if (recorder.blobUrl) {
+      try {
+        const blobRes = await fetch(recorder.blobUrl)
+        const audioBlob = await blobRes.blob()
+        const fd = new FormData()
+        fd.append('audio', audioBlob, 'recording.webm')
+        const sttRes = await fetch('/api/stt', { method: 'POST', body: fd })
+        if (sttRes.ok) {
+          // Response.json() returns any; safe to access known fields directly.
+          const data = await sttRes.json()
+          if (typeof data?.transcript === 'string') sttTranscript = data.transcript
+          if (typeof data?.providerName === 'string') sttProviderName = data.providerName
+        }
+      } catch {
+        // STT failure is non-blocking — submitSpeaking uses mock fallback
+      }
+    }
+
     try {
       const { submissionId } = await submitSpeaking(question.id, questionSetId, {
         hasRecording: recorder.state === 'stopped' && recorder.blobUrl !== null,
         recordingDurationSec: recorder.durationSec,
+        sttTranscript,
+        sttProviderName,
       })
       router.push(`/student/speaking/${question.id}/result?sub=${submissionId}`)
     } catch {
