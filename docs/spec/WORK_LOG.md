@@ -4,6 +4,91 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 6-B2 — 말하기 평가 Supabase 저장 연동
+
+**날짜**: 2026-05-04  
+**목표**: 학습자 말하기 평가 제출 결과를 Supabase `speaking_submissions` + `ai_evaluations`에 저장하는 최소 연동 구현. REPOSITORY_PROVIDER=mock 기존 동작 완전 유지.
+
+### 생성 파일
+
+- `src/lib/repositories/supabase-submission-repository.ts` — `SupabaseSubmissionRepository` + `SupabaseEvaluationRepository` 구현체. 파일럿 class/student 자동 bootstrap, question/question_set 콘텐츠 시드, speaking_submissions + ai_evaluations insert. 오류 발생 시 console.error 후 early return (화면 중단 없음).
+
+### 수정 파일
+
+- `src/lib/repositories/index.ts` — `getSubmissionRepository()` / `getEvaluationRepository()` 에서 REPOSITORY_PROVIDER=supabase일 때 Supabase 구현체 반환. `warnNotImplemented` 호출 제거 (6-B3+만 유지).
+- `app/student/speaking/actions.ts` — `saveSpeakingEval()` 직접 호출 유지 (result page 의존) + REPOSITORY_PROVIDER=supabase일 때만 `evalRepo.saveSpeakingEvalRecord(record)` 추가 시도. 실패 시 console.error 후 `{ submissionId }` 정상 반환.
+- `docs/spec/WORK_LOG.md` — Phase 6-B2 항목 추가.
+
+### Supabase 저장 흐름 요약
+
+```
+submitSpeaking(questionId, questionSetId)   ← Server Action
+  │
+  ├─ [항상] saveSpeakingEval(record)         → mock store (result page용)
+  │
+  └─ [REPOSITORY_PROVIDER=supabase일 때만]
+       SupabaseEvaluationRepository.saveSpeakingEvalRecord(record)
+         │
+         ├─ ensurePilotClass()               → classes 테이블 upsert/select
+         ├─ ensurePilotStudent(classId)       → students 테이블 upsert/select
+         ├─ ensureQuestionSet(questionSetId)  → question_sets 테이블 upsert (JSON 시드)
+         ├─ ensureQuestion(questionId)        → questions 테이블 upsert (JSON 시드)
+         ├─ INSERT speaking_submissions       → DB UUID 획득
+         └─ INSERT ai_evaluations            → submission_id = DB UUID
+```
+
+### 파일럿 컨텍스트 bootstrap 전략
+
+Auth 미구현 단계에서 `speaking_submissions.student_id` / `class_id` (UUID NOT NULL FK) 제약을 충족하기 위해:
+- "Pilot Class (Phase 6-B)" 이름의 class를 최초 1회 insert → UUID 캐시
+- "PILOT-S-001" anonymous_id의 student를 최초 1회 insert → UUID 캐시
+- 캐시는 module-level 변수 (서버 재시작 시 초기화 → 자동 재bootstrap)
+- `questions`, `question_sets`는 JSON에서 `upsert onConflict: 'id'` (text PK이므로 중복 안전)
+
+### TypeScript 이슈 및 해결
+
+**이슈**: Supabase v2.105.1에서 `createClient()` (Database 타입 미제공) 사용 시 TypeScript가 `Schema = never`로 추론하여 `.from().insert()` 호출이 컴파일 오류 발생.
+
+**해결**: `function db(client) { return client as any }` 헬퍼를 파일 내부에 정의하고 모든 `.from()` 호출에 사용. ESLint `@typescript-eslint/no-explicit-any` 주석으로 명시적으로 억제. 런타임 동작은 정확하며 타입 강제만 우회.
+
+### REPOSITORY_PROVIDER=mock일 때 영향
+
+**영향 없음.** `actions.ts`의 Supabase 시도 블록은 `process.env.REPOSITORY_PROVIDER === 'supabase'` 조건으로 완전히 분기됨. mock 모드에서는 기존 `saveSpeakingEval()` 경로만 실행되며 코드 경로 변경 없음.
+
+### REPOSITORY_PROVIDER=supabase 전환 후 테스트 방법
+
+1. `.env.local`에서 `REPOSITORY_PROVIDER=supabase` 설정 (SUPABASE URL/KEY는 이미 입력됨)
+2. `npm run dev` 실행
+3. `/student/speaking/q-001?setId=qs-diagnostic-01` 접속 → 제출 버튼 클릭
+4. 서버 콘솔에서 확인:
+   ```
+   [supabase] speaking_submission saved: <uuid> (mock ref: mock-q-001-...)
+   [supabase] ai_evaluation saved: <uuid>
+   ```
+5. Supabase Dashboard → Table Editor → `speaking_submissions` / `ai_evaluations` 에서 새 row 확인
+6. 결과 페이지 `/student/speaking/q-001/result?sub=mock-q-001-...`가 정상 렌더링되는지 확인
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (14개 라우트, 기존과 동일)
+
+### Known Issues
+
+1. **파일럿 student/class 단일 고정**: Auth 미구현으로 모든 제출이 동일한 pilot student에 귀속됨. Phase 7(Auth) 구현 후 실제 student_id로 교체 필요.
+2. **audio_url/duration_sec null**: mock 제출이므로 실제 음성 파일 없음. Storage 연동(Phase 7+) 후 채울 수 있음.
+3. **ai_evaluations.submission_id non-FK**: 스키마에서 `submission_id`는 UUID 타입이지만 FK 제약 없음. 따라서 `saveSpeakingEvalRecord`에서 DB UUID를 정확히 넘겨줘야 데이터 일관성 유지됨 (구현 완료).
+4. **Bootstrap race condition**: 동시 요청 시 pilot class/student가 중복 insert될 수 있음. 클래스 이름 unique constraint가 없어 다수의 pilot class가 생길 수 있으나, `.limit(1)` select로 첫 번째 row를 항상 사용하므로 기능 동작에는 영향 없음.
+
+### 다음 단계 제안 (Phase 6-B3)
+
+1. `teacher_reviews` 저장 구현 (`SupabaseTeacherReviewRepository`)
+2. `/teacher/submissions/[id]` 채점 확정 시 Supabase에도 저장
+3. `speaking_submissions` 목록 read 구현 (teacher dashboard에서 DB 기반 조회)
+
+---
+
 ## Phase 6-B1 — Supabase 클라이언트 초기화 및 Provider 선택 구조
 
 **날짜**: 2026-05-04  

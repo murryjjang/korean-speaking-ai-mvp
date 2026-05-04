@@ -4,7 +4,8 @@
  * Phase 6-A: always returns Mock implementations.
  * Phase 6-B1: provider selection structure added. Supabase client initialized
  *   but no Supabase implementations exist yet — all factories fall back to mock.
- * Phase 6-B2+: Supabase implementations added per repository type.
+ * Phase 6-B2: SupabaseSubmissionRepository + SupabaseEvaluationRepository
+ *   activated for speaking_submissions + ai_evaluations persistence.
  *
  * Callers import from here, never from specific implementation files.
  * Swap the implementation here without touching any page or action.
@@ -18,6 +19,10 @@ import {
   MockStudentRepository,
   MockClassRepository,
 } from './mock-repository'
+import {
+  SupabaseSubmissionRepository,
+  SupabaseEvaluationRepository,
+} from './supabase-submission-repository'
 import { getSupabaseClient } from '@/src/lib/supabase/client'
 import type {
   SubmissionRepository,
@@ -44,25 +49,27 @@ function resolvedProvider(): 'mock' | 'supabase' {
 }
 
 // Emits a one-time console.warn per repository name when supabase is selected
-// but the implementation does not exist yet (Phase 6-B2+).
+// but the implementation does not exist yet (Phase 6-B3+).
 const _notImplementedWarned = new Set<string>()
 function warnNotImplemented(name: string): void {
   if (_notImplementedWarned.has(name)) return
   _notImplementedWarned.add(name)
   console.warn(
-    `[repository] Supabase${name} is not yet implemented (Phase 6-B2+). Falling back to mock.`,
+    `[repository] Supabase${name} is not yet implemented (Phase 6-B3+). Falling back to mock.`,
   )
 }
 
 export function getSubmissionRepository(): SubmissionRepository {
-  // Phase 6-B2: replace with SupabaseSubmissionRepository when available
-  if (resolvedProvider() === 'supabase') warnNotImplemented('SubmissionRepository')
+  if (resolvedProvider() === 'supabase') {
+    return new SupabaseSubmissionRepository(getSupabaseClient()!)
+  }
   return new MockSubmissionRepository()
 }
 
 export function getEvaluationRepository(): EvaluationRepository {
-  // Phase 6-B2: replace with SupabaseEvaluationRepository when available
-  if (resolvedProvider() === 'supabase') warnNotImplemented('EvaluationRepository')
+  if (resolvedProvider() === 'supabase') {
+    return new SupabaseEvaluationRepository(getSupabaseClient()!)
+  }
   return new MockEvaluationRepository()
 }
 

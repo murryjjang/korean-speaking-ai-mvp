@@ -4,6 +4,7 @@ import { getSTTProvider } from '@/src/providers/stt'
 import { getLLMEvalProvider } from '@/src/providers/llm-eval'
 import { getPronunciationProvider } from '@/src/providers/pronunciation'
 import { saveSpeakingEval } from '@/src/lib/mock/speaking-store'
+import { getEvaluationRepository } from '@/src/lib/repositories'
 
 export async function submitSpeaking(
   questionId: string,
@@ -24,7 +25,7 @@ export async function submitSpeaking(
 
   const submissionId = `mock-${questionId}-${Date.now()}`
 
-  saveSpeakingEval({
+  const record = {
     submissionId,
     questionId,
     questionSetId,
@@ -32,7 +33,21 @@ export async function submitSpeaking(
     sttResult,
     llmEvalResult,
     pronunciationResult,
-  })
+  }
+
+  // Always save to mock store — result page reads from here regardless of provider.
+  saveSpeakingEval(record)
+
+  // Supabase persistence: only when REPOSITORY_PROVIDER=supabase.
+  // Failure does NOT block the result page (mock store is the fallback).
+  if (process.env.REPOSITORY_PROVIDER === 'supabase') {
+    try {
+      const evalRepo = getEvaluationRepository()
+      await evalRepo.saveSpeakingEvalRecord(record)
+    } catch (err) {
+      console.error('[submitSpeaking] Supabase persistence failed:', err)
+    }
+  }
 
   return { submissionId }
 }
