@@ -4,6 +4,113 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 7-C-lite — 학습자 화면 지원 언어 도움말 추가 (접기/펼치기)
+
+**날짜**: 2026-05-05  
+**목표**: 초급 학습자가 문제와 미션을 이해할 수 있도록 "모국어 도움말" 접기/펼치기 기능을 추가한다. 전체 UI 번역은 하지 않고, 한국어 지시문을 기본으로 유지하면서 보조 설명만 지원 언어로 제공한다.
+
+### 생성 파일
+
+- `src/components/ui/lang-hint.tsx` — `LangHint` 재사용 컴포넌트.
+  - `LangHintItem`: `{ lang: string; text: string }` 타입 (export)
+  - `LangHintProps`: `items: LangHintItem[]`, `label?: string` (기본값: `'도움말 보기'`)
+  - "▼ 도움말 보기" / "▲ 도움말 닫기" 토글 버튼
+  - 펼쳤을 때: `bg-slate-50 border border-slate-100` 배경, 언어 코드 `[EN]` 형식으로 앞에 표시
+  - `items` 빈 배열이면 null 렌더링 (조건부 사용 간소화)
+  - 모바일 360px에서 카드 높이 과도 증가 없음 — 접힌 상태가 기본
+
+### 수정 파일
+
+#### `src/components/ui/index.ts`
+- `LangHint` 컴포넌트 및 `LangHintItem` 타입 re-export 추가
+
+#### `app/student/speaking/[questionId]/speaking-client.tsx`
+- `LangHint`, `LangHintItem` import 추가
+- `QUESTION_HINTS` 맵 추가 — 질문 ID → `LangHintItem[]`
+  - `q-001` (자기소개 기본): EN / VI / JA / AR
+  - `q-003` (그림 묘사): EN / VI / JA / AR
+  - `q-007` (한국 음식 추천): EN / VI / JA / AR
+  - 나머지 질문은 힌트 없음 (hint 없을 경우 아무것도 렌더링 안 함)
+- `RECORDING_HINTS` 상수 추가 — 녹음 방법 안내 EN / VI / JA / AR
+- 질문 카드 `CardBody` 하단: `QUESTION_HINTS[question.id]` 있을 때 `<LangHint label="모국어 도움말 보기" />` 렌더링
+- prep 단계 카드: "준비 시작" 버튼 아래 `<LangHint items={RECORDING_HINTS} label="녹음 방법 도움말" />` 렌더링 (카운트다운 시작 전에만 표시)
+
+#### `app/student/mission/[scenarioId]/mission-client.tsx`
+- `LangHint`, `LangHintItem` import 추가
+- `SCENARIO_SITUATION_HINTS` 맵 추가 — 시나리오 ID → 상황 설명 `LangHintItem[]`
+  - `sc-restaurant-01` (식당): EN / VI / JA / AR
+  - `sc-hospital-01` (병원): EN / VI / JA / AR
+- `SCENARIO_GOALS_HINTS` 맵 추가 — 시나리오 ID → 전체 목표 요약 `LangHintItem[]`
+  - `sc-restaurant-01`: 목표 3개 요약 EN / VI / JA / AR
+  - `sc-hospital-01`: 목표 4개 요약 EN / VI / JA / AR
+- `CHAT_GUIDE_HINTS` 상수 추가 — 대화 입력 방법 안내 EN / VI / JA / AR
+- 미션 정보 카드 `CardBody` 하단: `<LangHint label="모국어 도움말 보기" />` 렌더링
+- 미션 목표 패널 `<ul>` 하단: `<LangHint label="목표 도움말 보기" />` 렌더링
+- ready 단계 "대화 시작" 버튼 아래: `<LangHint items={CHAT_GUIDE_HINTS} label="대화 방법 도움말" />` 렌더링
+
+### 도움말 구현 방식
+
+- **접기/펼치기**: 기본 닫힌 상태. 버튼 클릭 시 패널 토글.
+- **한국어 우선**: 한국어 지시문을 먼저 표시하고, 도움말 패널은 별도 토글로 분리.
+- **버튼 라벨 한국어 유지**: "도움말 보기", "도움말 닫기", "모국어 도움말 보기" 등 모두 한국어.
+- **언어 표기**: `[EN]`, `[VI]`, `[JA]`, `[AR]` 형식의 앞 표시로 어떤 언어인지 명확히 구분.
+- **지원 언어 범위**: mock 학생 데이터 기준 — 영어(EN), 베트남어(VI), 일본어(JA), 아랍어(AR).
+
+### 적용된 화면
+
+| 화면 | 힌트 위치 | 힌트 종류 |
+|---|---|---|
+| `/student/speaking/q-001` (자기소개) | 질문 카드 하단 | 질문 내용 번역 |
+| `/student/speaking/q-003` (그림 묘사) | 질문 카드 하단 | 질문 내용 번역 |
+| `/student/speaking/q-007` (음식 추천) | 질문 카드 하단 | 질문 내용 번역 |
+| `/student/speaking/[any]` — prep 단계 | 준비 시작 버튼 아래 | 녹음 방법 안내 |
+| `/student/mission/sc-restaurant-01` | 미션 정보 카드 하단 | 시나리오 상황 설명 |
+| `/student/mission/sc-restaurant-01` | 목표 패널 하단 | 목표 목록 번역 |
+| `/student/mission/sc-restaurant-01` | 대화 시작 버튼 아래 | 대화 방법 안내 |
+| `/student/mission/sc-hospital-01` | 미션 정보 카드 하단 | 시나리오 상황 설명 |
+| `/student/mission/sc-hospital-01` | 목표 패널 하단 | 목표 목록 번역 |
+
+### 모바일 360px 확인 방법
+
+1. `npm run dev` 실행
+2. Chrome DevTools → Toggle device toolbar → 360×800 (또는 Galaxy S20) 설정
+3. `/student/speaking/q-001?setId=qs-diagnostic-01` 접속 → 질문 카드에서 "모국어 도움말 보기" 확인
+4. "도움말 보기" 클릭 → 4개 언어 패널 펼쳐짐 확인
+5. "도움말 닫기" 클릭 → 패널 접힘 확인
+6. `/student/mission/sc-restaurant-01` 접속 → 미션 정보, 목표, 대화 시작 각 도움말 확인
+
+### 버튼 라벨을 한국어로 유지한 이유
+
+- 학습 목적 유지: 학습자가 한국어 인터페이스에 노출되어 UI 어휘도 학습 기회가 됨
+- 범위 명확화: "도움말(보조 설명)만 다국어, 핵심 UI는 한국어"라는 Phase 7-C-lite 설계 원칙
+- 전체 번역 금지: 스펙 요구 사항 ("버튼 전체 번역 금지")
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (14개 라우트, 기존과 동일)
+
+### Known Issues (Phase 7-C-lite 기준)
+
+| 이슈 | 영향 | 해소 예정 |
+|---|---|---|
+| **힌트 미제공 질문** — q-002, q-004, q-005, q-006, q-008은 힌트 없음 | 소 | Phase 8 이후 콘텐츠 충실화 시 추가 |
+| **아랍어 RTL 미처리** — 아랍어 텍스트가 LTR 컨텍스트에서 렌더링됨. 읽기는 가능하나 오른쪽 정렬 없음 | 소 | Phase 8 이후 필요 시 `dir="rtl"` 적용 |
+| **미번역 UI 요소** — 토글 버튼("도움말 보기"), 언어 코드("[EN]") 등은 한국어/영어 코드 유지 | 설계 의도 | Phase 7-C-lite 범위 밖 |
+| 기존 Phase 7-B-main, 7-A-lite, 6-B5 known issues 모두 유지 | — | 해당 Phase 참고 |
+
+### 다음 단계 제안 (Phase 8-A)
+
+| 항목 | 내용 |
+|---|---|
+| **Phase 8-A** | ETRI 또는 Whisper STT 실제 API 최소 연동 — 녹음 Blob을 FormData로 서버 Route Handler에 전달 → STT 결과 반환. mock transcript 대체. |
+| **Phase 8-B** | Supabase Storage 업로드 — 녹음 Blob을 presigned URL 또는 anon upload로 Storage에 저장, `audio_url` DB 업데이트 |
+| **Phase 8-C** | iOS Safari 대응 — MediaRecorder 미지원 환경 감지 후 대안 안내 |
+| **Phase 8-D** | 힌트 콘텐츠 확장 — 나머지 질문(q-002~q-008) 및 추가 시나리오 힌트 데이터 보충 |
+
+---
+
 ## Phase 7-B-main — 브라우저 마이크 녹음 최소 구현
 
 **날짜**: 2026-05-05  

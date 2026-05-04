@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Card, CardBody, Badge } from '@/src/components/ui'
+import { Button, Card, CardBody, Badge, LangHint } from '@/src/components/ui'
+import type { LangHintItem } from '@/src/components/ui'
 import { submitSpeaking } from '../actions'
 import { useAudioRecorder } from '@/src/hooks/use-audio-recorder'
 
@@ -35,6 +36,36 @@ function formatTime(sec: number): string {
   const s = sec % 60
   return `${m}:${s.toString().padStart(2, '0')}`
 }
+
+// 질문별 모국어 도움말 (mock 콘텐츠 기준 대표 문항)
+const QUESTION_HINTS: Record<string, LangHintItem[]> = {
+  'q-001': [
+    { lang: 'EN', text: 'Introduce yourself. Include your name, country, and why you are learning Korean.' },
+    { lang: 'VI', text: 'Hãy tự giới thiệu bản thân. Bao gồm tên, quốc gia và lý do học tiếng Hàn.' },
+    { lang: 'JA', text: '自己紹介をしてください。名前、出身国、韓国語を学ぶ理由を含めてください。' },
+    { lang: 'AR', text: 'قدّم نفسك. اذكر اسمك وبلدك وسبب تعلمك للغة الكورية.' },
+  ],
+  'q-003': [
+    { lang: 'EN', text: 'Look at the picture and describe the situation. (People exercising in a park)' },
+    { lang: 'VI', text: 'Nhìn vào bức tranh và mô tả tình huống. (Mọi người đang tập thể dục trong công viên)' },
+    { lang: 'JA', text: '絵を見て状況を説明してください。（公園で運動している人々）' },
+    { lang: 'AR', text: 'انظر إلى الصورة واشرح الوضع. (أشخاص يمارسون الرياضة في حديقة)' },
+  ],
+  'q-007': [
+    { lang: 'EN', text: 'Recommend a Korean food to your foreign friend. Explain your reasons.' },
+    { lang: 'VI', text: 'Giới thiệu một món ăn Hàn Quốc cho bạn bè nước ngoài. Giải thích lý do.' },
+    { lang: 'JA', text: '外国人の友達に韓国料理を勧めてください。理由も説明してください。' },
+    { lang: 'AR', text: 'أوصِ صديقك الأجنبي بطعام كوري. اشرح السبب.' },
+  ],
+}
+
+// 녹음 안내 도움말
+const RECORDING_HINTS: LangHintItem[] = [
+  { lang: 'EN', text: 'Press "준비 시작" to start. Recording begins after the countdown. Press "녹음 완료" when done. Listen before submitting with "제출하기".' },
+  { lang: 'VI', text: 'Nhấn "준비 시작" để bắt đầu. Ghi âm bắt đầu sau đếm ngược. Nhấn "녹음 완료" khi xong. Nghe lại trước khi nhấn "제출하기".' },
+  { lang: 'JA', text: '「준비 시작」を押してスタート。カウントダウン後に録音開始。「녹음 완료」で終了。「제출하기」で送信前に確認できます。' },
+  { lang: 'AR', text: 'اضغط "준비 시작" للبدء. يبدأ التسجيل بعد العد التنازلي. اضغط "녹음 완료" عند الانتهاء. يمكنك الاستماع قبل الضغط على "제출하기".' },
+]
 
 const RECORDER_ERROR_MESSAGES: Record<string, string> = {
   'not-supported': '이 브라우저는 마이크 녹음을 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요.',
@@ -185,6 +216,9 @@ export function SpeakingClient({
             <span>준비 시간: {question.prepTimeSec}초</span>
             <span>답변 시간: {formatTime(question.responseTimeSec)}</span>
           </div>
+          {QUESTION_HINTS[question.id] && (
+            <LangHint items={QUESTION_HINTS[question.id]} label="모국어 도움말 보기" />
+          )}
         </CardBody>
       </Card>
 
@@ -215,6 +249,9 @@ export function SpeakingClient({
                   >
                     준비 시작
                   </Button>
+                  <div className="mt-4 text-left">
+                    <LangHint items={RECORDING_HINTS} label="녹음 방법 도움말" />
+                  </div>
                 </>
               )}
             </div>

@@ -11,3 +11,5 @@ export type { Filter, FilterOption } from "./filter-panel";
 export { StatCard } from "./stat-card";
 export { PageHeader } from "./page-header";
 export { EmptyState } from "./empty-state";
+export { LangHint } from "./lang-hint";
+export type { LangHintItem } from "./lang-hint";

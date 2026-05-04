@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Button, Card, CardBody, CardHeader, Badge } from '@/src/components/ui'
+import { Button, Card, CardBody, CardHeader, Badge, LangHint } from '@/src/components/ui'
+import type { LangHintItem } from '@/src/components/ui'
 import { startMission, sendTurn, submitMission } from '../actions'
 
 // ── 타입 ──────────────────────────────────────────────────────────
@@ -53,6 +54,46 @@ type GoalState = {
 }
 
 // ── 상수 ──────────────────────────────────────────────────────────
+
+// 시나리오별 모국어 도움말 (mock 콘텐츠 기준 대표 시나리오)
+const SCENARIO_SITUATION_HINTS: Record<string, LangHintItem[]> = {
+  'sc-restaurant-01': [
+    { lang: 'EN', text: 'You are visiting a Korean restaurant for the first time. Talk with the staff to order food.' },
+    { lang: 'VI', text: 'Bạn đang đến nhà hàng Hàn Quốc lần đầu tiên. Nói chuyện với nhân viên để đặt món ăn.' },
+    { lang: 'JA', text: '初めて韓国のレストランに来ました。スタッフと話して料理を注文してください。' },
+    { lang: 'AR', text: 'أنت تزور مطعمًا كوريًا لأول مرة. تحدّث مع الموظف لطلب الطعام.' },
+  ],
+  'sc-hospital-01': [
+    { lang: 'EN', text: 'You are not feeling well and have come to a hospital. Explain your symptoms and make an appointment.' },
+    { lang: 'VI', text: 'Bạn không khỏe và đến bệnh viện. Giải thích triệu chứng và đặt lịch hẹn.' },
+    { lang: 'JA', text: '体調が悪くて病院に来ました。症状を説明して予約を入れてください。' },
+    { lang: 'AR', text: 'أنت لا تشعر بحالة جيدة وجئت إلى المستشفى. اشرح أعراضك وحدد موعدًا.' },
+  ],
+}
+
+// 미션 목표 도움말 (시나리오 단위 — 전체 목표 목록 요약)
+const SCENARIO_GOALS_HINTS: Record<string, LangHintItem[]> = {
+  'sc-restaurant-01': [
+    { lang: 'EN', text: 'Goals: 1) Tell the staff how many people are in your group. 2) Order 2 different foods. 3) Check the total price.' },
+    { lang: 'VI', text: 'Mục tiêu: 1) Thông báo số người trong nhóm. 2) Đặt 2 món ăn. 3) Kiểm tra tổng tiền.' },
+    { lang: 'JA', text: '目標：1) 人数をスタッフに伝える。2) 料理を2品注文する。3) 合計金額を確認する。' },
+    { lang: 'AR', text: 'الأهداف: 1) أخبر الموظف بعدد الأشخاص. 2) اطلب نوعين من الطعام. 3) تأكد من المبلغ الإجمالي.' },
+  ],
+  'sc-hospital-01': [
+    { lang: 'EN', text: 'Goals: 1) Explain your symptoms. 2) Say when you started feeling sick. 3) Request an appointment. 4) Confirm the date and time.' },
+    { lang: 'VI', text: 'Mục tiêu: 1) Giải thích triệu chứng. 2) Nói từ khi nào bạn bị bệnh. 3) Yêu cầu đặt lịch. 4) Xác nhận ngày giờ.' },
+    { lang: 'JA', text: '目標：1) 症状を説明する。2) いつから具合が悪いか伝える。3) 予約を依頼する。4) 日時を確認する。' },
+    { lang: 'AR', text: 'الأهداف: 1) اشرح الأعراض. 2) قل متى بدأت تشعر بالمرض. 3) اطلب موعدًا. 4) أكّد التاريخ والوقت.' },
+  ],
+}
+
+// 대화 시작 전 일반 안내 도움말
+const CHAT_GUIDE_HINTS: LangHintItem[] = [
+  { lang: 'EN', text: 'Type your Korean response in the text box. Press Enter to send. Try to achieve all goals before ending.' },
+  { lang: 'VI', text: 'Gõ câu trả lời tiếng Hàn vào ô văn bản. Nhấn Enter để gửi. Cố gắng đạt tất cả mục tiêu trước khi kết thúc.' },
+  { lang: 'JA', text: 'テキストボックスに韓国語で入力してください。Enterで送信。終了前にすべての目標を達成するよう努めてください。' },
+  { lang: 'AR', text: 'اكتب ردّك بالكورية في مربع النص. اضغط Enter للإرسال. حاول تحقيق جميع الأهداف قبل الإنهاء.' },
+]
 
 const DIFFICULTY_LABEL: Record<string, string> = {
   beginner: '초급',
@@ -213,6 +254,12 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
             <span>예상 {scenario.estimatedMinutes}분</span>
             <span>최대 {scenario.expectedTurns}턴</span>
           </div>
+          {SCENARIO_SITUATION_HINTS[scenario.scenarioId] && (
+            <LangHint
+              items={SCENARIO_SITUATION_HINTS[scenario.scenarioId]}
+              label="모국어 도움말 보기"
+            />
+          )}
         </CardBody>
       </Card>
 
@@ -264,6 +311,12 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
               )
             })}
           </ul>
+          {SCENARIO_GOALS_HINTS[scenario.scenarioId] && (
+            <LangHint
+              items={SCENARIO_GOALS_HINTS[scenario.scenarioId]}
+              label="목표 도움말 보기"
+            />
+          )}
         </CardBody>
       </Card>
 
@@ -306,6 +359,9 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
               <Button variant="primary" size="lg" onClick={() => void handleStart()}>
                 대화 시작
               </Button>
+              <div className="mt-4 text-left">
+                <LangHint items={CHAT_GUIDE_HINTS} label="대화 방법 도움말" />
+              </div>
             </div>
           </CardBody>
         </Card>
