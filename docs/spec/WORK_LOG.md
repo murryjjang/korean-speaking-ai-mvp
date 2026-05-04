@@ -4,6 +4,69 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 7-A-lite — 학습자 화면 모바일 반응형 보완 (레이아웃 & 터치 타깃)
+
+**날짜**: 2026-05-04  
+**목표**: 학습자 화면에서 모바일(360px~767px) 환경의 기본 사용성 확보. 마이크 녹음·Supabase·Auth·API 구현 없음.
+
+### 수정 파일
+
+- `src/components/layout/sidebar.tsx` — 모바일 하단 내비게이션 추가
+- `src/components/layout/app-shell.tsx` — 모바일 본문 패딩 조정
+- `src/components/ui/button.tsx` — 터치 타깃 최소 높이 확보
+
+### 모바일 보완 내용
+
+#### 1. 모바일 하단 내비게이션 (`sidebar.tsx`)
+
+- 기존 `<aside>`는 `hidden md:flex`로 데스크톱 전용 유지
+- `md:hidden fixed bottom-0 inset-x-0 z-50` 하단 탭바 추가
+  - 역할별 navItems를 탭으로 렌더링 (`flex-1`, `min-h-[44px]`)
+  - 활성 탭: `text-primary-700 font-semibold`
+  - disabled 탭: `opacity-40 cursor-not-allowed`
+  - iOS safe-area 대응: `style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}`
+
+#### 2. 본문 하단 여백 (`app-shell.tsx`)
+
+- `p-6` → `p-4 pb-16 md:p-6`
+  - 모바일에서 고정 하단 탭바(약 52px)에 본문 콘텐츠가 가려지지 않도록 `pb-16` 추가
+  - 데스크톱(md 이상)은 `p-6`으로 기존 동작 유지
+
+#### 3. 버튼 터치 타깃 (`button.tsx`)
+
+- `size="md"`: `min-h-[44px]` 추가
+- `size="lg"`: `min-h-[44px]` 추가
+- `size="sm"`: 변경 없음 (인라인 보조 버튼 용도 유지)
+- iOS HIG / Android Material 권장 터치 타깃 44px 기준 준수
+
+### 확인 화면
+
+| 화면 | 경로 | 상태 |
+|---|---|---|
+| 말하기 평가 목록 | `/student/speaking` | 정적 빌드 ○ |
+| 말하기 평가 녹음 | `/student/speaking/q-001` | 동적 ƒ |
+| 말하기 평가 결과 | `/student/speaking/q-001/result` | 동적 ƒ |
+| 미션 대화 목록 | `/student/mission` | 정적 빌드 ○ |
+| 미션 대화 진행 | `/student/mission/sc-restaurant-01` | 동적 ƒ |
+| 미션 대화 결과 | `/student/mission/sc-restaurant-01/result` | 동적 ƒ |
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (14개 라우트, 기존과 동일)
+
+### Known Issues (Phase 7-A-lite 기준)
+
+| 이슈 | 영향 | 해소 예정 |
+|---|---|---|
+| **모바일 녹음 미구현** — mock 제출만 동작 | 중 | Phase 7-B |
+| **모바일 탭바 아이콘 없음** — 텍스트 레이블만 표시 | 낮 | Phase 7-A (full) |
+| **말하기 녹음 UI 모바일 레이아웃 미세 조정 미완** — 320px에서 일부 버튼 잘릴 수 있음 | 낮 | Phase 7-A (full) |
+| 기존 Phase 6-B5 known issues 모두 유지 | — | 해당 Phase 참고 |
+
+---
+
 ## Phase 6-B5 — Supabase 저장 연동 점검 및 파일럿 출시판 문서화
 
 **날짜**: 2026-05-04  
