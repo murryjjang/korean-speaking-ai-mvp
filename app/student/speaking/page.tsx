@@ -60,17 +60,15 @@ export default function SpeakingSelectionPage() {
                   const qType = typeMap.get(q.typeId)
 
                   return (
-                    <li
-                      key={questionId}
-                      className="flex items-center justify-between gap-4 px-5 py-4"
-                    >
-                      <div className="flex items-start gap-4 min-w-0">
+                    <li key={questionId} className="px-4 py-3 md:px-5 md:py-4">
+                      {/* 번호 + 제목 + 난이도 */}
+                      <div className="flex items-start gap-3 md:gap-4 min-w-0">
                         <span className="text-xs text-text-muted font-mono w-5 shrink-0 pt-0.5">
                           {order}
                         </span>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-text-primary">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5 md:mb-1">
+                            <span className="text-sm font-medium text-text-primary leading-snug">
                               {q.title}
                             </span>
                             <Badge
@@ -81,19 +79,34 @@ export default function SpeakingSelectionPage() {
                               {difficultyLabel[q.difficulty] ?? q.difficulty}
                             </Badge>
                           </div>
-                          <p className="text-xs text-text-muted truncate">
+                          {/* 메타: 데스크톱 전용 */}
+                          <p className="hidden md:block text-xs text-text-muted truncate">
                             {qType?.name ?? q.typeId} · 준비{' '}
                             {q.prepTimeSec}초 · 답변 {q.responseTimeSec}초
                           </p>
                         </div>
+                        {/* 시작하기: 데스크톱 전용 */}
+                        <Link
+                          href={`/student/speaking/${q.id}?setId=${set.id}`}
+                          className="hidden md:inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 py-2 rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 shrink-0"
+                        >
+                          시작하기
+                        </Link>
                       </div>
 
-                      <Link
-                        href={`/student/speaking/${q.id}?setId=${set.id}`}
-                        className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 py-2 rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 shrink-0"
-                      >
-                        시작하기
-                      </Link>
+                      {/* 모바일 하단행: 메타 + 시작하기 */}
+                      <div className="md:hidden flex items-center justify-between gap-3 pl-8 mt-2">
+                        <p className="text-xs text-text-muted truncate flex-1">
+                          {qType?.name ?? q.typeId} · 준비{' '}
+                          {q.prepTimeSec}초 · 답변 {q.responseTimeSec}초
+                        </p>
+                        <Link
+                          href={`/student/speaking/${q.id}?setId=${set.id}`}
+                          className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 shrink-0"
+                        >
+                          시작하기
+                        </Link>
+                      </div>
                     </li>
                   )
                 })}

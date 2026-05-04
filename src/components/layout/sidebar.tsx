@@ -81,7 +81,7 @@ export function Sidebar({ navItems, role }: SidebarProps) {
             return (
               <span
                 key={item.href}
-                className="flex-1 flex items-center justify-center py-3 text-xs text-text-muted opacity-40 cursor-not-allowed select-none min-h-[44px]"
+                className="flex-1 flex items-center justify-center py-2 px-1 text-[11px] leading-tight text-text-muted opacity-40 cursor-not-allowed select-none min-h-[44px] text-center"
               >
                 {item.label}
               </span>
@@ -93,7 +93,7 @@ export function Sidebar({ navItems, role }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={[
-                "flex-1 flex items-center justify-center py-3 text-xs font-medium transition-colors min-h-[44px]",
+                "flex-1 flex items-center justify-center py-2 px-1 text-[11px] leading-tight font-medium transition-colors min-h-[44px] text-center",
                 isActive
                   ? "text-primary-700 font-semibold"
                   : "text-text-secondary",

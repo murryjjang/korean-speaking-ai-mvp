@@ -70,12 +70,12 @@ export default function MissionListPage() {
                   <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
                     평가 기준
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {scenario.rubric.dimensions.map((dim) => (
                       <span
                         key={dim.id}
                         title={dim.description}
-                        className="inline-flex items-center text-xs bg-slate-100 text-slate-600 rounded px-2 py-0.5"
+                        className="inline-flex items-center text-xs bg-slate-100 text-slate-600 rounded px-2 py-1"
                       >
                         {dim.label}
                       </span>
@@ -95,7 +95,7 @@ export default function MissionListPage() {
                   {/* 대화 화면은 Phase 4-B에서 구현. 현재는 링크만 연결. */}
                   <Link
                     href={`/student/mission/${scenario.scenarioId}`}
-                    className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 py-2 rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 shrink-0"
+                    className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 shrink-0"
                   >
                     대화 시작
                   </Link>

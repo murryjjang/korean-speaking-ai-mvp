@@ -254,16 +254,16 @@ export default async function MissionResultPage({
         </Card>
 
         {/* 하단 액션 */}
-        <div className="flex items-center justify-between pt-2 pb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2 pb-4">
           <Link
             href="/student/mission"
-            className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 py-2 rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300"
+            className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 w-full sm:w-auto"
           >
             미션 목록으로
           </Link>
           <Link
             href={`/student/mission/${scenarioId}`}
-            className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 py-2 rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700"
+            className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 w-full sm:w-auto"
           >
             다시 연습하기
           </Link>

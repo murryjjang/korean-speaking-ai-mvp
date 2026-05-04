@@ -184,7 +184,7 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
   const achievedCount = goalStates.filter((g) => g.achieved).length
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div className="max-w-2xl mx-auto space-y-3 md:space-y-4">
       {/* 뒤로 가기 */}
       <div>
         <Link
@@ -218,7 +218,7 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
 
       {/* 미션 목표 패널 */}
       <Card>
-        <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+        <div className="px-4 py-3 md:px-5 border-b border-border flex items-center justify-between">
           <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
             미션 목표
           </p>
@@ -270,12 +270,12 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
       {/* 평가 기준 요약 */}
       <div className="px-1">
         <p className="text-xs text-text-muted mb-1.5">평가 기준</p>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {scenario.rubric.dimensions.map((dim) => (
             <span
               key={dim.id}
               title={dim.description}
-              className="inline-flex items-center text-xs bg-slate-100 text-slate-600 rounded px-2 py-0.5"
+              className="inline-flex items-center text-xs bg-slate-100 text-slate-600 rounded px-2 py-1"
             >
               {dim.label}
             </span>
@@ -415,14 +415,14 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
                       제출 중 오류가 발생했습니다. 다시 시도해주세요.
                     </p>
                   )}
-                  <div className="flex items-center justify-center gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
                     <Link
                       href="/student/mission"
-                      className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 py-2 rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300"
+                      className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 w-full sm:w-auto"
                     >
                       목록으로
                     </Link>
-                    <Button variant="primary" onClick={() => void handleSubmit()}>
+                    <Button variant="primary" onClick={() => void handleSubmit()} className="w-full sm:w-auto">
                       제출하기
                     </Button>
                   </div>
