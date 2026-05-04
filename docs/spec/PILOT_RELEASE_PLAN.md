@@ -19,13 +19,13 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 
 ## 마일스톤 요약
 
-| 마일스톤 | 날짜 | 핵심 조건 |
-|---|---|---|
-| **D+0** — Phase 6-A 완료 | 2026-05-04 | 저장소 추상화 구조, 스키마 초안 |
-| **D+3** — 최소기능 시연판 | 2026-05-07 | Supabase 연결 + 핵심 경로 저장 확인 |
-| **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 |
-| **D+10** — API/녹음 연동 2차 보완판 | 2026-05-14 | 실제 녹음 + STT 연동 (옵션) |
-| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 |
+| 마일스톤 | 날짜 | 핵심 조건 | 상태 |
+|---|---|---|---|
+| **D+0** — Phase 6-A 완료 | 2026-05-04 | 저장소 추상화 구조, 스키마 초안 | ✅ 완료 |
+| **D+3** — 최소기능 시연판 | 2026-05-07 | Supabase 연결 + 핵심 경로 저장 확인 | ✅ 완료 (Phase 6-B1~B2) |
+| **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 | ✅ 완료 (Phase 6-B2~B5) |
+| **D+10** — API/녹음 연동 2차 보완판 | 2026-05-14 | 실제 녹음 + STT 연동 (옵션) | 진행 예정 |
+| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | 진행 예정 |
 
 ---
 
@@ -72,24 +72,37 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 
 ---
 
-## D+5 — Supabase 저장 연동 보완판 (2026-05-09)
+## D+5 — Supabase 저장 연동 보완판 (2026-05-09) ✅ 완료
 
 **목표**: 모든 핵심 제출·채점 데이터 DB에 저장.
 
-**완료 조건:**
-- SupabaseSubmissionRepository 전체 구현
-- SupabaseEvaluationRepository 구현 (ai_evaluations 저장)
-- SupabaseTeacherReviewRepository 구현 (teacher_reviews 저장)
-- SupabaseMissionRepository 구현 (mission_submissions 저장)
-- `REPOSITORY_PROVIDER=supabase` 환경변수로 전환 가능
-- 기존 화면에서 DB 데이터가 정상 표시되는지 확인
-- RLS 기본 정책 설정 (service_role full access)
+**완료 조건 및 결과:**
+- [x] SupabaseSubmissionRepository 전체 구현 (Phase 6-B2)
+- [x] SupabaseEvaluationRepository 구현 — ai_evaluations 저장 (Phase 6-B2)
+- [x] SupabaseTeacherReviewRepository 구현 — teacher_reviews 저장 (Phase 6-B3)
+- [x] SupabaseMissionRepository 구현 — mission_submissions 저장 (Phase 6-B4)
+- [x] `REPOSITORY_PROVIDER=supabase` 환경변수로 전환 가능
+- [x] mock fallback 유지 — `REPOSITORY_PROVIDER=mock`(미설정) 시 기존 동작 100% 유지
+- [x] Supabase 저장 실패 시 graceful degradation (화면 중단 없음)
+- [ ] RLS 기본 정책 설정 — **Phase 9(Auth 도입)으로 연기** (파일럿 단계 임시 disable 허용, SUPABASE_SCHEMA.md 참조)
 
-**데이터 플로우 변경:**
+**달성된 데이터 플로우 변경:**
 ```
-Before: page → mock store (Map)
-After:  page → repository factory → SupabaseRepository → supabase-js → PostgreSQL
+Before: Server Action → mock store (Map)
+After:  Server Action → mock store (항상, result 페이지 read 의존)
+                     → SupabaseRepository (REPOSITORY_PROVIDER=supabase 시 추가 저장)
+                          → supabase-js → PostgreSQL
 ```
+
+**Phase 6-B5 기준 저장 성공 테이블:**
+- `speaking_submissions` + `ai_evaluations` (speaking)
+- `teacher_reviews`
+- `mission_submissions` + `ai_evaluations` (mission)
+
+**알려진 D+5 잔여 이슈 (D+10 이후 해소 예정):**
+- teacher 제출 목록이 여전히 mock data.ts 직독 (read 경로 미통합)
+- result 페이지 URL이 mock submissionId 기반 (Supabase UUID 미연결)
+- teacher_reviews.submission_id가 placeholder UUID (speaking_submissions와 미연결)
 
 ---
 
@@ -350,15 +363,43 @@ ANTHROPIC_API_KEY=                 # LLM_EVAL_PROVIDER=claude 시 필요
 
 ---
 
+## D+10 방향 — 다음 단계 체크리스트 (Phase 6-B5 기준)
+
+D+5 완료 후 D+10(2026-05-14)까지 진행할 작업 체크리스트.
+
+### Phase 7-A — 학습자 반응형 UI 보완 (우선순위 높음)
+- [ ] 사이드바 모바일 햄버거 메뉴 구현 (768px 미만)
+- [ ] 테이블 가로 스크롤 처리 (교수자·관리자 화면)
+- [ ] 버튼·링크 터치 가능 영역 최소 44×44px 확보
+- [ ] 360px 기준 말하기 평가·미션 대화 레이아웃 픽스
+- [ ] 대화 말풍선 360px 가로 오버플로 처리
+
+### Phase 7-B — 브라우저 마이크 녹음 최소 구현
+- [ ] `MediaRecorder` API 기반 실제 오디오 녹음 UI
+- [ ] 마이크 권한 요청·거부 처리 및 안내 문구 표시
+- [ ] 녹음·미리듣기·재녹음 UI
+- [ ] Supabase Storage 오디오 업로드 (audio_url 채우기)
+- [ ] iOS Safari mp4/aac 포맷 변환 처리 (또는 Phase 8-A로 연기)
+
+### Phase 8-A — STT 실제 API 최소 연동 (선택적)
+- [ ] ETRI 개방API 또는 Whisper API 연동
+- [ ] STTProvider 교체 (mock → 실제)
+- [ ] 실제 전사문 ai_evaluations 반영
+
+---
+
 ## 이후 작업 Phase 제안
 
-Phase 6-A 완료 기준, 파일럿 출시 이후 다음 단계를 제안한다.
+Phase 6-B5 완료 기준, D+10 이후 다음 단계를 제안한다.
 
-| Phase | 목표 | 핵심 작업 |
-|---|---|---|
-| **Phase 7-A** | 반응형 UI 보완 | 사이드바 모바일 햄버거 메뉴, 테이블 가로 스크롤 처리, 버튼 터치 영역 최소 44px, 360px 레이아웃 픽스 |
-| **Phase 7-B** | 브라우저 마이크 녹음 최소 구현 | `MediaRecorder` API, 마이크 권한 요청·거부 처리, 녹음·재생·재녹음 UI, Supabase Storage 오디오 업로드 |
-| **Phase 8-A** | STT 실제 API 최소 연동 | ETRI 개방API 또는 Whisper API 연동, STTProvider 교체, 실제 전사문 반영, iOS mp4/aac 변환 처리 |
-| **Phase 8-B** | Supabase Auth 도입 | 교수자 로그인, 학생 세션 구분, RLS 정책 활성화 |
+| Phase | 목표 | 핵심 작업 | 비고 |
+|---|---|---|---|
+| **Phase 7-A** | 반응형 UI 보완 | 사이드바 모바일 햄버거 메뉴, 테이블 가로 스크롤 처리, 버튼 터치 영역 최소 44px, 360px 레이아웃 픽스 | D+6~7 목표 |
+| **Phase 7-B** | 브라우저 마이크 녹음 최소 구현 | `MediaRecorder` API, 마이크 권한 요청·거부 처리, 녹음·재생·재녹음 UI, Supabase Storage 오디오 업로드 | D+7~9 목표 |
+| **Phase 8-A** | STT 실제 API 최소 연동 | ETRI 개방API 또는 Whisper API 연동, STTProvider 교체, 실제 전사문 반영, iOS mp4/aac 변환 처리 | D+10, 7-B 완료 후 |
+| **Phase 9** | Supabase Auth 도입 + RLS 활성화 | 교수자 로그인, 학생 세션 구분, RLS 정책 활성화, pilot student 고정 해소 | D+12+ |
+| **Phase 10** | Vercel 배포 | 프로덕션 환경 배포, 커스텀 도메인, 환경변수 설정 | D+13+ |
+| **Phase 11** | 파일럿 테스트 준비 | 기기별 수동 테스트, 파일럿 가이드 작성, seed 데이터 준비 | D+14~15 |
 
-> Phase 7-A와 7-B는 병렬 진행 가능. Phase 8-A는 Phase 7-B(마이크 녹음) 완료 이후 시작 권장.
+> Phase 7-A와 7-B는 병렬 진행 가능. Phase 8-A는 Phase 7-B(마이크 녹음) 완료 이후 시작 권장.  
+> Phase 9(Auth + RLS)는 D+12 이후 별도 계획 수립 권장.

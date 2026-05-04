@@ -4,6 +4,113 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 6-B5 — Supabase 저장 연동 점검 및 파일럿 출시판 문서화
+
+**날짜**: 2026-05-04  
+**목표**: Phase 6-B2~B4 완료 기준으로 Supabase 저장 연동 상태를 점검하고, 파일럿 출시판 기준의 현재 저장 흐름·known issue·다음 단계 계획을 문서화한다. 코드 변경 없음.
+
+### 수정 파일
+
+- `docs/spec/WORK_LOG.md` — Phase 6-B5 항목 추가 (이 문서)
+- `docs/spec/PILOT_RELEASE_PLAN.md` — D+5 완료 상태 반영, Phase 6-B5 이후 D+10 방향 체크리스트 추가
+- `docs/spec/SUPABASE_SCHEMA.md` — RLS 임시 disable 현황과 Phase 9 이후 재활성화 계획 보강
+
+### Supabase 저장 연동 현황 (Phase 6-B5 기준)
+
+#### 저장 성공 항목 (REPOSITORY_PROVIDER=supabase 기준)
+
+| 테이블 | 저장 경로 | 구현 파일 | 완료 Phase |
+|---|---|---|---|
+| `speaking_submissions` | `/student/speaking/[questionId]` 제출 | `supabase-submission-repository.ts` | 6-B2 |
+| `ai_evaluations` (speaking) | speaking 제출 시 함께 저장 | `supabase-submission-repository.ts` | 6-B2 |
+| `teacher_reviews` | `/teacher/submissions/[id]` 채점 확정 | `supabase-teacher-review-repository.ts` | 6-B3 |
+| `mission_submissions` | 미션 대화 완료·제출 시 | `supabase-mission-repository.ts` | 6-B4 |
+| `ai_evaluations` (mission) | mission 제출 시 함께 저장 | `supabase-mission-repository.ts` | 6-B4 |
+
+#### 전체 저장 흐름 요약
+
+```
+[말하기 평가 제출]
+submitSpeaking(questionId, questionSetId)   ← Server Action
+  ├─ [항상]    saveSpeakingEval()           → mock store (result 페이지 read 의존)
+  └─ [supabase] SupabaseEvaluationRepository.saveSpeakingEvalRecord()
+                  ├─ ensurePilotClass / ensurePilotStudent / ensureQuestion / ensureQuestionSet
+                  ├─ INSERT speaking_submissions → DB UUID
+                  └─ INSERT ai_evaluations (submission_type='speaking')
+
+[교수자 채점 확정]
+finalizeTeacherEvaluation(submissionId, ...)  ← Server Action
+  ├─ [항상]    storeFinalize()              → mock store (page read 의존)
+  └─ [supabase] SupabaseTeacherReviewRepository.finalizeReview()
+                  ├─ _reviewIdCache hit   → UPDATE teacher_reviews
+                  └─ _reviewIdCache miss  → INSERT teacher_reviews (submission_id: placeholder UUID)
+
+[미션 대화 제출]
+submitMission(sessionId)                      ← Server Action
+  ├─ [항상]    saveMissionSubmission()        → mock store (result 페이지 read 의존)
+  └─ [supabase] SupabaseMissionRepository.createMissionSubmission()
+                  ├─ ensurePilotClass / ensurePilotStudent / ensureScenario
+                  ├─ INSERT mission_submissions → DB UUID
+                  └─ INSERT ai_evaluations (submission_type='mission')
+```
+
+#### mock fallback 유지 항목
+
+- `REPOSITORY_PROVIDER=mock`(미설정 시 기본값)일 때 기존 mock 경로만 실행, DB 호출 없음
+- Supabase 저장 실패 시: `console.error` 출력 후 화면은 mock store 기반으로 정상 표시
+- result 페이지 URL은 여전히 mock submissionId 기반 (Supabase UUID와 미연결)
+
+### Known Issues (Phase 6-B5 기준)
+
+| 이슈 | 영향 | 해소 예정 |
+|---|---|---|
+| **RLS 임시 disable** — 모든 테이블 RLS 비활성화 상태 | 높 (데이터 보호 없음) | Phase 9 (Supabase Auth 도입 시) |
+| **Auth 미구현** — pilot student / pilot class 고정 | 높 | Phase 9 |
+| **음성 파일 저장 없음** — audio_url / duration_sec null | 중 | Phase 7-B (Storage 연동) |
+| **mission result URL이 mock sessionId 기반** — Supabase UUID 미연결 | 중 | Phase 9 이후 read 경로 통합 시 |
+| **teacher_reviews.submission_id placeholder UUID** — speaking_submissions와 미연결 | 중 | Phase 9 (실제 submission_id 매핑) |
+| **teacher 제출 목록 미 DB화** — `/teacher/submissions` 목록이 mock data.ts 직독 | 중 | Phase 6-C 또는 Phase 9 |
+| **관리자 대시보드 mock 중심** — Supabase 집계 미구현 | 낮 | Phase 9+ |
+| **세션 서버 재시작 소실** — MissionSession / SpeakingEvalRecord in-memory | 중 | Phase 9+ |
+| **Bootstrap race condition** — pilot class/student 동시 중복 insert 가능 | 낮 | Phase 9 (Auth 후 자연 해소) |
+| **iOS 모바일 녹음 미구현** — mock 녹음 fallback 사용 | 중 | Phase 7-B |
+| **ai_evaluation_id null** — teacher_reviews의 ai_evaluation_id가 null 저장 | 중 | Phase 9 (UUID 매핑 구조 추가 시) |
+
+### 다음 단계 계획 (D+10 방향)
+
+| Phase | 날짜 목표 | 핵심 작업 |
+|---|---|---|
+| **Phase 7-A** | D+6~7 | 학습자 화면 반응형 UI 보완 (360px, 모바일 사이드바) |
+| **Phase 7-B** | D+7~9 | 브라우저 마이크 녹음 최소 구현 (MediaRecorder, 권한 처리) |
+| **Phase 8-A** | D+10 | ETRI 또는 Whisper STT 실제 API 최소 연동 |
+| **Phase 9** | D+12+ | Supabase Auth / 역할 분기 / RLS 정책 활성화 |
+| **Phase 10** | D+13+ | Vercel 배포 |
+| **Phase 11** | D+14~15 | 파일럿 테스트 준비, 기기별 수동 테스트 |
+
+### D+5 달성 여부 체크리스트
+
+- [x] `speaking_submissions` Supabase 저장 성공 (Phase 6-B2)
+- [x] `ai_evaluations` (speaking) Supabase 저장 성공 (Phase 6-B2)
+- [x] `teacher_reviews` Supabase 저장 성공 (Phase 6-B3)
+- [x] `mission_submissions` Supabase 저장 성공 (Phase 6-B4)
+- [x] `ai_evaluations` (mission) Supabase 저장 성공 (Phase 6-B4)
+- [x] `REPOSITORY_PROVIDER=supabase`로 전환 시 모든 핵심 write 경로 DB 저장 동작
+- [x] `REPOSITORY_PROVIDER=mock` 기존 동작 완전 유지
+- [x] 저장 실패 시 화면 중단 없는 graceful degradation
+- [x] 각 단계별 lint / tsc / build 통과
+- [ ] RLS 기본 정책 설정 — Phase 9(Auth 도입)으로 연기 (파일럿 단계에서 임시 disable 허용)
+- [ ] 교수자 제출 목록 DB 기반 조회 — Phase 6-C 또는 Phase 9로 연기
+
+**D+5 핵심 목표 달성**: 모든 핵심 write 경로(말하기 제출·AI 평가·교수자 채점·미션 제출) Supabase DB 저장 연동 완료.
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓ (문서 전용 Phase, 코드 변경 없음)
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (14개 라우트, 기존과 동일)
+
+---
+
 ## Phase 6-B4 — 학습자 미션 대화 Supabase 저장 연동
 
 **날짜**: 2026-05-04  

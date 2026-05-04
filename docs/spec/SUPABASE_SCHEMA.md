@@ -294,12 +294,44 @@ REPOSITORY_PROVIDER=supabase            # 미설정 시 mock fallback
 
 ---
 
-## RLS 정책 방침 (Phase 6-B)
+## RLS 정책 현황 (Phase 6-B5 기준)
 
-Phase 6-A에서는 RLS 비활성화 상태. Phase 6-B에서 다음 정책 추가 예정:
-- 교수자: 자신의 반 데이터만 read/write
-- 학생: 자신의 제출만 read/write (Auth 도입 후)
-- service_role: 모든 테이블 full access (서버 사이드 API용)
+### 현재 상태 — RLS 임시 disable
+
+Phase 6-B(파일럿 개발 단계) 전체에서 모든 테이블의 RLS를 비활성화 상태로 운영한다.
+
+**비활성화 대상 테이블:**
+- `classes`, `students`
+- `question_sets`, `questions`
+- `speaking_submissions`, `ai_evaluations`
+- `teacher_reviews`
+- `mission_scenarios`, `mission_submissions`
+- `provider_events`, `content_versions`
+
+**임시 disable 근거:**
+- Auth 미구현 단계에서 `anon` 키로 INSERT가 가능해야 파일럿 저장 연동 동작 가능
+- service_role 키는 서버 환경변수에만 보관 (`SUPABASE_SERVICE_ROLE_KEY`), 절대 `NEXT_PUBLIC` 불가
+- 파일럿 URL을 참가자에게만 비공개 공유하는 방식으로 임시 보호
+
+**보안 위험 완화 조치 (파일럿 기간):**
+- Supabase 프로젝트 URL을 공개 문서에 노출하지 않음
+- anon 키는 최소 권한으로 유지 (INSERT/SELECT only, DELETE 불가)
+- 파일럿 데이터에 실제 개인정보 포함하지 않음 (익명 ID 사용)
+
+### Phase 9 이후 — RLS 재활성화 계획
+
+Supabase Auth 도입(Phase 9) 후 아래 정책을 순차 적용한다.
+
+| 역할 | 테이블 | 허용 작업 |
+|---|---|---|
+| `authenticated` (교수자) | `teacher_reviews` | INSERT, UPDATE (자신이 작성한 row) |
+| `authenticated` (교수자) | `speaking_submissions`, `mission_submissions` | SELECT (자신의 반 학생 row) |
+| `authenticated` (학생) | `speaking_submissions`, `mission_submissions` | INSERT, SELECT (자신의 row) |
+| `authenticated` (학생) | `ai_evaluations` | SELECT (자신의 submission에 연결된 row) |
+| `service_role` | 전체 | full access (서버 사이드 Server Action 전용) |
+| `anon` | 전체 | 접근 불가 (Auth 도입 후) |
+
+> **Phase 9 이전 파일럿 기간에는 RLS 비활성화 상태 유지. PILOT_RELEASE_PLAN.md Known Issues 참조.**
 
 ---
 
