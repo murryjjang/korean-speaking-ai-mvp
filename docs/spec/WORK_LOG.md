@@ -4,6 +4,79 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 6-A — Supabase 저장소 추상화 (Database Schema & Repository Abstraction)
+
+**날짜**: 2026-05-04  
+**목표**: 기존 mock MVP를 깨지 않고, Supabase 저장 연동을 위한 DB 스키마와 저장소 추상화 구조를 설계. 실제 DB 연결·API 호출 없음. 다음 Phase에서 repository 선택 방식으로 안전하게 교체 가능하도록 준비.
+
+### 생성 파일
+
+**타입 (`src/types/`)**
+- `src/types/db.ts` — Supabase 테이블 컬럼과 1:1 대응하는 DB Row 타입 11종 (snake_case). ClassRow, StudentRow, QuestionRow, QuestionSetRow, SpeakingSubmissionRow, MissionScenarioRow, MissionSubmissionRow, AIEvaluationRow, TeacherReviewRow, ProviderEventRow, ContentVersionRow.
+
+**Repository 인터페이스 + Mock 구현 (`src/lib/repositories/`)**
+- `src/lib/repositories/types.ts` — 6개 Repository 인터페이스 (SubmissionRepository, EvaluationRepository, TeacherReviewRepository, MissionRepository, StudentRepository, ClassRepository) + 입력/필터 타입 (SubmissionFilter, CreateSpeakingSubmissionInput, CreateAIEvaluationInput, SpeakingEvalRecord).
+- `src/lib/repositories/mock-repository.ts` — 기존 mock store들을 repository 인터페이스로 wrapping하는 6개 Mock 구현체. 기존 store 파일 미수정. 서버 재시작 시 초기화되는 신규 제출 저장용 module-level Map 추가.
+- `src/lib/repositories/index.ts` — Repository 팩토리 함수 6종 (getSubmissionRepository, getEvaluationRepository, getTeacherReviewRepository, getMissionRepository, getStudentRepository, getClassRepository). Phase 6-B에서 `REPOSITORY_PROVIDER=supabase` 환경변수로 교체 가능하도록 설계.
+
+**스펙 문서 (`docs/spec/`)**
+- `docs/spec/SUPABASE_SCHEMA.md` — 11개 테이블 스키마 설계서. 컬럼/타입/인덱스/JSONB 사유/mock 데이터 매핑/환경변수/RLS 방침/마이그레이션 전략 포함.
+- `docs/spec/SUPABASE_SCHEMA.sql` — 실행 가능한 PostgreSQL DDL. CREATE TABLE + INDEX + RLS (주석 처리, Phase 6-B에서 활성화).
+- `docs/spec/PILOT_RELEASE_PLAN.md` — 15일 파일럿 출시 계획. D+3/D+5/D+10/D+15 마일스톤, 포함/제외 기능, known issue, 파일럿 주의사항, 지원 기기 기준(학습자·교수자·관리자), 반응형 UI 점검 체크리스트(360px~1280px), 모바일 마이크 녹음 테스트 체크리스트(Android·iOS·Windows), 파일럿 출시 전 필수 기기 테스트 목록, 이후 Phase 제안(7-A/7-B/8-A/8-B) 포함.
+
+### 수정 파일
+
+- `docs/spec/WORK_LOG.md` — Phase 6-A 항목 추가 및 PILOT_RELEASE_PLAN.md 설명 업데이트
+
+### 설계 원칙
+
+- **기존 파일 무수정**: `src/lib/mock/` 하위 4개 store 파일, 모든 `app/` 라우트 파일 완전 보존
+- **Provider 교체 방식**: 팩토리 함수에서 구현체 선택 → 기존 화면은 수정 없이 다음 Phase에서 교체 가능
+- **구조적 회귀 방지**: 신규 파일 7개 추가만 발생, 기존 import 경로 미변경
+
+### 테이블 목록
+
+| 테이블 | 설명 |
+|---|---|
+| `classes` | 수업 반 |
+| `students` | 학생 (익명 ID 포함) |
+| `question_sets` | 문항 세트 |
+| `questions` | 개별 문항 |
+| `speaking_submissions` | 말하기 평가 제출 |
+| `mission_scenarios` | 미션 시나리오 콘텐츠 |
+| `mission_submissions` | 미션 대화 제출 |
+| `ai_evaluations` | AI 평가 결과 (말하기+미션 공용) |
+| `teacher_reviews` | 교수자 채점 결과 |
+| `provider_events` | API 호출 로그 |
+| `content_versions` | 콘텐츠 변경 이력 |
+
+### Repository 인터페이스 요약
+
+```
+SubmissionRepository     listSubmissions / getSubmissionById / createSpeakingSubmission / updateSubmissionStatus
+EvaluationRepository     getAIEvaluation / saveAIEvaluation / getSpeakingEvalRecord / saveSpeakingEvalRecord
+TeacherReviewRepository  getTeacherReview / saveDraft / finalizeReview / getStatusOverride
+MissionRepository        createSession / getSession / updateSession / createMissionSubmission / getMissionSubmission
+StudentRepository        listStudents / getStudentById
+ClassRepository          listClasses / getClassById
+```
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓
+
+### 다음 단계 (Phase 6-B)
+
+1. `@supabase/supabase-js` 설치
+2. Supabase 클라이언트 초기화 파일 (`src/lib/supabase/client.ts`)
+3. `SUPABASE_SCHEMA.sql` Supabase Dashboard에서 실행
+4. SupabaseSubmissionRepository 구현 (speaking_submissions 저장부터 시작)
+5. `REPOSITORY_PROVIDER=supabase` 환경변수 설정 + 기존 페이지 repository 전환
+
+---
+
 ## Phase 5 — 교수자 채점 UI (Teacher Grading UI)
 
 **날짜**: 2026-05-04
