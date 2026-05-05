@@ -68,10 +68,14 @@ const RECORDING_HINTS: LangHintItem[] = [
 ]
 
 const RECORDER_ERROR_MESSAGES: Record<string, string> = {
-  'not-supported': '이 브라우저는 마이크 녹음을 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요.',
-  'permission-denied': '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 권한을 허용해주세요.',
-  'permission-dismissed': '마이크 접근이 취소되었습니다. 다시 시도하거나 mock으로 제출할 수 있습니다.',
-  unknown: '마이크 접근 중 오류가 발생했습니다. 다시 시도해주세요.',
+  'not-supported':
+    '이 브라우저는 마이크 녹음을 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요. (iOS는 iOS 15 이상 Safari 필요)',
+  'permission-denied':
+    '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 권한을 허용해주세요.',
+  'permission-dismissed':
+    '마이크 접근이 취소되었습니다. 다시 시도하거나 녹음 없이 제출할 수 있습니다.',
+  unknown:
+    '마이크 접근 중 오류가 발생했습니다. iOS Safari는 일부 기기에서 녹음이 제한될 수 있습니다. 녹음 없이도 제출할 수 있습니다.',
 }
 
 export function SpeakingClient({
@@ -88,6 +92,12 @@ export function SpeakingClient({
   const [prepRemaining, setPrepRemaining] = useState(question.prepTimeSec)
   const [prepStarted, setPrepStarted] = useState(false)
   const [submitError, setSubmitError] = useState(false)
+  // Detected once at mount; server always returns false (no navigator).
+  const [isIOSSafari] = useState<boolean>(() => {
+    if (typeof navigator === 'undefined') return false
+    const ua = navigator.userAgent
+    return /iP(hone|ad|od)/i.test(ua) && /^((?!chrome|android).)*safari/i.test(ua)
+  })
 
   const recorder = useAudioRecorder()
   // Track recording elapsed seconds independently so auto-stop still works
@@ -302,6 +312,13 @@ export function SpeakingClient({
                   <p className="text-sm text-text-secondary mb-6">
                     문항을 읽고 답변을 준비하세요.
                   </p>
+                  {isIOSSafari && (
+                    <div className="mb-4 mx-auto max-w-sm text-left px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-md">
+                      <p className="text-xs text-amber-700 leading-relaxed">
+                        <strong>iOS Safari 안내:</strong> iOS 15 이상에서만 녹음이 가능합니다. 일부 기기에서는 녹음이 제한될 수 있으며, 오류 시에도 제출은 가능합니다.
+                      </p>
+                    </div>
+                  )}
                   <Button
                     variant="primary"
                     size="lg"
@@ -356,7 +373,7 @@ export function SpeakingClient({
                   <p className="text-xs text-text-muted mb-6">
                     최대 {formatTime(question.responseTimeSec)}
                   </p>
-                  <Button variant="secondary" onClick={handleStopRecording}>
+                  <Button variant="secondary" onClick={handleStopRecording} className="min-w-[160px]">
                     녹음 완료
                   </Button>
                 </>
@@ -426,10 +443,10 @@ export function SpeakingClient({
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Button variant="secondary" onClick={handleRetake}>
+                <Button variant="secondary" onClick={handleRetake} className="w-full sm:w-auto">
                   다시 녹음
                 </Button>
-                <Button variant="primary" onClick={handleSubmit}>
+                <Button variant="primary" onClick={handleSubmit} className="w-full sm:w-auto">
                   제출하기
                 </Button>
               </div>

@@ -189,9 +189,11 @@ After:  Server Action → mock store (항상, result 페이지 read 의존)
 | **교수자 목록에 실 DB 데이터 미반영** (D+5 이전) — mock 데이터만 표시 | 중 | D+5 이후 해소 |
 | **모바일 교수자 채점 화면** — 좁은 화면에서 테이블·위저드 레이아웃 깨질 수 있음 | 중 | 교수자는 노트북 사용 권장. Phase 7-A에서 반응형 보완 예정 |
 | **모바일 관리자 화면** — 통계 테이블이 좁은 화면에서 가로 오버플로 가능 | 낮 | 관리자는 노트북 사용 권장 |
-| **iOS Safari 녹음 포맷 차이** — mp4/aac 포맷, STT 제공자에 따라 변환 처리 필요 | 중 | Phase 7-B에서 포맷 변환 처리 예정. D+10 이전은 mock 녹음으로 우회 |
-| **마이크 권한 거부 시 제출 불가** — 브라우저 권한 거부 시 녹음 진행 불가 | 중 | 안내 문구 표시 + mock 녹음 fallback 제공 예정 (Phase 7-B) |
-| **음성 파일 장기 저장 미처리** — 현재 오디오 파일 비영구 저장 | 낮 | Supabase Storage 연동 후 해소 (Phase 7-B) |
+| **iOS Safari 녹음 포맷 차이** — mp4/aac 포맷, STT 제공자에 따라 변환 처리 필요 | 중 | Phase 8-D에서 iOS 경고 배너 추가. Phase 8-A에서 서버 측 포맷 변환 처리 예정 |
+| **iOS Safari < 15** — MediaRecorder 미지원, 녹음 불가 | 중 | Phase 8-D: 미지원 브라우저 안내 메시지 + 녹음 없이 fallback 제출 가능 |
+| **iOS Safari 빈 Blob** — 일부 기기에서 0바이트 Blob 생성 | 중 | Phase 8-D: blob.size 체크 추가, blobUrl=null 시 빈 transcript fallback 제출 유지 |
+| **마이크 권한 거부 시 제출 불가** — 브라우저 권한 거부 시 녹음 진행 불가 | 중 | Phase 8-D: 권한 거부 안내 메시지 + 녹음 없이 fallback 제출 가능 (UI 명시) |
+| **음성 파일 장기 저장 미처리** — 현재 오디오 파일 비영구 저장 | 낮 | Phase 8-C에서 Supabase Storage 연동 완료. audio_url DB 저장 |
 
 ---
 
@@ -215,11 +217,19 @@ After:  Server Action → mock store (항상, result 페이지 read 의존)
 8. **Claude API**: anthropic API 키 필요. 파일럿 비용 예산 사전 확인.
 9. **PRONUNCIATION API**: D+15 출시 기준 mock 유지 가능. 실제 발음 평가 도입 전 사용자에게 고지.
 
+### 모바일/iOS 녹음 (Phase 8-D 기준)
+
+10. **iOS 기기 권장 버전**: 파일럿 참가 iPhone/iPad는 iOS 15 이상 필수. iOS 15 미만에서는 MediaRecorder 미지원으로 녹음 불가. 녹음 오류 시에도 제출은 가능함을 참가자에게 사전 안내.
+11. **iOS Safari 녹음 안내 문구 (학생 사전 공유)**:
+    > "말하기 평가 녹음 화면에서 마이크 권한 요청이 표시되면 허용해 주세요. iPhone/iPad에서는 iOS 15 이상이 필요합니다. 녹음 오류가 발생해도 '제출하기' 버튼으로 평가 제출이 가능합니다."
+12. **마이크 권한 거부 시**: 브라우저 설정 > 해당 사이트 > 마이크 권한 허용 후 페이지 새로고침 안내.
+13. **Android 녹음**: Chrome 최신 버전 권장. webm/opus 포맷 자동 선택.
+
 ### 운영
 
-10. **파일럿 규모 권장**: 동시 접속 20명 이하. Vercel 무료 티어 기준.
-11. **피드백 채널**: 파일럿 중 교수자/학생 피드백을 수집할 채널(이메일, 간단한 설문) 사전 준비.
-12. **롤백 계획**: 문제 발생 시 `REPOSITORY_PROVIDER=mock`으로 즉시 mock 모드 전환 가능. Supabase 저장 실패해도 화면은 동작.
+14. **파일럿 규모 권장**: 동시 접속 20명 이하. Vercel 무료 티어 기준.
+15. **피드백 채널**: 파일럿 중 교수자/학생 피드백을 수집할 채널(이메일, 간단한 설문) 사전 준비.
+16. **롤백 계획**: 문제 발생 시 `REPOSITORY_PROVIDER=mock`으로 즉시 mock 모드 전환 가능. Supabase 저장 실패해도 화면은 동작.
 
 ---
 

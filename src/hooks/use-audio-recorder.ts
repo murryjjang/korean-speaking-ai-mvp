@@ -117,8 +117,13 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       const blob = new Blob(chunksRef.current, {
         type: recorder.mimeType || 'audio/webm',
       })
-      const url = URL.createObjectURL(blob)
-      setBlobUrl(url)
+      // Only create a URL when the blob has actual audio data.
+      // A 0-byte blob happens on some iOS devices when recording fails silently;
+      // leaving blobUrl as null lets the submit fallback proceed without audio.
+      if (blob.size > 0) {
+        const url = URL.createObjectURL(blob)
+        setBlobUrl(url)
+      }
       setState('stopped')
     }
 

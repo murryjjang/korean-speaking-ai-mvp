@@ -4,6 +4,69 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 8-D — 모바일/iOS 녹음 예외 처리 보완
+
+**날짜**: 2026-05-05  
+**목표**: 녹음 실패(권한 거부·미지원 브라우저·iOS Safari 제한·빈 Blob)가 발생해도 제출 흐름이 깨지지 않도록 예외 처리를 보완하고, 모바일 360px 레이아웃을 최소 수정한다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/hooks/use-audio-recorder.ts` | `onstop`에서 `blob.size > 0` 체크 추가 — 빈 Blob일 때 blobUrl을 생성하지 않아 fallback 제출 흐름 유지 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | iOS Safari 감지(`isIOSSafari` state+effect), 준비 화면 iOS 경고 배너 추가, 에러 메시지 iOS 언급 추가, 리뷰 버튼 `w-full sm:w-auto` 추가, 녹음 완료 버튼 `min-w-[160px]` 추가 |
+| `docs/spec/WORK_LOG.md` | Phase 8-D 항목 추가 (이 문서) |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | Known Issues에 Phase 8-D 해소 항목 반영, iOS 파일럿 안내 추가 |
+
+### 추가된 예외 처리
+
+```
+1. 빈 Blob fallback (use-audio-recorder.ts)
+   - onstop 시 blob.size === 0 → blobUrl = null, state = 'stopped'
+   - submit 흐름: blobUrl이 null → STT/Storage skip → 빈 transcript로 submitSpeaking 진행
+   - 기존 성공 경로(blob.size > 0)는 변경 없음
+
+2. iOS Safari 감지 및 사전 경고 (speaking-client.tsx)
+   - useEffect에서 UA 파싱 → isIOSSafari state
+   - 준비 화면(prepStarted=false)에서 amber 배너 표시
+   - 메시지: "iOS 15 이상 필요, 오류 시에도 제출 가능"
+
+3. 에러 메시지 개선 (RECORDER_ERROR_MESSAGES)
+   - not-supported: iOS 15 이상 Safari 필요 명시
+   - unknown: iOS Safari 제한 가능성 안내 + 녹음 없이 제출 가능 안내
+
+4. 모바일 360px 버튼 레이아웃
+   - 리뷰 단계 [다시 녹음] [제출하기]: w-full sm:w-auto (모바일 전체 너비)
+   - 녹음 완료 버튼: min-w-[160px] (터치 영역 확보)
+```
+
+### 유지된 성공 흐름
+
+```
+정상 경로 (변경 없음):
+  녹음(blob > 0) → /api/stt → transcript → /api/storage/upload → audio_url
+  → submitSpeaking → Supabase 저장 → 결과 페이지
+
+Fallback 경로 (Phase 8-D 보완):
+  녹음 실패 또는 blob = 0
+  → blobUrl = null
+  → STT/Storage 호출 skip
+  → submitSpeaking({ hasRecording: false, sttTranscript: undefined, audioUrl: undefined })
+  → Supabase 저장 (audio_url = null, transcript = mock)
+  → 결과 페이지 정상 이동
+```
+
+### Known Issues (Phase 8-D 기준)
+
+| 이슈 | 영향도 | 방지/회피 방법 |
+|---|---|---|
+| **iOS Safari < 15** — `MediaRecorder` 미지원, 녹음 불가 | 중 | `not-supported` 에러 메시지 + 녹음 없이 제출 가능 |
+| **iOS Safari 15+ 빈 Blob** — 일부 기기에서 녹음 데이터 없이 onstop 발생 | 중 | blob.size 체크로 blobUrl = null, 빈 transcript fallback 제출 |
+| **iOS mp4/aac STT 변환** — Whisper/ETRI가 mp4를 지원하지 않을 경우 | 중 | Phase 8-A에서 서버 측 포맷 변환 처리 예정 |
+| **모바일 키보드 오버랩** — 녹음 화면에서 가상 키보드 팝업 시 타이머/버튼 가려질 수 있음 | 낮 | 말하기 평가 화면은 키보드 입력 없음, 영향 최소 |
+
+---
+
 ## Phase 8-C — Supabase Storage 최소 연동 (녹음 파일 업로드)
 
 **날짜**: 2026-05-05  
