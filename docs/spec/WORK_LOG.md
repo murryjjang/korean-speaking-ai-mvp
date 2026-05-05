@@ -1839,3 +1839,71 @@ Response:
 ### build 결과
 - `npm run build` → 빌드 성공
 - `/api/stt` 라우트가 `ƒ (Dynamic)` 서버 렌더 라우트로 등록됨
+
+---
+
+## Phase 8-I — 말하기 평가 자동 Smoke Test 추가 (2026-05-05)
+
+### 목표
+API key 없이도 핵심 API 흐름과 화면 렌더링이 깨지지 않는지 자동 확인.
+
+### 추가/수정 파일
+
+| 파일 | 내용 |
+|---|---|
+| `playwright.config.ts` | Playwright 설정, webServer(next dev :3099), api/chromium 프로젝트 분리 |
+| `tests/smoke/api-smoke.spec.ts` | API smoke 테스트 6개 |
+| `tests/smoke/mobile-speaking.spec.ts` | 모바일 E2E 테스트 4개 (브라우저 필요) |
+| `package.json` | `test:smoke`, `test:smoke:api`, `test:e2e` 스크립트 추가 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | 자동 테스트 범위·한계 기록 |
+
+### 테스트 구성
+
+#### API smoke (`tests/smoke/api-smoke.spec.ts`) — 브라우저 불필요
+Playwright `request` 픽스처로 HTTP 요청만 발송. `--project=api`로 실행.
+
+| 테스트 | 확인 내용 |
+|---|---|
+| `POST /api/pronunciation` 빈 오디오 | `normalizedScore` 숫자, `providerName` 문자열 반환 |
+| `POST /api/pronunciation` 잘못된 form data | 200(mock fallback) 또는 400 반환 |
+| `POST /api/evaluate-speaking` transcript+pronunciation | `overall_score`, `providerName`, `status` 포함 |
+| `POST /api/evaluate-speaking` 빈 body | mock fallback `overall_score` 반환 |
+| `POST /api/evaluate-speaking` 파싱 불가 바디 | 400 + `{ error: 'invalid_json' }` 반환 |
+| `GET /api/health` | 200 반환 |
+
+#### E2E smoke (`tests/smoke/mobile-speaking.spec.ts`) — Chromium 필요
+viewport 360×800px 기준 말하기 평가 페이지 렌더링 확인.
+
+| 테스트 | 확인 내용 |
+|---|---|
+| `/student/speaking/q-001` 로드 | 문제 제목·프롬프트 표시 |
+| 준비 시작 버튼 viewport 확인 | `x + width ≤ 360` |
+| MediaRecorder 미지원 fallback | 화면 crash 없이 렌더링 |
+| 준비 시작 클릭 후 카운트다운 | "준비 시간" + "준비 완료" 버튼 표시 |
+
+### 실행 결과 (2026-05-05)
+
+```
+npm run test:smoke:api   → 6 passed ✓ (브라우저 불필요, 로컬 확인 완료)
+npm run test:smoke       → E2E 4개: WSL2 시스템 의존성 필요 (하단 참고)
+```
+
+#### WSL2 E2E 실행 조건
+Playwright Chromium headless shell이 `libnspr4`, `libnss3`, `libasound2` 등 시스템 라이브러리를 요구함.
+WSL2 환경에서 다음 명령 1회 실행 후 E2E 테스트 실행 가능:
+```bash
+sudo npx playwright install-deps chromium
+```
+
+### 자동화하지 않은 항목 (수동 통합테스트로 유지)
+- 실제 iPhone Safari 녹음 (마이크 권한 허용/거부 실기기 확인)
+- 실제 Whisper STT 품질 (전사 정확도)
+- 실제 ETRI 발음평가 품질 (점수 정확도)
+- 실제 LLM 채점 품질 (루브릭 점수 타당성)
+- provider_events / ai_evaluations Supabase 실제 저장 확인
+- Android / iPad 레이아웃 수동 확인
+
+### lint / tsc / build
+- `npm run lint` → 에러 0
+- `npx tsc --noEmit` → 에러 0
+- `npm run build` → 빌드 성공

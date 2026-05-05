@@ -418,3 +418,42 @@ Phase 6-B5 완료 기준, D+10 이후 다음 단계를 제안한다.
 
 > Phase 7-A와 7-B는 병렬 진행 가능. Phase 8-A는 Phase 7-B(마이크 녹음) 완료 이후 시작 권장.  
 > Phase 9(Auth + RLS)는 D+12 이후 별도 계획 수립 권장.
+
+---
+
+## 자동 Smoke Test 범위 및 한계 (Phase 8-I 기준)
+
+### 자동화 범위
+
+#### API smoke (브라우저 불필요, `npm run test:smoke:api`)
+| 엔드포인트 | 확인 항목 |
+|---|---|
+| `POST /api/pronunciation` | mock fallback `normalizedScore`(0–100) 반환 |
+| `POST /api/pronunciation` | 잘못된 form data에도 crash 없음 |
+| `POST /api/evaluate-speaking` | mock fallback `overall_score`, `providerName`, `status` 반환 |
+| `POST /api/evaluate-speaking` | 빈 body에도 mock fallback 반환 |
+| `POST /api/evaluate-speaking` | 파싱 불가 JSON → 400 + `{ error: 'invalid_json' }` |
+| `GET /api/health` | 200 반환 |
+
+#### E2E smoke (Chromium 필요, `npm run test:smoke`)
+| 확인 항목 |
+|---|
+| `/student/speaking/q-001` 360px viewport 렌더링 |
+| "준비 시작" 버튼 viewport 내 표시 |
+| MediaRecorder 미지원 시 화면 crash 없음 |
+| 준비 시작 클릭 후 카운트다운 UI 표시 |
+
+#### E2E 실행 사전 조건 (WSL2)
+```bash
+sudo npx playwright install-deps chromium
+```
+
+### 자동화하지 않은 항목 (수동 확인 필수)
+- 실제 iPhone Safari 녹음 (마이크 권한 허용/거부, iOS 15 이상 실기기)
+- 실제 마이크 권한 허용/거부 UX 흐름
+- 실제 Whisper STT 품질 (전사 정확도, 한국어 인식률)
+- 실제 ETRI 발음평가 품질 (점수 신뢰도, 단어별 피드백)
+- 실제 LLM 채점 품질 (루브릭 점수 타당성, 한국어 피드백 품질)
+- `provider_events` / `ai_evaluations` Supabase 실제 저장 확인
+- Android Chrome / iPad Safari 레이아웃 수동 확인
+- 네트워크 지연 상황에서의 UX (느린 3G, 오프라인)
