@@ -190,6 +190,8 @@ After:  Server Action → mock store (항상, result 페이지 read 의존)
 | **모바일 교수자 채점 화면** — 좁은 화면에서 테이블·위저드 레이아웃 깨질 수 있음 | 중 | 교수자는 노트북 사용 권장. Phase 7-A에서 반응형 보완 예정 |
 | **모바일 관리자 화면** — 통계 테이블이 좁은 화면에서 가로 오버플로 가능 | 낮 | 관리자는 노트북 사용 권장 |
 | **provider_events DB 수동 적용 필요** — Phase 8-E 신규 컬럼(status, model 등)은 ALTER TABLE 수동 실행 필요 | 낮 | SUPABASE_SCHEMA.sql 하단 Phase 8-E Migration 섹션 참조. 미적용 시 STT 이벤트 INSERT 실패(기록 누락) — 제출 흐름은 영향 없음 |
+| **ETRI 발음평가 실제 미검증** — Phase 8-F에서 ETRI API 연동 구조 추가됨. `ETRI_API_KEY` 없으면 mock fallback | 낮 | `.env.local.example` 참조. 실제 키 없이도 mock provider로 파일럿 진행 가능. 기존 제출 흐름 무영향 |
+| **ETRI 오디오 포맷** — 브라우저 WebM 녹음을 그대로 ETRI에 전송. ETRI는 PCM/WAV 권장 | 낮 | `PRONUNCIATION_PROVIDER=mock` 유지 시 영향 없음. 실제 ETRI 연동 시 ffmpeg 변환 검토 필요 |
 | **iOS Safari 녹음 포맷 차이** — mp4/aac 포맷, STT 제공자에 따라 변환 처리 필요 | 중 | Phase 8-D에서 iOS 경고 배너 추가. Phase 8-A에서 서버 측 포맷 변환 처리 예정 |
 | **iOS Safari < 15** — MediaRecorder 미지원, 녹음 불가 | 중 | Phase 8-D: 미지원 브라우저 안내 메시지 + 녹음 없이 fallback 제출 가능 |
 | **iOS Safari 빈 Blob** — 일부 기기에서 0바이트 Blob 생성 | 중 | Phase 8-D: blob.size 체크 추가, blobUrl=null 시 빈 transcript fallback 제출 유지 |

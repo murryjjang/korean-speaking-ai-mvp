@@ -1,4 +1,5 @@
 import type { PronunciationProvider, PronunciationResult } from '@/src/types/providers'
+import { ETRIPronunciationProvider } from './etri'
 
 class MockPronunciationProvider implements PronunciationProvider {
   async evaluate(_audioBlob: Blob, referenceText: string): Promise<PronunciationResult> {
@@ -22,6 +23,14 @@ class MockPronunciationProvider implements PronunciationProvider {
 export function getPronunciationProvider(): PronunciationProvider {
   const providerName = process.env.PRONUNCIATION_PROVIDER ?? 'mock'
   switch (providerName) {
+    case 'etri': {
+      const key = process.env.ETRI_API_KEY
+      if (!key) {
+        console.warn('[pronunciation] ETRI_API_KEY not set — falling back to mock')
+        return new MockPronunciationProvider()
+      }
+      return new ETRIPronunciationProvider(key)
+    }
     case 'mock':
     default:
       return new MockPronunciationProvider()

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button, Card, CardBody, Badge, LangHint } from '@/src/components/ui'
 import type { LangHintItem } from '@/src/components/ui'
 import { submitSpeaking } from '../actions'
+import type { ClientPronunciationResult } from '../actions'
 import { useAudioRecorder } from '@/src/hooks/use-audio-recorder'
 
 type Phase = 'prep' | 'recording' | 'review' | 'submitting'
@@ -184,6 +185,7 @@ export function SpeakingClient({
     let sttTranscript: string | undefined
     let sttProviderName: string | undefined
     let audioUrl: string | undefined
+    let pronunciationResult: ClientPronunciationResult | undefined
 
     if (recorder.blobUrl) {
       let audioBlob: Blob | null = null
@@ -198,7 +200,7 @@ export function SpeakingClient({
       if (audioBlob) {
         const blob = audioBlob
 
-        // Run STT and Storage upload in parallel — both non-blocking.
+        // Run STT, Storage upload, and Pronunciation evaluation in parallel — all non-blocking.
         await Promise.allSettled([
           // STT via /api/stt
           (async () => {
@@ -234,6 +236,30 @@ export function SpeakingClient({
               // Storage upload failure is non-blocking — submit proceeds without audio_url
             }
           })(),
+          // Pronunciation evaluation via /api/pronunciation
+          (async () => {
+            try {
+              const fd = new FormData()
+              fd.append('audio', blob, 'recording.webm')
+              fd.append('questionId', question.id)
+              fd.append('referenceText', question.prompt)
+              const res = await fetch('/api/pronunciation', { method: 'POST', body: fd })
+              if (res.ok) {
+                const data = await res.json()
+                if (typeof data?.normalizedScore === 'number') {
+                  pronunciationResult = {
+                    normalizedScore: data.normalizedScore,
+                    wordScores: Array.isArray(data.wordScores) ? data.wordScores : [],
+                    feedback: typeof data.feedback === 'string' ? data.feedback : '',
+                    providerName: typeof data.providerName === 'string' ? data.providerName : 'mock',
+                    latencyMs: typeof data.latencyMs === 'number' ? data.latencyMs : 0,
+                  }
+                }
+              }
+            } catch {
+              // Pronunciation failure is non-blocking — submitSpeaking uses mock fallback
+            }
+          })(),
         ])
       }
     }
@@ -245,13 +271,14 @@ export function SpeakingClient({
         sttTranscript,
         sttProviderName,
         audioUrl,
+        pronunciationResult,
       })
       router.push(`/student/speaking/${question.id}/result?sub=${submissionId}`)
     } catch {
       setSubmitError(true)
       setPhase('review')
     }
-  }, [question.id, questionSetId, router, recorder.state, recorder.blobUrl, recorder.durationSec])
+  }, [question.id, question.prompt, questionSetId, router, recorder.state, recorder.blobUrl, recorder.durationSec])
 
   const handleRetake = useCallback(() => {
     recorder.reset()

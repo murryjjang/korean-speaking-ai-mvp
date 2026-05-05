@@ -4,6 +4,63 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 8-F — ETRI 발음평가 API 연동 구조
+
+**날짜**: 2026-05-05  
+**목표**: ETRI 발음평가 API 연동 구조를 추가한다. API 실패/키 없음/응답 오류 시에도 기존 말하기 제출 흐름을 깨지 않는다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/providers/pronunciation/etri.ts` | **신규** — `ETRIPronunciationProvider`. ETRI WiseASR API 호출, base64 오디오 전송, 응답 파싱, normalizeFeedback. 30초 timeout. 오류 시 throw (호출자가 fallback 처리) |
+| `src/providers/pronunciation/index.ts` | `PRONUNCIATION_PROVIDER=etri` 케이스 추가. `ETRI_API_KEY` 없으면 mock fallback + `console.warn` |
+| `app/api/pronunciation/route.ts` | **신규** — POST `/api/pronunciation`. FormData(audio, referenceText, questionId) 수신. ETRI/mock 호출. `logProviderEvent` 기록. 오류 시 mock fallback JSON 반환 |
+| `app/student/speaking/actions.ts` | `ClientPronunciationResult` 타입 추출. `SpeakingSubmitMeta`에 `pronunciationResult` 필드 추가. 클라이언트 제공값 우선 사용, 없으면 server-side fallback |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `handleSubmit`에서 `/api/pronunciation` 병렬 호출 추가. 성공 시 결과를 `submitSpeaking`에 전달. 실패해도 흐름 유지 |
+| `.env.local.example` | `ETRI_API_KEY`, `ETRI_API_BASE_URL` placeholder 추가 |
+| `docs/spec/WORK_LOG.md` | Phase 8-F 항목 추가 (이 문서) |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | ETRI 발음평가 Known Issues 추가 |
+
+### ETRI 연동 방식
+
+- **엔드포인트**: `https://aiopen.etri.re.kr:8000/WiseASR/PronunciationKor` (기본값; `ETRI_API_BASE_URL`로 오버라이드 가능)
+- **전송**: JSON body `{ access_key, argument: { language_code, script, audio(base64) } }`
+- **응답 파싱**: `return_object.recognized[0]` → `score`, `eojeol_score` (없으면 `word_score`)
+- **결과 정규화**: `normalizedScore`, `wordScores[]`, `feedback` (점수 구간별 메시지)
+
+### fallback 처리 (4가지 상황 모두 제출 유지)
+
+| 상황 | 처리 |
+|---|---|
+| `ETRI_API_KEY` 없음 | `getPronunciationProvider()`에서 mock 반환 + `console.warn` |
+| ETRI API 호출 실패 | `/api/pronunciation`에서 catch → mock fallback JSON 반환 |
+| 응답 파싱 실패 | `ETRIPronunciationProvider`에서 throw → route가 catch → fallback |
+| 오디오 없음 (blobUrl null) | `speaking-client.tsx`에서 `/api/pronunciation` 호출 자체를 건너뜀, actions.ts가 server-side mock 사용 |
+
+### provider_events 기록 항목
+
+| 상황 | provider_name | status | 추가 정보 |
+|---|---|---|---|
+| ETRI 성공 | `etri` | `success` | latency_ms, question_id |
+| ETRI 실패 후 fallback | `etri` | `error` | error_code=provider_error, error_message |
+| mock fallback 응답 | `mock` | `fallback` | metadata.reason, metadata.configuredProvider |
+| ETRI_API_KEY 없음 → mock | `mock` | `fallback` | metadata.reason=no_api_key |
+
+### DB 변경 여부
+
+`ai_evaluations.pronunciation_result` (jsonb) 컬럼이 Phase 6-B 이후 이미 존재함. **수동 DB 적용 불필요**.
+
+### Known Issues (Phase 8-F 기준)
+
+| 이슈 | 설명 |
+|---|---|
+| **실제 ETRI API 미검증** | `ETRI_API_KEY` 없이 mock fallback으로만 테스트됨. 실제 키로 end-to-end 검증 필요 |
+| **오디오 포맷** | ETRI API는 PCM/WAV 권장; 브라우저 WebM 녹음 그대로 전송 — 변환 없음. 실제 연동 시 ffmpeg 변환 검토 필요 |
+| **request_id 미수집** | ETRI 응답 헤더에서 request ID를 추출하지 않음 |
+
+---
+
 ## Phase 8-E — Provider Event Logging (STT)
 
 **날짜**: 2026-05-05  
