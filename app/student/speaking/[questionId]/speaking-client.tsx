@@ -171,24 +171,59 @@ export function SpeakingClient({
     setPhase('submitting')
     setSubmitError(false)
 
-    // Attempt STT via /api/stt — non-blocking, failure does not prevent submit.
     let sttTranscript: string | undefined
     let sttProviderName: string | undefined
+    let audioUrl: string | undefined
+
     if (recorder.blobUrl) {
+      let audioBlob: Blob | null = null
+
       try {
         const blobRes = await fetch(recorder.blobUrl)
-        const audioBlob = await blobRes.blob()
-        const fd = new FormData()
-        fd.append('audio', audioBlob, 'recording.webm')
-        const sttRes = await fetch('/api/stt', { method: 'POST', body: fd })
-        if (sttRes.ok) {
-          // Response.json() returns any; safe to access known fields directly.
-          const data = await sttRes.json()
-          if (typeof data?.transcript === 'string') sttTranscript = data.transcript
-          if (typeof data?.providerName === 'string') sttProviderName = data.providerName
-        }
+        audioBlob = await blobRes.blob()
       } catch {
-        // STT failure is non-blocking — submitSpeaking uses mock fallback
+        // Blob fetch failure — continue without audio
+      }
+
+      if (audioBlob) {
+        const blob = audioBlob
+
+        // Run STT and Storage upload in parallel — both non-blocking.
+        await Promise.allSettled([
+          // STT via /api/stt
+          (async () => {
+            try {
+              const fd = new FormData()
+              fd.append('audio', blob, 'recording.webm')
+              const res = await fetch('/api/stt', { method: 'POST', body: fd })
+              if (res.ok) {
+                // Response.json() returns any; safe to access known fields directly.
+                const data = await res.json()
+                if (typeof data?.transcript === 'string') sttTranscript = data.transcript
+                if (typeof data?.providerName === 'string') sttProviderName = data.providerName
+              }
+            } catch {
+              // STT failure is non-blocking — submitSpeaking uses mock fallback
+            }
+          })(),
+          // Storage upload via /api/storage/upload
+          (async () => {
+            try {
+              const fd = new FormData()
+              fd.append('audio', blob, 'recording.webm')
+              fd.append('questionId', question.id)
+              const res = await fetch('/api/storage/upload', { method: 'POST', body: fd })
+              if (res.ok) {
+                const data = await res.json()
+                if (typeof data?.publicUrl === 'string' && data.publicUrl) {
+                  audioUrl = data.publicUrl
+                }
+              }
+            } catch {
+              // Storage upload failure is non-blocking — submit proceeds without audio_url
+            }
+          })(),
+        ])
       }
     }
 
@@ -198,6 +233,7 @@ export function SpeakingClient({
         recordingDurationSec: recorder.durationSec,
         sttTranscript,
         sttProviderName,
+        audioUrl,
       })
       router.push(`/student/speaking/${question.id}/result?sub=${submissionId}`)
     } catch {

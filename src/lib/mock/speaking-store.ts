@@ -8,6 +8,8 @@ export type SpeakingEvalRecord = {
   sttResult: STTResult
   llmEvalResult: LLMEvalResult
   pronunciationResult: PronunciationResult
+  /** Supabase Storage public URL or null when upload was skipped/failed (Phase 8-C+). */
+  audioUrl?: string | null
 }
 
 // Module-level store — Phase 3 MVP only. Resets on server restart.

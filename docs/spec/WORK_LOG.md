@@ -4,6 +4,157 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 8-C — Supabase Storage 최소 연동 (녹음 파일 업로드)
+
+**날짜**: 2026-05-05  
+**목표**: 녹음 Blob을 Supabase Storage에 업로드하고, `audio_url`을 `speaking_submissions`에 저장한다. Storage 업로드 실패 시에도 STT, 제출, 결과 화면 이동은 계속된다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/lib/supabase/storage.ts` | `uploadAudioToStorage()` helper — bucket upload + getPublicUrl 반환 |
+| `app/api/storage/upload/route.ts` | POST route — FormData(audio, questionId) → Storage upload → `{ storagePath, publicUrl }` |
+| `src/lib/repositories/types.ts` | `SpeakingEvalRecord`에 `audioUrl?: string \| null` 추가 |
+| `src/lib/mock/speaking-store.ts` | `SpeakingEvalRecord`에 `audioUrl?: string \| null` 추가 |
+| `app/student/speaking/actions.ts` | `SpeakingSubmitMeta`에 `audioUrl?` 추가, `record.audioUrl` 저장 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | Blob 1회 fetch → STT + Storage 병렬 업로드 → `audioUrl` pass-through |
+| `src/lib/repositories/supabase-submission-repository.ts` | `speaking_submissions.audio_url`에 `record.audioUrl ?? null` 사용 |
+| `docs/spec/WORK_LOG.md` | Phase 8-C 항목 추가 (이 문서) |
+
+### Storage 업로드 구조
+
+```
+클라이언트 (speaking-client.tsx)
+  ├─ fetch(recorder.blobUrl) → audioBlob
+  └─ Promise.allSettled([
+       /api/stt         ← STT (기존)
+       /api/storage/upload ← 신규
+         └─ uploadAudioToStorage(blob, questionId)
+              ├─ bucket: recordings
+              ├─ path: speaking/{questionId}/{timestamp}.{ext}
+              ├─ 성공 → { storagePath, publicUrl }
+              └─ 실패 → null + console.error([provider_events] storage.error)
+     ])
+  └─ submitSpeaking(questionId, setId, { ..., audioUrl })
+       └─ saveSpeakingEvalRecord({ ..., audioUrl })
+            └─ speaking_submissions.audio_url = audioUrl ?? null
+```
+
+### 필요한 Supabase bucket 설정
+
+Supabase Dashboard > Storage에서 다음 설정이 필요합니다:
+
+| 항목 | 값 |
+|---|---|
+| **Bucket 이름** | `recordings` |
+| **Public** | `true` (getPublicUrl이 서명 없이 동작하려면 필수) |
+| **파일 크기 제한** | 50 MB 이상 권장 (최장 5분 기준 약 30 MB) |
+| **허용 MIME 타입** | `audio/webm`, `audio/mp4`, `audio/ogg` |
+
+Supabase Storage Policies (RLS) — pilot 기준 최소 설정:
+
+```sql
+-- anon INSERT 허용 (pilot phase — Phase 9에서 Auth 기반으로 교체 예정)
+CREATE POLICY "allow_anon_upload"
+ON storage.objects FOR INSERT
+TO anon
+WITH CHECK (bucket_id = 'recordings');
+```
+
+> bucket이 없거나 policy가 없으면 업로드가 실패합니다.
+> 실패 시 서버 콘솔에 `[provider_events] storage.error` 가 찍히고,
+> `audio_url` 없이 제출이 계속됩니다 (non-blocking).
+
+### audio_url 저장 위치
+
+`speaking_submissions.audio_url` (text, nullable) 컬럼에 Supabase Storage Public URL 저장.
+
+- 성공 시: `https://{project}.supabase.co/storage/v1/object/public/recordings/speaking/{questionId}/{timestamp}.webm`
+- 실패 시: `null` (기존 동작과 동일)
+
+### 업로드 실패 시 fallback 조건
+
+| 조건 | 결과 |
+|---|---|
+| Supabase client 미설정 | `storage.skip reason=no_supabase_client` 경고 → `audioUrl=undefined` |
+| bucket `recordings` 미존재 | `storage.error` 로그 → `audioUrl=undefined` |
+| anon INSERT policy 없음 | `storage.error` 로그 → `audioUrl=undefined` |
+| 네트워크 오류 | `storage.error` 로그 → `audioUrl=undefined` |
+| `/api/storage/upload` fetch 실패 | catch → `audioUrl=undefined` |
+| 위 모든 경우 | `submitSpeaking`은 `audioUrl=undefined` 로 정상 호출 → DB에 `audio_url=null` |
+
+### provider_events 기록
+
+```
+storage.skip   → console.warn  '[provider_events] storage.skip reason=no_supabase_client'
+storage.success → console.info  '[provider_events] storage.success path=... bucket=recordings'
+storage.error  → console.error '[provider_events] storage.error message=... path=...'
+```
+
+Phase 8-E에서 이 이벤트들을 DB `provider_events` 테이블에 기록할 수 있습니다.
+
+### Phase 8-F ETRI 연동 준비
+
+`uploadAudioToStorage()` 반환값:
+```typescript
+{ storagePath: 'speaking/q-001/1234567890.webm', publicUrl: 'https://...' }
+```
+
+- `storagePath`: ETRI API가 Supabase에서 직접 파일을 읽을 수 있는 경로
+- `transcript`: `sttResult.transcript` — ETRI 발음평가 참조 텍스트로 사용 가능
+- `SpeakingEvalRecord.audioUrl`: Phase 8-F provider에서 접근 가능
+
+### STT/OpenAI 흐름 영향
+
+없음. STT와 Storage 업로드는 `Promise.allSettled`로 완전히 병렬 독립 실행. 어느 쪽 실패도 다른 쪽에 영향 없음.
+
+### 테스트 방법
+
+**Storage 업로드 정상 동작 확인:**
+1. Supabase Dashboard에서 `recordings` bucket 생성 + public + anon INSERT policy 적용
+2. `.env.local`: `REPOSITORY_PROVIDER=supabase`, `NEXT_PUBLIC_SUPABASE_URL=...`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=...`
+3. `npm run dev` → `/student/speaking/q-001?setId=qs-diagnostic-01`
+4. 녹음 → 제출 시 서버 콘솔 확인:
+   - 성공: `[provider_events] storage.success path=speaking/q-001/... bucket=recordings`
+5. Supabase Dashboard > Table Editor > `speaking_submissions` 에서 `audio_url` 확인
+
+**Storage 업로드 실패 (non-blocking) 확인:**
+1. `recordings` bucket 미생성 상태에서 동일 흐름 실행
+2. 서버 콘솔에 `[provider_events] storage.error` 출력 확인
+3. 결과 페이지 정상 도달 확인
+
+**STT 흐름 유지 확인:**
+1. `STT_PROVIDER=openai`, `OPENAI_API_KEY=sk-...` 설정
+2. 기존과 동일하게 STT 동작 확인
+
+### 테스트 결과
+
+- `npm run lint` → 오류 없음 ✓
+- `npx tsc --noEmit` → 오류 없음 ✓
+- `npm run build` → 빌드 성공 ✓ (16개 라우트, `/api/storage/upload` 추가)
+
+### Known Issues (Phase 8-C 기준)
+
+| 이슈 | 영향 | 해소 예정 |
+|---|---|---|
+| **Storage bucket 수동 생성 필요** | 중 — bucket 없으면 업로드 실패(non-blocking) | 사용자가 Dashboard에서 직접 생성 |
+| **anon 업로드 RLS 미완** | 중 — Auth 미구현으로 pilot용 anon policy 필요 | Phase 9 (Auth 이후 교체) |
+| **audio_url은 Public URL** — signed URL 미구현 | 소 — public bucket 기준. private bucket 사용 시 signed URL 별도 구현 필요 | Phase 9 이후 |
+| **iOS Safari 대응 미완** | 중 — MediaRecorder 미지원 환경 | Phase 8-D |
+| 기존 Phase 8-B known issues 유지 | — | 해당 Phase 참고 |
+
+### 다음 단계 제안
+
+| 항목 | 내용 |
+|---|---|
+| **Phase 8-D** | iOS Safari 대응 — MediaRecorder 미지원 환경 감지 및 대안 안내 |
+| **Phase 8-E** | provider_events DB 기록 — Storage/STT 성공/실패를 `provider_events` 테이블에 저장 |
+| **Phase 8-F** | ETRI 발음평가 API 연동 — `storagePath` + `transcript` → ETRI API → `pronunciationResult` 실제 채점 |
+| **Phase 9** | Supabase Auth 도입 — anon policy를 Auth 기반 RLS로 교체 |
+
+---
+
 ## Phase 8-B — OpenAI Whisper STT 실제 API provider 최소 연동
 
 **날짜**: 2026-05-05  

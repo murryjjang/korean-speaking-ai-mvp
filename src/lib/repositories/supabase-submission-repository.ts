@@ -321,7 +321,7 @@ export class SupabaseEvaluationRepository implements EvaluationRepository {
         class_id: classId,
         question_id: record.questionId,
         question_set_id: record.questionSetId || null,
-        audio_url: null,
+        audio_url: record.audioUrl ?? null,
         duration_sec: null,
         status: 'pending',
         submitted_at: record.submittedAt,

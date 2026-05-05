@@ -14,6 +14,8 @@ export interface SpeakingSubmitMeta {
   sttTranscript?: string
   /** Provider name that produced sttTranscript (e.g. 'mock', 'whisper'). */
   sttProviderName?: string
+  /** Supabase Storage public URL from /api/storage/upload; omit when upload failed. */
+  audioUrl?: string
 }
 
 export async function submitSpeaking(
@@ -59,10 +61,11 @@ export async function submitSpeaking(
     sttResult,
     llmEvalResult,
     pronunciationResult,
+    audioUrl: meta?.audioUrl ?? null,
     meta: {
       hasRecording: meta?.hasRecording ?? false,
       recordingDurationSec: meta?.recordingDurationSec ?? 0,
-      audioUrl: null,
+      audioUrl: meta?.audioUrl ?? null,
     },
   }
 

@@ -70,6 +70,8 @@ export type SpeakingEvalRecord = {
   sttResult: STTResult
   llmEvalResult: LLMEvalResult
   pronunciationResult: PronunciationResult
+  /** Supabase Storage public URL or null when upload was skipped/failed (Phase 8-C+). */
+  audioUrl?: string | null
 }
 
 // ── Repository interfaces ───────────────────────────────────────────
