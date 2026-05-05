@@ -457,3 +457,32 @@ sudo npx playwright install-deps chromium
 - `provider_events` / `ai_evaluations` Supabase 실제 저장 확인
 - Android Chrome / iPad Safari 레이아웃 수동 확인
 - 네트워크 지연 상황에서의 UX (느린 3G, 오프라인)
+
+---
+
+## Phase 8-H TTS/음성 안내 — 자동화 범위 및 Known Issues
+
+### 자동화 범위 (Phase 8-H 기준)
+
+#### API smoke
+| 엔드포인트 | 확인 항목 |
+|---|---|
+| `POST /api/tts` text 있음 | fallback JSON 반환 (providerName, status 포함) |
+| `POST /api/tts` text 없음 | 400 + `{ error: 'text_required' }` |
+| `POST /api/tts` 파싱 불가 바디 | 400 + `{ error: 'invalid_json' }` |
+
+#### E2E smoke (360px viewport)
+| 확인 항목 |
+|---|
+| "문제 듣기" 버튼 viewport 내 표시 |
+| "녹음 안내 듣기" 버튼 viewport 내 표시 |
+| 버튼 클릭 후 페이지 crash 없음 |
+
+### Known Issues (수동 확인 필수)
+
+- **실제 iPhone Safari 음성 재생**: iOS Safari의 자동재생 제한으로 버튼 클릭 후 재생만 지원. 실기기 수동 확인 필요.
+- **실제 OpenAI TTS 연동 테스트**: `TTS_PROVIDER=openai` + `OPENAI_API_KEY` 설정 후 실 API 연동 테스트 필요.
+- **speechSynthesis 품질 편차**: 브라우저/기기별 한국어 TTS 음성 품질 차이 있음. Chrome은 양호하나 일부 Android·iOS 기기에서 한국어 음성 미지원 가능.
+- **자동재생 제한**: 자동재생 없음 — 사용자 버튼 클릭 후 재생만 지원 (브라우저 정책 준수).
+- **iOS Safari speechSynthesis**: iOS 15+ Safari에서 `speechSynthesis.speak()` 지원하나 `onend` 이벤트 발화가 불안정할 수 있음.
+- **audioBase64 크기**: 긴 문장의 경우 base64 오디오 데이터가 커질 수 있음. 추후 스트리밍 또는 presigned URL 방식으로 전환 고려.

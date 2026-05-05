@@ -110,3 +110,52 @@ test.describe('/api/health smoke', () => {
     expect(res.ok()).toBe(true)
   })
 })
+
+test.describe('/api/tts smoke', () => {
+  test('API key 없이도 fallback JSON 반환', async ({ request }) => {
+    const res = await request.post('/api/tts', {
+      data: {
+        text: '자신을 소개해 보세요.',
+        questionId: 'q-001',
+        purpose: 'question',
+      },
+    })
+
+    expect(res.ok()).toBe(true)
+
+    const body = await res.json()
+
+    // 응답 구조 확인
+    expect(typeof body.ok).toBe('boolean')
+    expect(typeof body.providerName).toBe('string')
+    expect(['success', 'fallback', 'error']).toContain(body.status)
+
+    // API key 없는 환경에서는 fallbackText가 반환되어야 함
+    if (body.status === 'fallback') {
+      expect(typeof body.fallbackText).toBe('string')
+      expect(body.fallbackText.length).toBeGreaterThan(0)
+    }
+
+    // audioBase64가 있으면 문자열이어야 함
+    if (body.audioBase64 !== undefined) {
+      expect(typeof body.audioBase64).toBe('string')
+    }
+  })
+
+  test('text 없이 전송 → 400 반환', async ({ request }) => {
+    const res = await request.post('/api/tts', { data: {} })
+    expect(res.status()).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('text_required')
+  })
+
+  test('파싱 불가 바디 → 400 반환', async ({ request }) => {
+    const res = await request.post('/api/tts', {
+      data: Buffer.from('{bad json'),
+      headers: { 'Content-Type': 'application/json' },
+    })
+    expect(res.status()).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('invalid_json')
+  })
+})

@@ -63,6 +63,29 @@ test.describe('말하기 평가 모바일 360px smoke', () => {
     await expect(pageTitle).toBeVisible()
   })
 
+  test('문제 듣기/녹음 안내 듣기 버튼 표시 및 클릭 시 crash 없음', async ({ page }) => {
+    await page.goto('/student/speaking/q-001')
+
+    // 두 TTS 버튼이 표시되어야 함
+    const listenBtn = page.getByRole('button', { name: '문제 듣기' })
+    const guideBtn = page.getByRole('button', { name: '녹음 안내 듣기' })
+    await expect(listenBtn).toBeVisible()
+    await expect(guideBtn).toBeVisible()
+
+    // 360px 뷰포트 안에 있어야 함
+    const listenBox = await listenBtn.boundingBox()
+    const guideBox = await guideBtn.boundingBox()
+    if (listenBox) expect(listenBox.x + listenBox.width).toBeLessThanOrEqual(MOBILE_VIEWPORT.width)
+    if (guideBox) expect(guideBox.x + guideBox.width).toBeLessThanOrEqual(MOBILE_VIEWPORT.width)
+
+    // 버튼 클릭 시 crash 없어야 함 (실제 음성 재생 성공은 강제하지 않음)
+    await listenBtn.click()
+    await page.waitForTimeout(1500) // API 응답 + 상태 전환 대기
+
+    // 페이지가 여전히 정상 상태여야 함
+    await expect(page.getByRole('heading', { name: /자기소개/ })).toBeVisible()
+  })
+
   test('준비 시작 클릭 후 카운트다운 UI 표시', async ({ page }) => {
     await page.goto('/student/speaking/q-001')
 

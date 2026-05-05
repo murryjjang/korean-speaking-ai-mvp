@@ -7,6 +7,7 @@ import type { LangHintItem } from '@/src/components/ui'
 import { submitSpeaking } from '../actions'
 import type { ClientPronunciationResult } from '../actions'
 import { useAudioRecorder } from '@/src/hooks/use-audio-recorder'
+import { useTTS } from '@/src/hooks/use-tts'
 
 type Phase = 'prep' | 'recording' | 'review' | 'submitting'
 
@@ -60,7 +61,14 @@ const QUESTION_HINTS: Record<string, LangHintItem[]> = {
   ],
 }
 
-// 녹음 안내 도움말
+// 음성 안내 — 녹음 방법을 초급 학습자가 이해할 수 있는 짧은 한국어로 안내
+const RECORDING_GUIDE_TEXT =
+  '준비가 되면 준비 시작 버튼을 누르세요. ' +
+  '녹음이 시작되면 한국어로 말하세요. ' +
+  '말하기가 끝나면 녹음 완료 버튼을 누르세요. ' +
+  '마지막으로 제출하기 버튼을 눌러 평가를 받으세요.'
+
+// 녹음 안내 도움말 (다국어 텍스트)
 const RECORDING_HINTS: LangHintItem[] = [
   { lang: 'EN', text: 'Press "준비 시작" to start. Recording begins after the countdown. Press "녹음 완료" when done. Listen before submitting with "제출하기".' },
   { lang: 'VI', text: 'Nhấn "준비 시작" để bắt đầu. Ghi âm bắt đầu sau đếm ngược. Nhấn "녹음 완료" khi xong. Nghe lại trước khi nhấn "제출하기".' },
@@ -101,6 +109,7 @@ export function SpeakingClient({
   })
 
   const recorder = useAudioRecorder()
+  const tts = useTTS()
   // Track recording elapsed seconds independently so auto-stop still works
   const [recordingElapsed, setRecordingElapsed] = useState(0)
   const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -317,6 +326,42 @@ export function SpeakingClient({
           {QUESTION_HINTS[question.id] && (
             <LangHint items={QUESTION_HINTS[question.id]} label="모국어 도움말 보기" />
           )}
+
+          {/* TTS 음성 안내 */}
+          <div className="mt-4 pt-3 border-t border-border">
+            {tts.state === 'idle' || tts.state === 'error' ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => tts.play(question.prompt, question.id, 'question')}
+                >
+                  문제 듣기
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => tts.play(RECORDING_GUIDE_TEXT, question.id, 'recording-guide')}
+                >
+                  녹음 안내 듣기
+                </Button>
+              </div>
+            ) : tts.state === 'loading' ? (
+              <Button variant="ghost" size="sm" loading disabled>
+                재생 준비 중
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-text-muted">재생 중</span>
+                <Button variant="ghost" size="sm" onClick={tts.stop}>
+                  정지
+                </Button>
+              </div>
+            )}
+            {tts.errorMessage && (
+              <p className="mt-2 text-xs text-text-muted">{tts.errorMessage}</p>
+            )}
+          </div>
         </CardBody>
       </Card>
 

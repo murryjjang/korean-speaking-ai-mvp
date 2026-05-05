@@ -1,7 +1,6 @@
 import type { TTSProvider, TTSResult } from '@/src/types/providers'
 
-// Browser TTS is handled client-side via Web Speech API.
-// This server stub returns metadata; actual synthesis happens in the browser.
+// Server stub — synthesis happens client-side via Web Speech API.
 class BrowserTTSProvider implements TTSProvider {
   async synthesize(text: string): Promise<TTSResult> {
     return {
@@ -27,13 +26,49 @@ class MockTTSProvider implements TTSProvider {
   }
 }
 
-export function getTTSProvider(): TTSProvider {
-  const providerName = process.env.TTS_PROVIDER ?? 'browser'
-  switch (providerName) {
-    case 'mock':
-      return new MockTTSProvider()
-    case 'browser':
-    default:
-      return new BrowserTTSProvider()
+class OpenAITTSProvider implements TTSProvider {
+  async synthesize(text: string): Promise<TTSResult> {
+    const startMs = Date.now()
+    const model = process.env.TTS_MODEL ?? 'tts-1'
+    const voice = process.env.TTS_VOICE ?? 'nova'
+
+    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model, input: text, voice }),
+    })
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '')
+      throw new Error(`OpenAI TTS ${response.status}: ${detail}`)
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const latencyMs = Date.now() - startMs
+
+    return {
+      audioUrl: '',
+      durationSec: Math.ceil(text.length / 15),
+      audioData: new Uint8Array(arrayBuffer),
+      mimeType: 'audio/mpeg',
+      providerName: 'openai',
+      providerVersion: model,
+      latencyMs,
+    }
   }
+}
+
+export function getTTSProvider(): TTSProvider {
+  const providerName = process.env.TTS_PROVIDER ?? 'mock'
+  if (providerName === 'openai' && process.env.OPENAI_API_KEY) {
+    return new OpenAITTSProvider()
+  }
+  if (providerName === 'mock') {
+    return new MockTTSProvider()
+  }
+  // 'browser' or unknown default → server stub, client handles synthesis
+  return new BrowserTTSProvider()
 }

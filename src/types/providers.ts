@@ -22,6 +22,8 @@ export type STTResult = ProviderMeta & {
 export type TTSResult = ProviderMeta & {
   audioUrl: string
   durationSec: number
+  audioData?: Uint8Array   // Raw PCM/MP3 bytes returned by server-side providers
+  mimeType?: string        // e.g. 'audio/mpeg'
 }
 
 export type PronunciationWordScore = {

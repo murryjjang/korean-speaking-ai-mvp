@@ -1907,3 +1907,74 @@ sudo npx playwright install-deps chromium
 - `npm run lint` → 에러 0
 - `npx tsc --noEmit` → 에러 0
 - `npm run build` → 빌드 성공
+
+---
+
+## Phase 8-H — TTS/음성 안내 구조 추가 (2026-05-05)
+
+### 목표
+학습자 말하기 평가 화면에 실제 전환 가능한 TTS provider 구조와 브라우저 fallback을 추가한다.
+
+### 추가/수정 파일
+
+| 파일 | 내용 |
+|---|---|
+| `src/types/providers.ts` | `TTSResult`에 `audioData?: Uint8Array`, `mimeType?: string` 추가 |
+| `src/providers/tts/index.ts` | `OpenAITTSProvider` 추가, `getTTSProvider()` 분기 확장 |
+| `app/api/tts/route.ts` | TTS API route 신규 생성 |
+| `src/hooks/use-tts.ts` | 클라이언트 TTS hook (base64 audio → speechSynthesis → 에러 순서) |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | "문제 듣기", "녹음 안내 듣기" 버튼 추가 |
+| `.env.local.example` | `TTS_MODEL`, `TTS_VOICE` placeholder 추가 |
+| `tests/smoke/api-smoke.spec.ts` | `/api/tts` smoke 테스트 3개 추가 |
+| `tests/smoke/mobile-speaking.spec.ts` | TTS 버튼 표시/클릭 E2E 테스트 추가 |
+
+### TTS provider 구조
+
+```
+TTS_PROVIDER=openai + OPENAI_API_KEY → OpenAITTSProvider (실제 TTS, audioData 반환)
+TTS_PROVIDER=mock                    → MockTTSProvider (mock URL, audioData 없음)
+TTS_PROVIDER=browser (기본)          → BrowserTTSProvider (서버 stub, 클라이언트 speechSynthesis)
+```
+
+### /api/tts 응답 구조
+
+```json
+// 성공 (OpenAI TTS)
+{ "ok": true, "providerName": "openai", "status": "success",
+  "audioBase64": "...", "mimeType": "audio/mpeg" }
+
+// fallback (API key 없음 또는 mock)
+{ "ok": true, "providerName": "mock", "status": "fallback",
+  "fallbackText": "..." }
+
+// 에러 (API 호출 실패)
+{ "ok": false, "providerName": "openai", "status": "error",
+  "fallbackText": "...", "message": "..." }
+```
+
+### 클라이언트 fallback 우선순위
+
+1. `audioBase64` 있음 → `new Audio(data:...)` 재생
+2. `fallbackText` 있음 + `window.speechSynthesis` 있음 → speechSynthesis 재생 (ko-KR)
+3. 위 둘 다 없거나 실패 → 에러 메시지 텍스트 표시
+
+### 음성 안내 문구
+
+| 버튼 | 내용 |
+|---|---|
+| 문제 듣기 | `question.prompt` (현재 문제 지문) |
+| 녹음 안내 듣기 | "준비가 되면 준비 시작 버튼을 누르세요. 녹음이 시작되면 한국어로 말하세요. 말하기가 끝나면 녹음 완료 버튼을 누르세요. 마지막으로 제출하기 버튼을 눌러 평가를 받으세요." |
+
+### provider_events 기록 항목
+
+| 상황 | provider | status |
+|---|---|---|
+| OpenAI TTS 성공 | openai | success |
+| API key 없음/mock | mock | fallback |
+| OpenAI TTS 실패 | openai | error |
+
+### lint / tsc / build
+- `npm run lint` → 에러 0
+- `npx tsc --noEmit` → 에러 0
+- `npm run build` → 빌드 성공
+- `npm run test:smoke` → 결과 참조
