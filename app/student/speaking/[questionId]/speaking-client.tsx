@@ -458,18 +458,18 @@ export function SpeakingClient({
             <LangHint items={QUESTION_HINTS[question.id]} label="모국어 도움말 보기" />
           )}
 
-          {/* TTS 음성 안내 */}
-          <div className="mt-4 pt-3 border-t border-border">
-            {tts.state === 'idle' || tts.state === 'error' ? (
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => tts.play(question.prompt, question.id, 'question')}
-                >
-                  문제 듣기
-                </Button>
-                {!isDialogueMission && (
+          {/* TTS 음성 안내 — dialogue_mission에서는 표시하지 않음 */}
+          {!isDialogueMission && (
+            <div className="mt-4 pt-3 border-t border-border">
+              {tts.state === 'idle' || tts.state === 'error' ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => tts.play(question.prompt, question.id, 'question')}
+                  >
+                    문제 듣기
+                  </Button>
                   <Button
                     variant="secondary"
                     size="sm"
@@ -477,24 +477,24 @@ export function SpeakingClient({
                   >
                     녹음 안내 듣기
                   </Button>
-                )}
-              </div>
-            ) : tts.state === 'loading' ? (
-              <Button variant="secondary" size="sm" loading disabled>
-                재생 준비 중
-              </Button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-text-muted">재생 중</span>
-                <Button variant="secondary" size="sm" onClick={tts.stop}>
-                  정지
+                </div>
+              ) : tts.state === 'loading' ? (
+                <Button variant="secondary" size="sm" loading disabled>
+                  재생 준비 중
                 </Button>
-              </div>
-            )}
-            {tts.errorMessage && (
-              <p className="mt-2 text-xs text-text-muted">{tts.errorMessage}</p>
-            )}
-          </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-muted">재생 중</span>
+                  <Button variant="secondary" size="sm" onClick={tts.stop}>
+                    정지
+                  </Button>
+                </div>
+              )}
+              {tts.errorMessage && (
+                <p className="mt-2 text-xs text-text-muted">{tts.errorMessage}</p>
+              )}
+            </div>
+          )}
         </CardBody>
       </Card>
 
