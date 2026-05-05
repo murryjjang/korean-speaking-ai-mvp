@@ -9,6 +9,8 @@ import { submitSpeaking } from '../actions'
 import type { ClientPronunciationResult } from '../actions'
 import { useAudioRecorder } from '@/src/hooks/use-audio-recorder'
 import { useTTS } from '@/src/hooks/use-tts'
+import { QuestionAssetRenderer } from '@/src/components/question-asset-renderer'
+import type { StudentVisibleAsset } from '@/src/content/assessment-assets'
 
 type Phase = 'prep' | 'recording' | 'review' | 'submitting'
 
@@ -26,12 +28,15 @@ export type QuestionData = {
   imageCaption?: string
   imageLicenseNote?: string
   assetType?: string
-  // dialogue_mission — learner-facing only (never expose aiInformation)
+  // asset registry — student-safe only (teacherOnlyNote は절대 포함하지 않음)
+  assetMeta?: StudentVisibleAsset
+  // listening_response — listenLimit & learner-facing elements only (never listeningScriptForTeacherOnly)
+  listenLimit?: number
+  learnerVisibleElements?: string[]
+  // dialogue_mission — learner-facing only (never aiInformation)
   missionGoals?: string[]
   evaluationMode?: string
   maxDialogueDurationSec?: number
-  // listening_response — learner-facing elements only (never expose listeningScriptForTeacherOnly)
-  learnerVisibleElements?: string[]
 }
 
 const MIN_VALID_DURATION_SEC = 2
@@ -342,6 +347,9 @@ export function SpeakingClient({
   }, [recorder])
 
   const dVariant = difficultyVariant[question.difficulty] ?? 'default'
+  const isDialogueMission =
+    question.typeId === 'qt-dialogue-mission' ||
+    question.evaluationMode === 'interactive_dialogue'
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -394,21 +402,13 @@ export function SpeakingClient({
             </div>
           ) : null}
 
-          {/* Asset-type notices — shown during prep/recording phases */}
-          {question.assetType === 'audio' && question.typeId !== 'qt-dialogue-mission' && (
-            <div className="mt-4 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-xs text-blue-700 leading-relaxed">
-                🔈 듣기 음원은 파일럿 전 등록 예정입니다. 위 안내 사항을 참고하여 답하세요.
-              </p>
-            </div>
-          )}
-          {(question.assetType === 'chart' || question.assetType === 'graph') && !question.imageUrl && (
-            <div className="mt-4 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-xs text-blue-700 leading-relaxed">
-                📊 자료(그래프/표)는 파일럿 전 등록 예정입니다. 위 안내를 참고하여 답하세요.
-              </p>
-            </div>
-          )}
+          {/* Official question asset — material_description / listening_response */}
+          <QuestionAssetRenderer
+            questionId={question.id}
+            assetMeta={question.assetMeta}
+            listenLimit={question.listenLimit}
+          />
+
           {question.typeId === 'qt-dialogue-mission' && (
             <div className="mt-4 px-3 py-2.5 bg-purple-50 border border-purple-200 rounded-md">
               <p className="text-xs font-semibold text-purple-800 mb-1">
@@ -430,6 +430,11 @@ export function SpeakingClient({
                   </ul>
                 </div>
               )}
+              {question.maxDialogueDurationSec && (
+                <p className="text-xs text-purple-600 mt-2">
+                  대화 제한 시간: {formatTime(question.maxDialogueDurationSec)}
+                </p>
+              )}
             </div>
           )}
           {question.typeId === 'qt-listening-resp' && question.learnerVisibleElements && question.learnerVisibleElements.length > 0 && (
@@ -443,10 +448,12 @@ export function SpeakingClient({
             </div>
           )}
 
-          <div className="mt-4 flex items-center gap-4 text-xs text-text-muted">
-            <span>준비 시간: {question.prepTimeSec}초</span>
-            <span>답변 시간: {formatTime(question.responseTimeSec)}</span>
-          </div>
+          {!isDialogueMission && (
+            <div className="mt-4 flex items-center gap-4 text-xs text-text-muted">
+              <span>준비 시간: {question.prepTimeSec}초</span>
+              <span>답변 시간: {formatTime(question.responseTimeSec)}</span>
+            </div>
+          )}
           {QUESTION_HINTS[question.id] && (
             <LangHint items={QUESTION_HINTS[question.id]} label="모국어 도움말 보기" />
           )}
@@ -462,13 +469,15 @@ export function SpeakingClient({
                 >
                   문제 듣기
                 </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => tts.play(RECORDING_GUIDE_TEXT, question.id, 'recording-guide')}
-                >
-                  녹음 안내 듣기
-                </Button>
+                {!isDialogueMission && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => tts.play(RECORDING_GUIDE_TEXT, question.id, 'recording-guide')}
+                  >
+                    녹음 안내 듣기
+                  </Button>
+                )}
               </div>
             ) : tts.state === 'loading' ? (
               <Button variant="secondary" size="sm" loading disabled>
@@ -490,7 +499,7 @@ export function SpeakingClient({
       </Card>
 
       {/* Prep phase */}
-      {phase === 'prep' && (
+      {!isDialogueMission && phase === 'prep' && (
         <Card>
           <CardBody>
             <div className="text-center py-8">
@@ -534,7 +543,7 @@ export function SpeakingClient({
       )}
 
       {/* Recording phase */}
-      {phase === 'recording' && (
+      {!isDialogueMission && phase === 'recording' && (
         <Card>
           <CardBody>
             <div className="text-center py-8">
@@ -593,7 +602,7 @@ export function SpeakingClient({
       )}
 
       {/* Review phase */}
-      {phase === 'review' && (
+      {!isDialogueMission && phase === 'review' && (
         <Card>
           <CardBody>
             <div className="text-center py-6">
@@ -671,7 +680,7 @@ export function SpeakingClient({
       )}
 
       {/* Submitting phase */}
-      {phase === 'submitting' && (
+      {!isDialogueMission && phase === 'submitting' && (
         <Card>
           <CardBody>
             <div className="text-center py-8">
@@ -681,6 +690,25 @@ export function SpeakingClient({
               <p className="mt-4 text-xs text-text-muted">
                 AI가 말하기를 평가하고 있습니다. 잠시 기다려주세요.
               </p>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Dialogue mission placeholder — 10-E-5에서 실제 AI 대화 UI로 교체 예정 */}
+      {isDialogueMission && (
+        <Card>
+          <CardBody>
+            <div className="text-center py-8">
+              <p className="text-sm font-medium text-text-primary mb-1">
+                AI 대화형 평가 준비 중
+              </p>
+              <p className="text-xs text-text-secondary mb-6">
+                현재 상태: 다음 단계 구현 예정
+              </p>
+              <Button variant="secondary" disabled>
+                AI 대화 준비 중
+              </Button>
             </div>
           </CardBody>
         </Card>

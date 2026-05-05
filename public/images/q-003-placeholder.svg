@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450">
+  <defs>
+    <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#bde0f5"/>
+      <stop offset="100%" stop-color="#ddf0fa"/>
+    </linearGradient>
+    <linearGradient id="grassGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6db84a"/>
+      <stop offset="100%" stop-color="#4e9c30"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000022"/>
+    </filter>
+  </defs>
+
+  <!-- Sky background -->
+  <rect width="800" height="450" fill="url(#skyGrad)"/>
+
+  <!-- Sun with glow -->
+  <circle cx="700" cy="75" r="48" fill="#ffd84d" opacity="0.25"/>
+  <circle cx="700" cy="75" r="36" fill="#ffe566"/>
+
+  <!-- Clouds -->
+  <g opacity="0.92">
+    <ellipse cx="155" cy="72" rx="58" ry="26" fill="#fff"/>
+    <ellipse cx="193" cy="62" rx="46" ry="22" fill="#fff"/>
+    <ellipse cx="122" cy="78" rx="34" ry="18" fill="#fff"/>
+  </g>
+  <g opacity="0.88">
+    <ellipse cx="585" cy="82" rx="52" ry="24" fill="#fff"/>
+    <ellipse cx="623" cy="70" rx="42" ry="20" fill="#fff"/>
+  </g>
+
+  <!-- Ground -->
+  <rect y="302" width="800" height="148" fill="url(#grassGrad)"/>
+
+  <!-- Path -->
+  <ellipse cx="400" cy="318" rx="285" ry="20" fill="#c9a870"/>
+  <ellipse cx="400" cy="316" rx="282" ry="17" fill="#d6b57a"/>
+
+  <!-- Left tree -->
+  <rect x="84" y="198" width="16" height="107" rx="4" fill="#7a5230"/>
+  <ellipse cx="92" cy="188" rx="54" ry="50" fill="#2e7a26"/>
+  <ellipse cx="74" cy="202" rx="36" ry="32" fill="#3e9e34"/>
+  <ellipse cx="112" cy="195" rx="28" ry="26" fill="#3a9230"/>
+
+  <!-- Right tree -->
+  <rect x="670" y="208" width="16" height="96" rx="4" fill="#7a5230"/>
+  <ellipse cx="678" cy="198" rx="50" ry="46" fill="#2e7a26"/>
+  <ellipse cx="658" cy="212" rx="30" ry="28" fill="#3a9230"/>
+  <ellipse cx="698" cy="205" rx="32" ry="30" fill="#3e9e34"/>
+
+  <!-- Bench (left side) -->
+  <rect x="145" y="284" width="88" height="8" rx="3" fill="#9a6f38" filter="url(#softShadow)"/>
+  <rect x="155" y="280" width="68" height="5" rx="2" fill="#b88040"/>
+  <rect x="154" y="292" width="8" height="20" rx="2" fill="#9a6f38"/>
+  <rect x="221" y="292" width="8" height="20" rx="2" fill="#9a6f38"/>
+
+  <!-- Person 1 — running (left side of path) -->
+  <g filter="url(#softShadow)">
+    <circle cx="292" cy="220" r="16" fill="#f3c09a"/>
+    <!-- hair -->
+    <ellipse cx="292" cy="208" rx="14" ry="8" fill="#5a3010"/>
+    <!-- body -->
+    <rect x="284" y="236" width="16" height="32" rx="5" fill="#3872cc"/>
+    <!-- arms -->
+    <line x1="284" y1="244" x2="266" y2="260" stroke="#f3c09a" stroke-width="5" stroke-linecap="round"/>
+    <line x1="300" y1="244" x2="318" y2="254" stroke="#f3c09a" stroke-width="5" stroke-linecap="round"/>
+    <!-- legs -->
+    <line x1="288" y1="268" x2="274" y2="300" stroke="#3872cc" stroke-width="5" stroke-linecap="round"/>
+    <line x1="296" y1="268" x2="312" y2="295" stroke="#3872cc" stroke-width="5" stroke-linecap="round"/>
+    <!-- shoes -->
+    <ellipse cx="272" cy="302" rx="11" ry="5" fill="#333"/>
+    <ellipse cx="315" cy="297" rx="11" ry="5" fill="#333"/>
+  </g>
+
+  <!-- Person 2 — stretching (center) -->
+  <g filter="url(#softShadow)">
+    <circle cx="432" cy="214" r="16" fill="#e8a87e"/>
+    <ellipse cx="432" cy="202" rx="14" ry="8" fill="#2a1a08"/>
+    <rect x="424" y="230" width="16" height="32" rx="5" fill="#cc3838"/>
+    <!-- arms raised -->
+    <line x1="424" y1="238" x2="406" y2="212" stroke="#e8a87e" stroke-width="5" stroke-linecap="round"/>
+    <line x1="440" y1="238" x2="458" y2="212" stroke="#e8a87e" stroke-width="5" stroke-linecap="round"/>
+    <!-- legs -->
+    <line x1="428" y1="262" x2="418" y2="296" stroke="#cc3838" stroke-width="5" stroke-linecap="round"/>
+    <line x1="438" y1="262" x2="448" y2="296" stroke="#cc3838" stroke-width="5" stroke-linecap="round"/>
+    <ellipse cx="416" cy="298" rx="11" ry="5" fill="#333"/>
+    <ellipse cx="450" cy="298" rx="11" ry="5" fill="#333"/>
+  </g>
+
+  <!-- Person 3 — cycling (right side) -->
+  <g filter="url(#softShadow)">
+    <circle cx="568" cy="218" r="15" fill="#d4a87e"/>
+    <ellipse cx="568" cy="207" rx="13" ry="7" fill="#3a2208"/>
+    <rect x="561" y="233" width="14" height="26" rx="4" fill="#2aaa44"/>
+    <!-- bicycle wheels -->
+    <circle cx="546" cy="274" r="23" fill="none" stroke="#555" stroke-width="4"/>
+    <circle cx="596" cy="274" r="23" fill="none" stroke="#555" stroke-width="4"/>
+    <!-- wheel spokes (simplified) -->
+    <line x1="546" y1="251" x2="546" y2="297" stroke="#aaa" stroke-width="1.5"/>
+    <line x1="523" y1="274" x2="569" y2="274" stroke="#aaa" stroke-width="1.5"/>
+    <line x1="596" y1="251" x2="596" y2="297" stroke="#aaa" stroke-width="1.5"/>
+    <line x1="573" y1="274" x2="619" y2="274" stroke="#aaa" stroke-width="1.5"/>
+    <!-- frame -->
+    <polyline points="571,274 558,250 546,274" fill="none" stroke="#555" stroke-width="3.5" stroke-linejoin="round"/>
+    <polyline points="558,250 596,274" fill="none" stroke="#555" stroke-width="3.5"/>
+    <polyline points="596,274 586,254 571,274" fill="none" stroke="#555" stroke-width="3"/>
+    <!-- handlebar -->
+    <line x1="554" y1="245" x2="544" y2="240" stroke="#555" stroke-width="4" stroke-linecap="round"/>
+    <line x1="544" y1="240" x2="544" y2="248" stroke="#555" stroke-width="3" stroke-linecap="round"/>
+    <!-- seat -->
+    <line x1="584" y1="253" x2="574" y2="249" stroke="#555" stroke-width="4" stroke-linecap="round"/>
+    <!-- rider legs -->
+    <line x1="565" y1="259" x2="554" y2="272" stroke="#2aaa44" stroke-width="4" stroke-linecap="round"/>
+    <line x1="573" y1="259" x2="580" y2="270" stroke="#2aaa44" stroke-width="4" stroke-linecap="round"/>
+    <!-- rider arms -->
+    <line x1="561" y1="242" x2="549" y2="246" stroke="#d4a87e" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Caption bar -->
+  <rect x="0" y="408" width="800" height="42" fill="rgba(15,30,55,0.62)"/>
+  <text x="16" y="433" fill="#fff" font-size="14" font-family="'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif" font-weight="600">공원에서 운동하는 사람들</text>
+  <text x="784" y="433" text-anchor="end" fill="rgba(255,255,255,0.6)" font-size="11" font-family="sans-serif">임시 일러스트 — 파일럿 전 실제 사진으로 교체</text>
+
+  <!-- Placeholder stamp (top-right corner) -->
+  <rect x="664" y="10" width="126" height="26" rx="5" fill="rgba(220,80,40,0.82)"/>
+  <text x="727" y="27" text-anchor="middle" fill="#fff" font-size="11.5" font-family="sans-serif" font-weight="700" letter-spacing="0.5">PLACEHOLDER</text>
+</svg>

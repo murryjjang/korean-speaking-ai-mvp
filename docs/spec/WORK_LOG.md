@@ -4,6 +4,124 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-4 추가 수정 — dialogue_mission 단발 녹음→제출 UI 비표시
+
+**날짜**: 2026-05-06  
+**목표**: q4 dialogue_mission에서 기존 단발 녹음→제출 UI를 숨기고 "대화형 문항 준비 중" 상태로 명확히 표시.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `isDialogueMission` 조건 추가 — 4개 phase 카드 비표시, dialogue placeholder 카드 추가, 대화 시간 표시, 녹음 안내 TTS 숨김 |
+| `tests/smoke/auth-routes.spec.ts` | 기존 "준비 시작" 검사 3군데 dialogue_mission 분기 수정, 신규 8개 테스트 추가 |
+| `docs/spec/WORK_LOG.md` | 이 항목 |
+| `docs/spec/PHASE_10E_GAP_ANALYSIS.md` | 10-E-4 추가 수정 처리 결과 반영 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | D+15 상태 + 10-E-4 추가 수정 기록 반영 |
+
+### 변경 내용 요약
+
+- `isDialogueMission = typeId === 'qt-dialogue-mission' || evaluationMode === 'interactive_dialogue'`
+- `!isDialogueMission &&` 조건 적용: prep / recording / review / submitting 4개 phase 카드 모두
+- dialogue_mission 전용 placeholder 카드: "AI 대화형 평가 준비 중" + disabled "AI 대화 준비 중" 버튼
+- 질문 카드에서 dialogue_mission: 준비/답변 시간 표시 숨김, `maxDialogueDurationSec` 표시 추가, "녹음 안내 듣기" TTS 버튼 숨김
+- q1/q2/q3 기존 흐름 유지, no-speech/short-audio guard 유지, legacy q-003 route 유지
+- aiInformation 비노출 기존 구조 유지
+
+### 10-E-5 Known Issues
+
+- 실제 AI 대화 UI 구현 (턴-by-턴 대화, WebSocket 또는 SSE)
+- 대화 로그 저장 (`dialogueTurns` → Supabase)
+- missionGoals 달성 여부 평가 로직
+- 교수자 최종확정 rubric 강화 (대화 미션 35점 체계)
+
+### lint / tsc / build / smoke
+
+- `npm run lint` → 에러 0
+- `npx tsc --noEmit` → 에러 0
+- `npm run build` → 빌드 성공 (22 routes)
+- `npm run test:smoke` → **89 passed** (기존 81 + 신규 8)
+
+---
+
+## Phase 10-E-4 — 공식 평가세트 asset 구조·listenLimit UI·student-safe rendering
+
+**날짜**: 2026-05-06  
+**목표**: 공식 문항의 자료 asset 구조를 정비하고 학습자 화면에서 자료가 실제로 보이도록 개선.
+
+### 수정/신규 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/content/assessment-assets.ts` | 신규 — 공식 9개 asset의 metadata registry (student-safe 전용, teacherOnlyNote 격리) |
+| `src/components/question-asset-renderer.tsx` | 신규 — assetType별 렌더링 컴포넌트 (image/chart/audio/dialogue_profile) |
+| `app/student/speaking/[questionId]/page.tsx` | `getStudentVisibleAsset()` 호출 → `assetMeta` + `listenLimit` 전달, teacher-only 필드 격리 강화 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `QuestionData`에 `assetMeta`/`listenLimit` 추가, `QuestionAssetRenderer` 통합, old asset notice 대체 |
+| `tests/smoke/auth-routes.spec.ts` | Phase 10-E-4 UI smoke 18개 추가 (81 passed) |
+| `docs/spec/WORK_LOG.md` | 이 항목 |
+| `docs/spec/PHASE_10E_GAP_ANALYSIS.md` | 10-E-4 처리 결과 반영 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | 파일럿 전 실제 asset 교체 항목 명시 |
+
+### asset registry 구조 (`src/content/assessment-assets.ts`)
+
+- 9개 공식 asset 등록:
+  - beginner q2: 식당 사진 (image, placeholder)
+  - intermediate q2: 수업방식 선호도 (chart, ready — 앱 내부 렌더링)
+  - advanced q2: 등록 인원 변화 (chart, ready — 앱 내부 렌더링)
+  - beginner/intermediate/advanced q3: 각 음원 (audio, placeholder)
+  - beginner/intermediate/advanced q4: dialogue profile (dialogue_profile, ready)
+- `getStudentVisibleAsset(questionId)` — teacher-only 필드 완전 제거 후 반환
+- `teacherOnlyNote`, `replacementRequiredBeforePilot`은 학습자 화면에 절대 미전달
+
+### 자료 설명 문항 개선
+
+| 문항 | 처리 방식 |
+|---|---|
+| beginner q2 | 실제 사진 없음 → 깔끔한 🏪 placeholder 카드 (식당 안 모습 + 설명) |
+| intermediate q2 | 앱 내부 가로 바 차트 — 대면 50%, 온라인 30%, 혼합형 20% 실제 표시 |
+| advanced q2 | 앱 내부 가로 바 차트 — 2024:120명, 2025:180명, 2026:260명 실제 표시 |
+
+### 듣고 답하기 audio asset 구조
+
+- `AudioAssetCard` 컴포넌트:
+  - `listenCount` state (0초기값)
+  - `listenLimit` (questions.json에서 전달, 기본 2)
+  - "들은 횟수: 0 / 2" 표시
+  - 음원 없음 → 버튼 disabled + "듣기 음원은 파일럿 전 등록 예정입니다."
+  - 음원 있음 → `<audio>` 재생 + 카운트 증가 (limit 도달 시 disabled)
+  - 음원 없으면 카운트 증가 절대 불가
+- `listeningScriptForTeacherOnly`는 server page에서 client로 미전달 (기존 유지 + 강화)
+
+### dialogue_mission data/화면 유지
+
+- `evaluationMode: "interactive_dialogue"` 유지
+- `aiInformation`은 page.tsx에서 client로 미전달 (기존 유지 + 강화)
+- `missionGoals`만 학습자 화면에 전달 + 표시
+- "AI와 대화하며 미션을 달성하는 문항" 안내 유지
+- "실시간 AI 대화 기능은 다음 단계에서 활성화됩니다." 안내 유지
+- 10-E-5 준비 상태 유지
+
+### student-safe rendering 강화
+
+- `page.tsx`에서 `assetMeta` 생성 시 `typeId !== 'qt-dialogue-mission'` 조건으로 dialogue_profile 미전달
+- `QuestionAssetRenderer`는 teacher-only 필드 일체 불포함
+- `scoringNotes`, `teacherNotes`, `listeningScriptForTeacherOnly`, `aiInformation` 모두 서버에서 차단
+
+### no-speech/short-audio guard 유지
+
+- `MIN_VALID_DURATION_SEC=2` 유지
+- `MIN_VALID_BLOB_SIZE=3000` 유지
+- 짧은 녹음 → 제출 차단, STT 호출 금지 (변경 없음)
+
+### lint / tsc / build / smoke
+
+- `npm run lint` → 에러 0
+- `npx tsc --noEmit` → 에러 0
+- `npm run build` → 빌드 성공
+- `npm run test:smoke` → **81 passed** (기존 63 + 신규 18)
+
+---
+
 ## Phase 10-E-3 추가 수정 — 낭독 피드백·404·대화 미션 재정의
 
 **날짜**: 2026-05-06  

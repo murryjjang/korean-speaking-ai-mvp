@@ -198,9 +198,14 @@ test.describe('Phase 10-E-3: 공식 문항 12개 URL 접근성', () => {
   ]
 
   for (const { qId, setId } of officialQuestions) {
-    test(`${qId} — 404 없이 열림, 준비 시작 버튼 표시`, async ({ page }) => {
+    const isDialogue = qId.endsWith('-dialogue-mission')
+    test(`${qId} — 404 없이 열림, ${isDialogue ? 'AI 대화 안내 표시' : '준비 시작 버튼 표시'}`, async ({ page }) => {
       await page.goto(`/student/speaking/${qId}?setId=${setId}`)
-      await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+      if (isDialogue) {
+        await expect(page.getByRole('button', { name: 'AI 대화 준비 중' })).toBeVisible()
+      } else {
+        await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+      }
     })
   }
 
@@ -215,5 +220,204 @@ test.describe('Phase 10-E-3: 공식 문항 12개 URL 접근성', () => {
     await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
     await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
     await expect(page.getByText('수업 시작 시간')).toBeVisible()
+  })
+})
+
+test.describe('Phase 10-E-4: 공식 문항 asset rendering', () => {
+  // --- material_description q2 ---
+
+  test('beginner q2 image placeholder가 렌더링됨 (식당 안 모습)', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q2-material-description?setId=beginner-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    // 이미지 placeholder 또는 실제 이미지 컨테이너 중 하나가 있어야 함
+    const hasPlaceholder = await page.locator('[data-testid="image-asset-placeholder"]').isVisible().catch(() => false)
+    const hasImage = await page.locator('[data-testid="image-asset-container"]').isVisible().catch(() => false)
+    expect(hasPlaceholder || hasImage).toBe(true)
+    // 식당 제목이 보여야 함
+    await expect(page.getByText('식당 안 모습')).toBeVisible()
+  })
+
+  test('intermediate q2 chart에 50%/30%/20% 수치가 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/intermediate-q2-material-description?setId=intermediate-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    await expect(page.locator('[data-testid="chart-asset"]')).toBeVisible()
+    // data-testid 기반으로 수치 확인 — 바 스팬과 표 셀 양쪽에 있으므로 first() 사용
+    await expect(page.getByText('50%').first()).toBeVisible()
+    await expect(page.getByText('30%').first()).toBeVisible()
+    await expect(page.getByText('20%').first()).toBeVisible()
+    // 항목 레이블도 있어야 함
+    await expect(page.getByText('대면 수업').first()).toBeVisible()
+  })
+
+  test('advanced q2 chart에 2024/120명, 2025/180명, 2026/260명 수치가 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/advanced-q2-material-description?setId=advanced-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    await expect(page.locator('[data-testid="chart-asset"]')).toBeVisible()
+    // data-testid 기반으로 수치 확인 — 바 스팬과 표 셀 양쪽에 있으므로 first() 사용
+    await expect(page.getByText('120명').first()).toBeVisible()
+    await expect(page.getByText('180명').first()).toBeVisible()
+    await expect(page.getByText('260명').first()).toBeVisible()
+    // 연도 레이블
+    await expect(page.getByText('2024').first()).toBeVisible()
+    await expect(page.getByText('2025').first()).toBeVisible()
+    await expect(page.getByText('2026').first()).toBeVisible()
+  })
+
+  test('intermediate/advanced q2에 licenseNote 또는 teacherOnlyNote가 노출되지 않음', async ({ page }) => {
+    await page.goto('/student/speaking/intermediate-q2-material-description?setId=intermediate-set-1')
+    const bodyText = await page.locator('body').innerText()
+    expect(bodyText).not.toContain('teacherOnlyNote')
+    expect(bodyText).not.toContain('파일럿 전 실제 사진 교체')
+    expect(bodyText).not.toContain('앱 내부 SVG')
+  })
+
+  // --- listening_response q3 ---
+
+  test('beginner q3 listening card가 렌더링되고 음원 미등록 안내가 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    await expect(page.locator('[data-testid="listening-asset-card"]')).toBeVisible()
+    await expect(page.locator('[data-testid="audio-not-ready"]')).toBeVisible()
+    await expect(page.locator('[data-testid="listen-count"]')).toBeVisible()
+  })
+
+  test('intermediate q3 listening card가 렌더링됨', async ({ page }) => {
+    await page.goto('/student/speaking/intermediate-q3-listening-response?setId=intermediate-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    await expect(page.locator('[data-testid="listening-asset-card"]')).toBeVisible()
+  })
+
+  test('advanced q3 listening card가 렌더링됨', async ({ page }) => {
+    await page.goto('/student/speaking/advanced-q3-listening-response?setId=advanced-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    await expect(page.locator('[data-testid="listening-asset-card"]')).toBeVisible()
+  })
+
+  test('q3 listenLimit 카운터가 "들은 횟수: 0 / 2" 형태로 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
+    await expect(page.locator('[data-testid="listen-count"]')).toContainText('들은 횟수: 0 / 2')
+  })
+
+  test('q3 learnerVisibleElements가 학습자 화면에 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
+    await expect(page.getByText('수업 시작 시간')).toBeVisible()
+    await expect(page.getByText('수업 장소')).toBeVisible()
+  })
+
+  test('q3 listeningScriptForTeacherOnly가 학습자 화면에 노출되지 않음', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
+    // 스크립트 콘텐츠가 화면에 렌더링되면 안 됨
+    const bodyText = await page.locator('body').innerText()
+    expect(bodyText).not.toContain('listeningScriptForTeacherOnly')
+    // 실제 스크립트 텍스트 — 학습자에게 보이면 안 됨 (교수자 전용)
+    expect(bodyText).not.toContain('내일부터 한국어 수업이 시작됩니다')
+  })
+
+  test('q3 audio 미등록 상태에서 listen 버튼이 disabled 상태임', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
+    const btn = page.locator('[data-testid="listen-button"]')
+    await expect(btn).toBeVisible()
+    // 음원 없음 → 버튼이 비활성화됨
+    await expect(btn).toBeDisabled()
+  })
+
+  // --- dialogue_mission q4 ---
+
+  test('beginner q4 dialogue_mission card가 렌더링됨 — missionGoals 표시', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    // 10-E-4 추가: dialogue_mission은 준비 시작 대신 AI 대화 준비 중 버튼 표시
+    await expect(page.getByRole('button', { name: 'AI 대화 준비 중' })).toBeVisible()
+    await expect(page.getByText('AI와 대화하며 미션을 달성하는 문항')).toBeVisible()
+    // 미션 목표 중 타이틀과 겹치지 않는 항목 사용 (strict mode 위반 방지)
+    await expect(page.getByText('차가운/따뜻한 음료 선택')).toBeVisible()
+  })
+
+  test('intermediate q4 missionGoals 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/intermediate-q4-dialogue-mission?setId=intermediate-set-1')
+    await expect(page.getByText('말하기 수업 시간 확인')).toBeVisible()
+  })
+
+  test('advanced q4 missionGoals 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/advanced-q4-dialogue-mission?setId=advanced-set-1')
+    await expect(page.getByText('일정 조정 가능 여부 확인')).toBeVisible()
+  })
+
+  test('q4 aiInformation이 학습자 화면에 노출되지 않음', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    const bodyText = await page.locator('body').innerText()
+    expect(bodyText).not.toContain('aiInformation')
+    // dialogue_mission aiRole 상세 정보 미노출 확인
+    expect(bodyText).not.toContain('teacherOnlyNote')
+  })
+
+  test('q4 dialogue_mission이 일반 녹음형 UI와 구분됨 — interactive_dialogue 안내 표시', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    // 일반 문항과 달리 AI 대화 안내가 보여야 함
+    await expect(page.getByText('실시간 AI 대화 기능은 다음 단계에서 활성화됩니다')).toBeVisible()
+  })
+
+  // --- teacher-only 필드 비노출 통합 확인 ---
+
+  test('공식 문항 12개 URL이 계속 404 없이 열림 (10-E-3 유지)', async ({ page }) => {
+    const routes = [
+      '/student/speaking/beginner-q1-reading?setId=beginner-set-1',
+      '/student/speaking/beginner-q2-material-description?setId=beginner-set-1',
+      '/student/speaking/beginner-q3-listening-response?setId=beginner-set-1',
+      '/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1',
+      '/student/speaking/intermediate-q1-reading?setId=intermediate-set-1',
+      '/student/speaking/intermediate-q2-material-description?setId=intermediate-set-1',
+      '/student/speaking/intermediate-q3-listening-response?setId=intermediate-set-1',
+      '/student/speaking/intermediate-q4-dialogue-mission?setId=intermediate-set-1',
+      '/student/speaking/advanced-q1-reading?setId=advanced-set-1',
+      '/student/speaking/advanced-q2-material-description?setId=advanced-set-1',
+      '/student/speaking/advanced-q3-listening-response?setId=advanced-set-1',
+      '/student/speaking/advanced-q4-dialogue-mission?setId=advanced-set-1',
+    ]
+    for (const route of routes) {
+      await page.goto(route)
+      if (route.includes('dialogue-mission')) {
+        // 10-E-4 추가: dialogue_mission은 AI 대화 준비 중 버튼으로 표시
+        await expect(page.getByRole('button', { name: 'AI 대화 준비 중' })).toBeVisible()
+      } else {
+        await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+      }
+    }
+  })
+
+  test('legacy q-003 route 유지 (10-E-3 후퇴 없음)', async ({ page }) => {
+    await page.goto('/student/speaking/q-003')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+})
+
+test.describe('Phase 10-E-4 추가: dialogue_mission 기존 녹음→제출 UI 비표시', () => {
+  const dialogueCases = [
+    { qId: 'beginner-q4-dialogue-mission', setId: 'beginner-set-1' },
+    { qId: 'intermediate-q4-dialogue-mission', setId: 'intermediate-set-1' },
+    { qId: 'advanced-q4-dialogue-mission', setId: 'advanced-set-1' },
+  ]
+
+  for (const { qId, setId } of dialogueCases) {
+    test(`${qId} — 기존 단발 녹음 UI(준비 시작)가 보이지 않음`, async ({ page }) => {
+      await page.goto(`/student/speaking/${qId}?setId=${setId}`)
+      await expect(page.getByRole('button', { name: '준비 시작' })).not.toBeVisible()
+    })
+
+    test(`${qId} — AI 대화 준비 중 버튼(disabled) 표시`, async ({ page }) => {
+      await page.goto(`/student/speaking/${qId}?setId=${setId}`)
+      const btn = page.getByRole('button', { name: 'AI 대화 준비 중' })
+      await expect(btn).toBeVisible()
+      await expect(btn).toBeDisabled()
+    })
+  }
+
+  test('q1/q2/q3 녹음 흐름은 유지됨 — beginner q1 준비 시작 버튼 표시', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q1-reading?setId=beginner-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+
+  test('q1/q2/q3 녹음 흐름은 유지됨 — beginner q3 준비 시작 버튼 표시', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
   })
 })

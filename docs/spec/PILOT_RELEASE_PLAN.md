@@ -25,7 +25,36 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 | **D+3** — 최소기능 시연판 | 2026-05-07 | Supabase 연결 + 핵심 경로 저장 확인 | ✅ 완료 (Phase 6-B1~B2) |
 | **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 | ✅ 완료 (Phase 6-B2~B5) |
 | **D+10** — 로그인/역할 분기 | 2026-05-14 | Supabase Auth 기반 로그인 + 역할별 route 보호 | ✅ 완료 (Phase 9-A) |
-| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | **P0 처리 완료 (10-E-1), P1-1~P1-4 처리 완료 (10-E-2), 정식 문항 콘텐츠 입력 완료 (10-E-3), reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정), 실제 음원/이미지 asset 등록 대기 (10-E-4), dialogue_mission AI 대화 UI 구현 대기 (10-E-5)** |
+| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | **P0 처리 완료 (10-E-1), P1-1~P1-4 처리 완료 (10-E-2), 정식 문항 콘텐츠 입력 완료 (10-E-3), reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정), asset 구조·listenLimit·student-safe rendering 완료 (10-E-4), dialogue_mission 단발 녹음 UI 비표시·준비 중 상태 표시 완료 (10-E-4 추가 수정), 실제 식당 사진·음원 mp3 교체 대기 (파일럿 전 필수), dialogue_mission 실제 AI 대화 UI 구현 대기 (10-E-5)** |
+
+---
+
+## 파일럿 전 필수 asset 교체 목록 (Phase 10-E-4 기준)
+
+파일럿 출시 전 반드시 교체 또는 등록해야 할 실제 자료 목록. 현재는 모두 placeholder 또는 앱 내부 렌더링 상태.
+
+| 항목 | 현재 상태 | 필요 작업 | 우선순위 |
+|---|---|---|---|
+| beginner q2 식당 사진 | placeholder 카드 표시 | 실제 사진 촬영 또는 CC0 라이선스 이미지 확보 후 `/public/images/official/beginner-restaurant-scene.jpg` 등록, `questions.json` `imageUrl` 업데이트 | **필수** |
+| beginner q3 음원 | 미등록 (버튼 disabled) | 실제 mp3/aac 생성 후 `/public/audio/official/beginner-korean-class-announcement.mp3` 등록, `questions.json` `assetUrl` 업데이트 | **필수** |
+| intermediate q3 음원 | 미등록 (버튼 disabled) | 실제 mp3/aac 생성 후 `/public/audio/official/intermediate-presentation-class-change.mp3` 등록 | **필수** |
+| advanced q3 음원 | 미등록 (버튼 disabled) | 실제 mp3/aac 생성 후 `/public/audio/official/advanced-hybrid-class-analysis.mp3` 등록 | **필수** |
+| intermediate q2 차트 | 앱 내부 바 차트 (임시 사용 가능) | 파일럿 초기에는 앱 내부 렌더링으로 운용 가능. 향후 실제 설문 데이터로 교체 가능 | 선택 |
+| advanced q2 차트 | 앱 내부 바 차트 (임시 사용 가능) | 파일럿 초기에는 앱 내부 렌더링으로 운용 가능. 향후 실제 데이터로 교체 가능 | 선택 |
+| q4 dialogue AI 대화 UI | 안내 카드만 표시 | 10-E-5에서 실제 대화 UI 구현 예정 | **필수 (10-E-5)** |
+
+**음원 등록 절차 (mp3/aac 준비 후):**
+1. `public/audio/official/` 디렉토리 생성
+2. mp3/aac 파일 배치
+3. `src/content/questions.json`의 해당 문항 `assetUrl` 필드 업데이트
+4. `src/content/assessment-assets.ts`의 해당 asset `src` 필드 업데이트 + `status: 'ready'` 변경
+5. 빌드/테스트 후 배포
+
+**이미지 등록 절차 (식당 사진 준비 후):**
+1. `public/images/official/` 디렉토리 생성
+2. `beginner-restaurant-scene.jpg` 배치 (저작권 확인 필수)
+3. `src/content/questions.json`의 `beginner-q2-material-description` `imageUrl` 필드 업데이트
+4. `src/content/assessment-assets.ts`의 `beginner-restaurant-image` `src` 필드 업데이트 + `status: 'ready'` 변경
 
 ---
 
@@ -304,6 +333,8 @@ VALUES ('<student-auth-user-uuid>', 'student', '홍길동', '<students-table-uui
 > **Phase 10-E-2 기록 (2026-05-05)**: 정식 평가세트는 PDF 기준 초급/중급/고급 4문항 체계로 전환 중. 4유형(낭독 15점, 자료설명 25점, 듣고답하기 25점, 대화미션 35점) × 3수준 = 12문항 skeleton 구성 완료. 파일럿 적용 전 콘텐츠 교수자 검수 및 사진/음원 asset 등록 필요(10-E-3~10-E-4).
 
 > **Phase 10-E-3 추가 수정 기록 (2026-05-06)**: 공식 평가세트 12문항 route 접근성 확인 완료. q2/q3 URL 404 수정, reading 피드백 유형 분리, dialogue_mission 생성형 AI 쌍방 대화형 재정의. 잔여 작업: 10-E-4(실제 사진/음원 asset 등록, listenLimit 적용), 10-E-5(dialogue_mission AI 대화 UI, dialogueTurns 저장, missionGoals 달성 평가, 교수자 최종확정 official rubric 강화), 10-E-6(attempt 단위 1~4번 전체 응시 흐름). **4번 dialogue_mission은 단발 녹음형으로 최종 운영하지 않음. 생성형 AI 쌍방 대화형 평가로 구현 예정(10-E-5).**
+
+> **Phase 10-E-4 추가 수정 기록 (2026-05-06)**: q4 dialogue_mission 학습자 화면에서 기존 단발 녹음→제출 UI(준비 시작/녹음/검토/제출 phase) 비표시 완료. 대신 "AI 대화형 평가 준비 중" placeholder 카드 + disabled "AI 대화 준비 중" 버튼 표시. q1/q2/q3 녹음 흐름, no-speech guard, legacy q-003 route 유지. **10-E-5 Known Issues: 실제 AI 대화 UI 구현, 대화 로그 저장(dialogueTurns → DB), missionGoals 달성 평가.**
 
 **목표**: 실제 사용자와 파일럿 세션 시작.
 

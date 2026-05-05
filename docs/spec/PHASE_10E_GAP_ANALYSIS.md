@@ -3,9 +3,39 @@
 **Korean Speaking AI MVP — 평가 설계 정렬 분석**  
 **작성일**: 2026-05-05  
 **분석자**: Claude (Phase 10-E-0)  
-**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05) / 정식 문항 콘텐츠 입력 완료 (10-E-3 콘텐츠, 2026-05-05) / reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정, 2026-05-06)
+**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05) / 정식 문항 콘텐츠 입력 완료 (10-E-3 콘텐츠, 2026-05-05) / reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정, 2026-05-06) / asset 구조·listenLimit UI·student-safe rendering 완료 (10-E-4, 2026-05-06) / dialogue_mission 단발 녹음→제출 UI 비표시 완료 (10-E-4 추가 수정, 2026-05-06)
 
-**4번 dialogue_mission 구현 방향**: 단발 녹음형으로 최종 운영하지 않음. 생성형 AI 쌍방 대화형 평가로 구현 예정. 실제 AI 대화 UI·대화 로그 저장·missionGoals 달성 평가는 **10-E-5**에서 구현. 현재는 임시 단발 녹음형으로 평가하며 `evaluationMode: "interactive_dialogue"` 필드로 명시.
+**10-E-4 처리 결과 (2026-05-06):**
+- ✅ asset registry (`src/content/assessment-assets.ts`) 생성 — 9개 공식 asset, teacher-only 필드 격리
+- ✅ `QuestionAssetRenderer` 컴포넌트 — image/chart/audio assetType별 분기 렌더링
+- ✅ beginner q2: 식당 사진 placeholder 카드 (학습자 친화적, 개발자 문구 최소화)
+- ✅ intermediate q2: 앱 내부 바 차트 — 대면 50% / 온라인 30% / 혼합형 20% 실제 표시
+- ✅ advanced q2: 앱 내부 바 차트 — 2024:120명 / 2025:180명 / 2026:260명 실제 표시
+- ✅ q3 audio asset 구조 — listenCount state, listenLimit UI ("들은 횟수: 0 / 2"), 음원 미등록 시 disabled
+- ✅ listeningScriptForTeacherOnly 비전달 강화 (smoke 검증)
+- ✅ aiInformation 비전달 강화 (smoke 검증)
+- ✅ dialogue_mission interactive_dialogue 안내 유지
+- ✅ teacherOnlyNote / scoringNotes / teacherNotes 학습자 화면 비노출 구조 강화
+- ✅ smoke 81 passed (기존 63 + 신규 18)
+
+**10-E-4 추가 수정 처리 결과 (2026-05-06):**
+- ✅ q4 dialogue_mission에서 기존 단발 녹음→제출 phase UI(준비 시작/녹음/검토/제출) 완전 비표시
+- ✅ `isDialogueMission` 조건 추가 (`typeId === 'qt-dialogue-mission' || evaluationMode === 'interactive_dialogue'`)
+- ✅ q4에서 "AI 대화형 평가 준비 중" placeholder 카드 + disabled "AI 대화 준비 중" 버튼 표시
+- ✅ q4 질문 카드에 `maxDialogueDurationSec` 대화 제한 시간 표시 추가
+- ✅ q4에서 "준비 시간 / 답변 시간" 표시 숨김, "녹음 안내 듣기" TTS 버튼 숨김
+- ✅ q1/q2/q3 기존 녹음→제출 흐름 유지 (no-speech/short-audio guard 포함)
+- ✅ legacy q-003 route 유지
+- ✅ smoke 89 passed (기존 81 + 신규 8)
+- 🔜 남은 항목: 실제 식당 사진 교체, 음원 mp3 등록, dialogue_mission AI 대화 UI (10-E-5)
+
+**4번 dialogue_mission Known Issues (10-E-5 예정):**
+- 실제 AI 대화 UI 구현 (WebSocket 또는 API 기반 턴-by-턴 대화)
+- 대화 로그 저장 (`dialogueTurns` → DB)
+- missionGoals 달성 여부 평가 로직
+- 교수자 최종확정 rubric 강화 (대화 미션 35점 체계)
+
+**4번 dialogue_mission 구현 방향**: 단발 녹음형으로 최종 운영하지 않음. 생성형 AI 쌍방 대화형 평가로 구현 예정. 실제 AI 대화 UI·대화 로그 저장·missionGoals 달성 평가는 **10-E-5**에서 구현. 현재는 단발 녹음 UI를 숨기고 "준비 중" 상태로 표시하며 `evaluationMode: "interactive_dialogue"` 필드로 명시.
 
 ---
 

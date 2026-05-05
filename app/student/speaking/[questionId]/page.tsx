@@ -4,6 +4,7 @@ import questionsJson from '@/src/content/questions.json'
 import questionSetsJson from '@/src/content/question-sets.json'
 import questionTypesJson from '@/src/content/question-types.json'
 import { PageHeader } from '@/src/components/ui'
+import { getStudentVisibleAsset } from '@/src/content/assessment-assets'
 import { SpeakingClient } from './speaking-client'
 
 // Canonical ID aliases — old short IDs redirect to canonical long IDs.
@@ -48,6 +49,12 @@ export default async function SpeakingQuestionPage({
           : qs.questions.some((qi) => qi.questionId === questionId)),
     ) ?? questionSetsJson[0]
 
+  // dialogue_mission은 renderer를 사용하지 않음 (대화 카드에서 처리)
+  const assetMeta =
+    question.typeId !== 'qt-dialogue-mission'
+      ? getStudentVisibleAsset(question.id)
+      : undefined
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
@@ -79,12 +86,15 @@ export default async function SpeakingQuestionPage({
           imageCaption: question.imageCaption,
           imageLicenseNote: question.imageLicenseNote,
           assetType: question.assetType ?? undefined,
-          // dialogue_mission: pass learner-visible fields only (never aiInformation)
+          // asset registry — student-safe only (teacherOnlyNote 미전달)
+          assetMeta,
+          // listening_response: listenLimit (listeningScriptForTeacherOnly 미전달)
+          listenLimit: (question as { listenLimit?: number }).listenLimit,
+          learnerVisibleElements: (question as { learnerVisibleElements?: string[] }).learnerVisibleElements,
+          // dialogue_mission: learner-visible fields only (aiInformation 미전달)
           missionGoals: (question as { missionGoals?: string[] }).missionGoals,
           evaluationMode: (question as { evaluationMode?: string }).evaluationMode,
           maxDialogueDurationSec: (question as { maxDialogueDurationSec?: number }).maxDialogueDurationSec,
-          // listening_response: pass only learner-visible elements (never listeningScriptForTeacherOnly)
-          learnerVisibleElements: (question as { learnerVisibleElements?: string[] }).learnerVisibleElements,
         }}
         questionSetId={resolvedSet.id}
         setName={resolvedSet.name}
