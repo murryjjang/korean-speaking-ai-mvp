@@ -1,43 +1,109 @@
 [
   {
+    "id": "qs-beginner-01",
+    "name": "초급 평가세트",
+    "description": "초급 학습자를 위한 정식 말하기 평가 세트. 낭독 15점 + 자료 설명 25점 + 듣고 답하기 25점 + 대화 미션 35점 = 100점.",
+    "purpose": "official",
+    "level": "beginner",
+    "totalMaxScore": 100,
+    "questions": [
+      { "questionId": "q-b1-1", "order": 1 },
+      { "questionId": "q-b1-2", "order": 2 },
+      { "questionId": "q-b1-3", "order": 3 },
+      { "questionId": "q-b1-4", "order": 4 }
+    ],
+    "isActive": true,
+    "isOfficial": true,
+    "version": "1.0",
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
+    "id": "qs-intermediate-01",
+    "name": "중급 평가세트",
+    "description": "중급 학습자를 위한 정식 말하기 평가 세트. 낭독 15점 + 자료 설명 25점 + 듣고 답하기 25점 + 대화 미션 35점 = 100점.",
+    "purpose": "official",
+    "level": "intermediate",
+    "totalMaxScore": 100,
+    "questions": [
+      { "questionId": "q-i1-1", "order": 1 },
+      { "questionId": "q-i1-2", "order": 2 },
+      { "questionId": "q-i1-3", "order": 3 },
+      { "questionId": "q-i1-4", "order": 4 }
+    ],
+    "isActive": true,
+    "isOfficial": true,
+    "version": "1.0",
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
+    "id": "qs-advanced-01",
+    "name": "고급 평가세트",
+    "description": "고급 학습자를 위한 정식 말하기 평가 세트. 낭독 15점 + 자료 설명 25점 + 듣고 답하기 25점 + 대화 미션 35점 = 100점.",
+    "purpose": "official",
+    "level": "advanced",
+    "totalMaxScore": 100,
+    "questions": [
+      { "questionId": "q-a1-1", "order": 1 },
+      { "questionId": "q-a1-2", "order": 2 },
+      { "questionId": "q-a1-3", "order": 3 },
+      { "questionId": "q-a1-4", "order": 4 }
+    ],
+    "isActive": true,
+    "isOfficial": true,
+    "version": "1.0",
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
     "id": "qs-diagnostic-01",
     "name": "진단평가 세트 A",
-    "description": "수업 시작 전 학습자 수준을 파악하기 위한 평가",
-    "purpose": "diagnostic",
+    "description": "수업 시작 전 학습자 수준을 파악하기 위한 평가 (개발·테스트용)",
+    "purpose": "dev",
+    "level": null,
+    "totalMaxScore": null,
     "questions": [
       { "questionId": "q-001", "order": 1 },
       { "questionId": "q-003", "order": 2 },
       { "questionId": "q-007", "order": 3 }
     ],
-    "isActive": true,
+    "isActive": false,
+    "isOfficial": false,
+    "isLegacy": true,
     "version": "1.0",
     "createdAt": "2026-01-01T00:00:00Z"
   },
   {
     "id": "qs-practice-01",
     "name": "연습평가 세트 A",
-    "description": "수업 중 연습용 평가 세트",
-    "purpose": "practice",
+    "description": "수업 중 연습용 평가 세트 (개발·테스트용)",
+    "purpose": "dev",
+    "level": null,
+    "totalMaxScore": null,
     "questions": [
       { "questionId": "q-002", "order": 1 },
       { "questionId": "q-005", "order": 2 },
       { "questionId": "q-007", "order": 3 }
     ],
-    "isActive": true,
+    "isActive": false,
+    "isOfficial": false,
+    "isLegacy": true,
     "version": "1.0",
     "createdAt": "2026-01-01T00:00:00Z"
   },
   {
     "id": "qs-post-01",
     "name": "사후평가 세트 A",
-    "description": "수업 종료 후 학습 성과를 측정하는 평가",
-    "purpose": "post",
+    "description": "수업 종료 후 학습 성과를 측정하는 평가 (개발·테스트용)",
+    "purpose": "dev",
+    "level": null,
+    "totalMaxScore": null,
     "questions": [
       { "questionId": "q-002", "order": 1 },
       { "questionId": "q-006", "order": 2 },
       { "questionId": "q-008", "order": 3 }
     ],
-    "isActive": true,
+    "isActive": false,
+    "isOfficial": false,
+    "isLegacy": true,
     "version": "1.0",
     "createdAt": "2026-01-01T00:00:00Z"
   }

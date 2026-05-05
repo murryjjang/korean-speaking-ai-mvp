@@ -1,8 +1,184 @@
 [
   {
+    "id": "rubric-reading-01",
+    "name": "낭독 루브릭 v1",
+    "description": "낭독 문항 채점 루브릭. 발음 정확성·억양·끊어 읽기·의미 전달력 4개 항목. 총 15점.",
+    "questionType": "qt-reading",
+    "totalMaxScore": 15,
+    "items": [
+      {
+        "id": "ri-read-pronunciation",
+        "label": "발음 정확성",
+        "description": "자음·모음의 정확한 발음, 연음 처리",
+        "maxScore": 4,
+        "weight": 0.27
+      },
+      {
+        "id": "ri-read-prosody",
+        "label": "억양·리듬",
+        "description": "자연스러운 억양과 리듬, 강세 처리",
+        "maxScore": 4,
+        "weight": 0.27
+      },
+      {
+        "id": "ri-read-phrasing",
+        "label": "끊어 읽기·속도",
+        "description": "의미 단위로 적절히 끊어 읽기, 자연스러운 속도",
+        "maxScore": 4,
+        "weight": 0.27
+      },
+      {
+        "id": "ri-read-delivery",
+        "label": "의미 전달력",
+        "description": "청자가 내용을 이해할 수 있는 명확한 전달",
+        "maxScore": 3,
+        "weight": 0.20
+      }
+    ],
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
+    "id": "rubric-material-desc-01",
+    "name": "자료 설명 루브릭 v1",
+    "description": "자료 설명 문항 채점 루브릭. 자료 이해·필수 요소·구조·어휘·전달 5개 항목. 총 25점.",
+    "questionType": "qt-material-desc",
+    "totalMaxScore": 25,
+    "items": [
+      {
+        "id": "ri-md-comprehension",
+        "label": "자료 이해 정확성",
+        "description": "자료의 핵심 내용을 정확히 파악하여 반영",
+        "maxScore": 5,
+        "weight": 0.20
+      },
+      {
+        "id": "ri-md-required",
+        "label": "필수 요소 포함",
+        "description": "문항별 필수 포함 요소를 모두 언급",
+        "maxScore": 7,
+        "weight": 0.28
+      },
+      {
+        "id": "ri-md-structure",
+        "label": "구조와 조직",
+        "description": "논리적이고 체계적인 설명 구조",
+        "maxScore": 5,
+        "weight": 0.20
+      },
+      {
+        "id": "ri-md-expression",
+        "label": "어휘·문장 표현",
+        "description": "적절한 어휘와 문법적으로 정확한 문장 사용",
+        "maxScore": 5,
+        "weight": 0.20
+      },
+      {
+        "id": "ri-md-clarity",
+        "label": "전달 명확성",
+        "description": "청자가 이해할 수 있는 명확하고 자연스러운 전달",
+        "maxScore": 3,
+        "weight": 0.12
+      }
+    ],
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
+    "id": "rubric-listening-resp-01",
+    "name": "듣고 답하기 루브릭 v1",
+    "description": "듣고 답하기 문항 채점 루브릭. 핵심 정보 파악·정확성·필수 요소·간결성 4개 항목. 총 25점.",
+    "questionType": "qt-listening-resp",
+    "totalMaxScore": 25,
+    "items": [
+      {
+        "id": "ri-lr-comprehension",
+        "label": "핵심 정보 파악",
+        "description": "듣기 내용의 핵심 정보를 정확히 이해",
+        "maxScore": 7,
+        "weight": 0.28
+      },
+      {
+        "id": "ri-lr-accuracy",
+        "label": "정보 정확성",
+        "description": "들은 내용을 정확하게 전달·재현",
+        "maxScore": 8,
+        "weight": 0.32
+      },
+      {
+        "id": "ri-lr-required",
+        "label": "필수 요소 포함",
+        "description": "질문에서 요구하는 필수 정보를 모두 포함",
+        "maxScore": 5,
+        "weight": 0.20
+      },
+      {
+        "id": "ri-lr-clarity",
+        "label": "간결성·명확성",
+        "description": "간결하고 명확하게 답변, 불필요한 내용 없음",
+        "maxScore": 5,
+        "weight": 0.20
+      }
+    ],
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
+    "id": "rubric-dialogue-mission-01",
+    "name": "대화 미션 루브릭 v1",
+    "description": "대화 미션 문항 채점 루브릭. 미션 달성도·상호작용·전략·정확성·유창성 5개 항목. 총 35점.",
+    "questionType": "qt-dialogue-mission",
+    "totalMaxScore": 35,
+    "items": [
+      {
+        "id": "ri-dm-mission",
+        "label": "미션 달성도",
+        "description": "주어진 미션을 완전히 달성했는지 여부",
+        "maxScore": 10,
+        "weight": 0.29
+      },
+      {
+        "id": "ri-dm-interaction",
+        "label": "상호작용 능력",
+        "description": "자연스러운 상호작용, 적절한 반응과 대화 유지",
+        "maxScore": 8,
+        "weight": 0.23
+      },
+      {
+        "id": "ri-dm-strategy",
+        "label": "질문·확인 전략",
+        "description": "필요한 정보를 얻기 위한 적절한 질문과 확인 표현 사용",
+        "maxScore": 7,
+        "weight": 0.20
+      },
+      {
+        "id": "ri-dm-accuracy",
+        "label": "정확성·적절성",
+        "description": "어휘·문법의 정확성, 상황에 맞는 표현 사용",
+        "maxScore": 5,
+        "weight": 0.14
+      },
+      {
+        "id": "ri-dm-fluency",
+        "label": "유창성",
+        "description": "자연스러운 발화 속도, 흐름, 자신감",
+        "maxScore": 5,
+        "weight": 0.14
+      }
+    ],
+    "isActive": true,
+    "version": "1.0",
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
     "id": "rubric-speaking-01",
-    "name": "한국어 말하기 평가 루브릭 v1",
-    "description": "말하기 평가의 기본 루브릭. 발음·유창성·어휘·문법·과제수행 5개 항목.",
+    "name": "한국어 말하기 평가 루브릭 v1 (레거시)",
+    "description": "레거시 말하기 평가 루브릭. 발음·유창성·어휘·문법·과제수행 5개 항목 × 20점 = 100점. 정식 평가에서는 type-specific 루브릭 사용.",
+    "questionType": null,
+    "totalMaxScore": 100,
     "items": [
       {
         "id": "ri-pronunciation",
@@ -41,6 +217,7 @@
       }
     ],
     "isActive": true,
+    "isLegacy": true,
     "version": "1.0",
     "createdAt": "2026-01-01T00:00:00Z"
   }

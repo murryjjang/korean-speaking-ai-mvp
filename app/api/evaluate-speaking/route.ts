@@ -1,5 +1,6 @@
 import { evaluateSpeakingDetail } from '@/src/providers/llm-eval'
 import { logProviderEvent } from '@/src/lib/supabase/provider-events'
+import questionsJson from '@/src/content/questions.json'
 
 export async function POST(request: Request) {
   let body: {
@@ -21,15 +22,22 @@ export async function POST(request: Request) {
     transcript = '',
     pronunciationResult,
     referenceText,
-    rubricId = 'rubric-speaking-01',
+    rubricId: bodyRubricId,
   } = body
+
+  // Resolve question metadata from content store when questionId is provided
+  const question = questionId ? questionsJson.find((q) => q.id === questionId) : undefined
+  const rubricId = bodyRubricId ?? question?.rubricId ?? 'rubric-speaking-01'
 
   const configuredProvider = process.env.LLM_EVAL_PROVIDER ?? 'mock'
 
   const result = await evaluateSpeakingDetail({
     transcript,
     rubricId,
-    questionPrompt: referenceText,
+    questionPrompt: referenceText ?? question?.prompt,
+    questionId,
+    questionType: question?.typeId,
+    requiredElements: question?.requiredElements ?? [],
     pronunciationScore: pronunciationResult?.normalizedScore,
     pronunciationFeedback: pronunciationResult?.feedback,
   })

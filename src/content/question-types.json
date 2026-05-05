@@ -1,10 +1,53 @@
 [
   {
+    "id": "qt-reading",
+    "name": "낭독",
+    "description": "제시된 지문을 정확한 발음과 자연스러운 억양으로 소리 내어 읽기",
+    "icon": "book-open",
+    "maxScore": 15,
+    "isActive": true,
+    "isOfficial": true,
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
+    "id": "qt-material-desc",
+    "name": "자료 설명",
+    "description": "사진·그래프·표 등 제시 자료를 보고 핵심 내용을 설명하기",
+    "icon": "image",
+    "maxScore": 25,
+    "isActive": true,
+    "isOfficial": true,
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
+    "id": "qt-listening-resp",
+    "name": "듣고 답하기",
+    "description": "제시된 음성을 듣고 핵심 내용을 파악하여 질문에 답하기",
+    "icon": "headphones",
+    "maxScore": 25,
+    "isActive": true,
+    "isOfficial": true,
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
+    "id": "qt-dialogue-mission",
+    "name": "대화에서 미션 달성하기",
+    "description": "제시된 상황에서 미션을 달성하는 대화 수행하기",
+    "icon": "message-square",
+    "maxScore": 35,
+    "isActive": true,
+    "isOfficial": true,
+    "createdAt": "2026-05-05T00:00:00Z"
+  },
+  {
     "id": "qt-self-intro",
     "name": "자기소개",
     "description": "자신을 소개하는 말하기",
     "icon": "user",
+    "maxScore": 100,
     "isActive": true,
+    "isOfficial": false,
+    "isLegacy": true,
     "createdAt": "2026-01-01T00:00:00Z"
   },
   {
@@ -12,7 +55,10 @@
     "name": "그림 묘사",
     "description": "제시된 그림을 설명하는 말하기",
     "icon": "image",
+    "maxScore": 100,
     "isActive": true,
+    "isOfficial": false,
+    "isLegacy": true,
     "createdAt": "2026-01-01T00:00:00Z"
   },
   {
@@ -20,7 +66,10 @@
     "name": "상황 대응",
     "description": "주어진 상황에서 적절히 말하기",
     "icon": "message-circle",
+    "maxScore": 100,
     "isActive": true,
+    "isOfficial": false,
+    "isLegacy": true,
     "createdAt": "2026-01-01T00:00:00Z"
   },
   {
@@ -28,7 +77,10 @@
     "name": "의견 말하기",
     "description": "주제에 대한 자신의 의견 말하기",
     "icon": "mic",
+    "maxScore": 100,
     "isActive": true,
+    "isOfficial": false,
+    "isLegacy": true,
     "createdAt": "2026-01-01T00:00:00Z"
   }
 ]

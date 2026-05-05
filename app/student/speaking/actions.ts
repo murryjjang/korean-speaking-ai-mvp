@@ -117,7 +117,7 @@ export async function submitSpeaking(
 
   const llmEvalPromise = evaluateSpeakingDetail({
     transcript,
-    rubricId: 'rubric-speaking-01',
+    rubricId: question?.rubricId ?? 'rubric-speaking-01',
     questionPrompt: question?.prompt,
     questionId,
     questionType: question?.typeId,

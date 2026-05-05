@@ -3,7 +3,7 @@
 **Korean Speaking AI MVP — 평가 설계 정렬 분석**  
 **작성일**: 2026-05-05  
 **분석자**: Claude (Phase 10-E-0)  
-**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05)
+**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05)
 
 ---
 
@@ -223,16 +223,18 @@ attempt {
 > **10-E-1 처리 결과 (2026-05-05)**: P0-1~P0-5 처리 완료. P1-9(needs_teacher_review), P1-10(grade), P1-3(requiredElements 데이터) 함께 처리. 35/35 smoke test 통과.  
 > P0-6 (q-003 실제 사진) 은 파일럿 전 수동 asset 교체로 해결 예정.
 
+> **10-E-2 처리 결과 (2026-05-05)**: P1-1(4유형 체계), P1-2(유형별 배점 루브릭), P1-4(초급/중급/고급 세트 구조), P1-6(대화미션 연결) 처리 완료. `/api/evaluate-speaking` route의 questionId 컨텍스트 미전달 버그 수정. 44/44 smoke test 통과 (신규 9개 포함).
+
 ### P1 — 파일럿 전 반드시 수정 (10-E-2 ~ 10-E-6)
 
 | 번호 | 문제 | 파일 | 단계 | 상태 |
 |---|---|---|---|---|
-| P1-1 | 4유형 문항 체계 정비 (낭독/자료설명/듣고답하기/대화미션) | `question-types.json`, `questions.json` | 10-E-2 | 대기 |
-| P1-2 | 문항별 배점 15/25/25/35 반영 | `rubrics.json`, `llm-eval/index.ts` | 10-E-2 | 대기 |
+| P1-1 | 4유형 문항 체계 정비 (낭독/자료설명/듣고답하기/대화미션) | `question-types.json`, `questions.json` | 10-E-2 | ✅ 처리 완료 |
+| P1-2 | 문항별 배점 15/25/25/35 반영 | `rubrics.json`, `llm-eval/index.ts` | 10-E-2 | ✅ 처리 완료 |
 | P1-3 | 문항별 `requiredElements` 데이터 | `questions.json` | 10-E-2 | ✅ 10-E-1에서 처리 |
-| P1-4 | 초급/중급/고급 평가세트 구조 | `question-sets.json`, `/student/speaking/page.tsx` | 10-E-3 | 대기 |
+| P1-4 | 초급/중급/고급 평가세트 구조 | `question-sets.json`, `/student/speaking/page.tsx` | 10-E-3 | ✅ 처리 완료 (10-E-2에서 선행) |
 | P1-5 | 듣고 답하기: 스크립트 비공개 + 음원 제공 구조 | `questions.json`, TTS/audio asset | 10-E-4 | 대기 |
-| P1-6 | 대화 미션: speaking 4문항 세트 연결 | `question-sets.json`, mission 라우트 연결 | 10-E-2 | 대기 |
+| P1-6 | 대화 미션: speaking 4문항 세트 연결 | `question-sets.json`, mission 라우트 연결 | 10-E-2 | ✅ 처리 완료 (qt-dialogue-mission 유형으로 연결) |
 | P1-7 | 실제 사진/그래프 asset 등록 | `public/images/`, `questions.json` | 10-E-4 | 대기 |
 | P1-8 | 교수자 최종확정 화면 강화 (required_elements/evidence) | `step-rubric-adjust.tsx`, `step-submission-view.tsx` | 10-E-5 | 대기 |
 | P1-9 | `needs_teacher_review` 플래그 추가 | `types/providers.ts`, `llm-eval/index.ts` | 10-E-1 | ✅ 처리 완료 |

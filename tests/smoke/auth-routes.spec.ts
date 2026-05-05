@@ -136,3 +136,47 @@ test.describe('인증 우회 — Supabase 미설정 환경', () => {
     await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
   })
 })
+
+test.describe('정식 평가세트 구조 smoke (Phase 10-E-2)', () => {
+  test('정식 세트 3개 (초급/중급/고급)가 학습자 화면에 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking')
+
+    await expect(page.getByRole('heading', { name: '말하기 평가' })).toBeVisible()
+    await expect(page.getByText('초급 평가세트')).toBeVisible()
+    await expect(page.getByText('중급 평가세트')).toBeVisible()
+    await expect(page.getByText('고급 평가세트')).toBeVisible()
+  })
+
+  test('각 세트에 4문항이 있어 총 12개 이상의 시작하기 링크가 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking')
+
+    // 데스크톱 뷰포트(1280px)에서 hidden md:inline-flex 링크가 표시됨
+    const startLinks = page.getByRole('link', { name: '시작하기' })
+    const count = await startLinks.count()
+    // 3세트 × 4문항 = 12개 이상
+    expect(count).toBeGreaterThanOrEqual(12)
+  })
+
+  test('정식 세트에 4개 문항 유형 레이블이 모두 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking')
+
+    await expect(page.getByText('낭독').first()).toBeVisible()
+    await expect(page.getByText('자료 설명').first()).toBeVisible()
+    await expect(page.getByText('듣고 답하기').first()).toBeVisible()
+    await expect(page.getByText('대화에서 미션 달성하기').first()).toBeVisible()
+  })
+
+  test('정식 세트 첫 문항(낭독) 페이지 접근 — 준비 시작 버튼 표시', async ({ page }) => {
+    await page.goto('/student/speaking/q-b1-1?setId=qs-beginner-01')
+
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+
+  test('기존 q-001/q-003 legacy route가 여전히 작동함', async ({ page }) => {
+    await page.goto('/student/speaking/q-001')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+
+    await page.goto('/student/speaking/q-003')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+})

@@ -316,3 +316,62 @@ test.describe('/api/tts smoke', () => {
     expect(body.error).toBe('invalid_json')
   })
 })
+
+test.describe('/api/evaluate-speaking 정식 문항 유형 smoke (Phase 10-E-2)', () => {
+  test('qt-reading (q-b1-1) 낭독 평가 → valid response', async ({ request }) => {
+    const res = await request.post('/api/evaluate-speaking', {
+      data: {
+        questionId: 'q-b1-1',
+        transcript: '학교 식당은 평일 오전 11시 30분부터 오후 1시 30분까지 운영합니다. 학생증을 가지고 오시면 할인이 됩니다.',
+        rubricId: 'rubric-reading-01',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.overall_score).toBe('number')
+    expect(['A', 'B', 'C', 'D', 'F']).toContain(body.grade)
+    expect(Array.isArray(body.required_elements_found)).toBe(true)
+  })
+
+  test('qt-material-desc (q-b1-2) 자료 설명 평가 → valid response', async ({ request }) => {
+    const res = await request.post('/api/evaluate-speaking', {
+      data: {
+        questionId: 'q-b1-2',
+        transcript: '이 사진은 식당입니다. 사람들이 앉아서 밥을 먹고 있습니다. 분위기가 밝고 따뜻합니다.',
+        rubricId: 'rubric-material-desc-01',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.overall_score).toBe('number')
+    expect(Array.isArray(body.required_elements_found)).toBe(true)
+  })
+
+  test('qt-dialogue-mission (q-b1-4) 대화 미션 평가 → valid response', async ({ request }) => {
+    const res = await request.post('/api/evaluate-speaking', {
+      data: {
+        questionId: 'q-b1-4',
+        transcript: '안녕하세요. 아메리카노 한 잔 주세요. 얼마예요? 감사합니다.',
+        rubricId: 'rubric-dialogue-mission-01',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.overall_score).toBe('number')
+    expect(Array.isArray(body.required_elements_found)).toBe(true)
+    expect(body.required_elements_found.length).toBeGreaterThan(0)
+  })
+
+  test('qt-listening-resp (q-i1-3) 듣고 답하기 평가 → valid response', async ({ request }) => {
+    const res = await request.post('/api/evaluate-speaking', {
+      data: {
+        questionId: 'q-i1-3',
+        transcript: '수업 방식이 강의식에서 발표 중심으로 바뀝니다. 이번 변경의 이유는 학생들의 의사소통 능력을 높이기 위해서입니다.',
+        rubricId: 'rubric-listening-resp-01',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.overall_score).toBe('number')
+  })
+})

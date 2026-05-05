@@ -4,6 +4,70 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-2 — 정식 문항 유형 체계 및 평가세트 구조 정비
+
+**날짜**: 2026-05-05  
+**목표**: 4유형 문항 체계(낭독/자료설명/듣고답하기/대화미션) 정의, 초급/중급/고급 정식 평가세트 12문항 구성, 유형별 루브릭 연결.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/content/question-types.json` | 4개 정식 유형 추가: `qt-reading`(낭독, 15점), `qt-material-desc`(자료설명, 25점), `qt-listening-resp`(듣고답하기, 25점), `qt-dialogue-mission`(대화미션, 35점). 기존 4개 유형 `isLegacy: true`로 demote |
+| `src/content/question-sets.json` | 정식 세트 3개 신설: `qs-beginner-01`(초급), `qs-intermediate-01`(중급), `qs-advanced-01`(고급). 기존 세트 3개 `isActive: false`, `purpose: 'dev'`, `isLegacy: true`로 demote |
+| `src/content/questions.json` | 정식 문항 12개 신설(q-b1-1~4, q-i1-1~4, q-a1-1~4). 기존 q-001~q-008 `isActive` 유지(URL 직접 접근 가능), `isLegacy: true` 표기. 전체 문항에 `setId`, `level`, `questionNo`, `guide`, `maxScore`, `rubricId`, `isOfficial`, `assetType`, `assetUrl`, `modelAnswer`, `teacherNotes`, `requiredElements` 필드 추가 |
+| `src/content/rubrics.json` | 유형별 루브릭 4개 신설: `rubric-reading-01`(15점), `rubric-material-desc-01`(25점), `rubric-listening-resp-01`(25점), `rubric-dialogue-mission-01`(35점). 기존 `rubric-speaking-01`은 `isLegacy: true`로 유지 |
+| `src/providers/llm-eval/index.ts` | `MOCK_MODEL_ANSWERS_BY_TYPE`에 4개 정식 유형 모범 답안 추가. `elementKeywords`에 신규 문항 required element 키워드 30여 개 추가 |
+| `app/student/speaking/page.tsx` | `purposeLabel`에 `'official': '정식 평가'` 추가. `purposeVariant`에 `'official': 'success'` 추가. `level` 필드 기반 "초급 평가세트" / "중급 평가세트" / "고급 평가세트" 섹션 레이블 표시 |
+| `app/student/speaking/actions.ts` | `rubricId` 해결을 `question?.rubricId ?? 'rubric-speaking-01'`로 변경 (문항별 고유 루브릭 지원) |
+| `app/api/evaluate-speaking/route.ts` | `questionsJson` import 추가. `questionId`로 문항 메타데이터 조회 후 `questionType`, `requiredElements`, `rubricId`를 `evaluateSpeakingDetail`에 전달 (API 직접 호출 시에도 올바른 평가 컨텍스트 적용) |
+| `tests/smoke/auth-routes.spec.ts` | 5개 테스트 추가: 정식 세트 3개 표시 / 12개 이상 시작하기 링크 / 4개 유형 레이블 / q-b1-1 낭독 페이지 접근 / legacy q-001·q-003 route 정상 동작 |
+| `tests/smoke/api-smoke.spec.ts` | 4개 테스트 추가: 4개 정식 유형(qt-reading, qt-material-desc, qt-dialogue-mission, qt-listening-resp) API 평가 응답 검증 |
+| `docs/spec/WORK_LOG.md` | 이 항목 추가 |
+| `docs/spec/PHASE_10E_GAP_ANALYSIS.md` | 10-E-2 처리 결과 반영 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | 정식 평가세트 전환 기록 |
+
+### 핵심 변경 내용
+
+**4유형 문항 체계 정식화**:
+- 낭독(qt-reading): 텍스트 제공, 정확히 읽기, 15점
+- 자료 설명(qt-material-desc): 사진/그래프/표 보고 설명, 25점
+- 듣고 답하기(qt-listening-resp): 음원 청취 후 답변, 25점
+- 대화에서 미션 달성하기(qt-dialogue-mission): 롤플레이, 미션 달성형, 35점
+- 4문항 합산 = 100점
+
+**초급/중급/고급 세트 구조**:
+- 초급(qs-beginner-01): q-b1-1(낭독) → q-b1-2(자료설명) → q-b1-3(듣고답하기) → q-b1-4(대화미션)
+- 중급(qs-intermediate-01): q-i1-1 ~ q-i1-4 (동일 유형 순서)
+- 고급(qs-advanced-01): q-a1-1 ~ q-a1-4 (동일 유형 순서)
+
+**Legacy 문항 유지**:
+- q-001~q-008 개별 URL 접근 정상 동작
+- `/student/speaking/q-001` 등 기존 경로 유지
+- 학습자 목록 화면에는 정식 세트(isActive: true)만 표시
+
+**API 컨텍스트 개선**:
+- `/api/evaluate-speaking` 직접 호출 시 questionId → question 조회 → `questionType`, `requiredElements`, `rubricId` 자동 해결
+- 기존에는 `requiredElements: []` 빈 배열로 평가 → 이제 올바른 문항 메타 전달
+
+### 버그 수정
+
+`/api/evaluate-speaking` route에서 `questionId`를 받았으나 `questionsJson`을 조회하지 않아 `requiredElements`, `questionType`이 항상 빈 값으로 평가되는 문제 수정. 이로 인해 `required_elements_found.length` 검증 테스트(q-b1-4)가 실패하던 문제 해결.
+
+### 테스트 결과
+
+`44 passed (24.4s)` — 기존 35개 + 신규 9개 전부 통과
+
+### 남은 Known Issues (10-E-3 이후)
+
+- q-003 실제 사진 미교체 (placeholder SVG 유지) — 10-E-4
+- 듣고 답하기 음원 asset 없음 (현재 텍스트 스크립트만) — 10-E-4
+- 대화 미션 실제 롤플레이 연동 (현재 일반 speaking 평가로 처리) — 10-E-5
+- 교수자 최종확정 화면 required_elements/evidence 미반영 — 10-E-5
+- 정식 문항 콘텐츠 교수자 검수 필요 — 10-E-3
+
+---
+
 ## Phase 10-E-1 — 평가 루브릭·모범표현·결과화면 긴급 개선
 
 **날짜**: 2026-05-05  

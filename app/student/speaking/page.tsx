@@ -17,15 +17,19 @@ const difficultyVariant: Record<string, 'success' | 'info' | 'warning'> = {
 }
 
 const purposeLabel: Record<string, string> = {
+  official: '정식 평가',
   diagnostic: '진단평가',
   practice: '연습평가',
   post: '사후평가',
+  dev: '개발용',
 }
 
-const purposeVariant: Record<string, 'info' | 'default' | 'warning'> = {
+const purposeVariant: Record<string, 'success' | 'info' | 'default' | 'warning'> = {
+  official: 'success',
   diagnostic: 'info',
   practice: 'default',
   post: 'warning',
+  dev: 'default',
 }
 
 export default function SpeakingSelectionPage() {
