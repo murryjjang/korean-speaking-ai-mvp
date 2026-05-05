@@ -67,8 +67,8 @@ test.describe('말하기 평가 모바일 360px smoke', () => {
     await page.goto('/student/speaking/q-001')
 
     // 두 TTS 버튼이 표시되어야 함
-    const listenBtn = page.getByRole('button', { name: '문제 듣기' })
-    const guideBtn = page.getByRole('button', { name: '녹음 안내 듣기' })
+    const listenBtn = page.getByRole('button', { name: /문제 듣기/ })
+    const guideBtn = page.getByRole('button', { name: /녹음 안내 듣기/ })
     await expect(listenBtn).toBeVisible()
     await expect(guideBtn).toBeVisible()
 
@@ -102,6 +102,97 @@ test.describe('말하기 평가 모바일 360px smoke', () => {
     const box = await skipBtn.boundingBox()
     if (box) {
       expect(box.x + box.width).toBeLessThanOrEqual(MOBILE_VIEWPORT.width)
+    }
+  })
+
+  test('짧은 녹음 후 제출 버튼 disabled + 재녹음 안내 표시', async ({ page }) => {
+    // Mock getUserMedia + MediaRecorder to produce a tiny blob (100 bytes) immediately
+    await page.addInitScript(() => {
+      if (navigator.mediaDevices) {
+        Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+          value: async () => ({
+            getTracks: () => [{ stop: () => undefined }],
+          }),
+          writable: true,
+          configurable: true,
+        })
+      }
+
+      class TinyRecorder {
+        state = 'inactive'
+        mimeType = 'audio/webm'
+        ondataavailable: ((e: { data: Blob }) => void) | null = null
+        onstop: (() => void) | null = null
+        onerror: (() => void) | null = null
+
+        start() {
+          this.state = 'recording'
+          // Emit a tiny blob after 60ms (well within the auto-stop window)
+          setTimeout(() => {
+            const tiny = new Blob([new Uint8Array(100)], { type: 'audio/webm' })
+            if (this.ondataavailable) this.ondataavailable({ data: tiny })
+          }, 60)
+        }
+
+        stop() {
+          if (this.state !== 'inactive') {
+            this.state = 'inactive'
+            if (this.onstop) this.onstop()
+          }
+        }
+
+        static isTypeSupported(_: string) {
+          return true
+        }
+      }
+
+      Object.defineProperty(window, 'MediaRecorder', {
+        value: TinyRecorder,
+        writable: true,
+        configurable: true,
+      })
+    })
+
+    await page.goto('/student/speaking/q-001')
+
+    // Start prep and immediately skip to recording
+    await page.getByRole('button', { name: '준비 시작' }).click()
+    await page.getByRole('button', { name: /준비 완료/ }).click()
+
+    // Wait for recording UI to appear
+    await expect(page.getByText('녹음 중')).toBeVisible({ timeout: 5000 })
+
+    // Stop recording immediately (durationSec will be 0 < 2)
+    await page.getByRole('button', { name: '녹음 완료' }).click()
+
+    // Short-recording warning should appear in review phase
+    await expect(page.getByTestId('short-recording-warning')).toBeVisible({ timeout: 5000 })
+
+    // Warning must contain the required message
+    await expect(page.getByTestId('short-recording-warning')).toContainText('녹음 시간이 너무 짧습니다')
+    await expect(page.getByTestId('short-recording-warning')).toContainText('다시 녹음해 주세요')
+
+    // Submit button must be disabled — cannot proceed to result page
+    const submitBtn = page.getByRole('button', { name: '제출하기' })
+    await expect(submitBtn).toBeDisabled()
+  })
+
+  test('q-003 그림 묘사 — 360px에서 이미지 또는 미등록 안내 표시', async ({ page }) => {
+    await page.goto('/student/speaking/q-003')
+
+    await expect(page.getByRole('heading', { name: /그림 묘사/ })).toBeVisible()
+
+    // 이미지 컨테이너(data-testid) 또는 미등록 안내 중 하나가 표시되어야 함
+    const hasImage = await page.locator('[data-testid="question-image-container"]').isVisible().catch(() => false)
+    const hasFallback = await page.getByText('그림 자료가 아직 등록되지 않았습니다').isVisible().catch(() => false)
+    expect(hasImage || hasFallback).toBe(true)
+
+    // 이미지 컨테이너가 있으면 360px 카드 너비를 벗어나지 않아야 함
+    if (hasImage) {
+      const containerBox = await page.locator('[data-testid="question-image-container"]').boundingBox()
+      if (containerBox) {
+        expect(containerBox.width).toBeLessThanOrEqual(MOBILE_VIEWPORT.width)
+      }
     }
   })
 })

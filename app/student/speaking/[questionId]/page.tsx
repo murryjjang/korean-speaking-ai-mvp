@@ -50,12 +50,17 @@ export default async function SpeakingQuestionPage({
       <SpeakingClient
         question={{
           id: question.id,
+          typeId: question.typeId,
           title: question.title,
           prompt: question.prompt,
           prepTimeSec: question.prepTimeSec,
           responseTimeSec: question.responseTimeSec,
           difficulty: question.difficulty,
           typeLabel: qType?.name ?? question.typeId,
+          imageUrl: question.imageUrl,
+          imageAlt: question.imageAlt,
+          imageCaption: question.imageCaption,
+          imageLicenseNote: question.imageLicenseNote,
         }}
         questionSetId={resolvedSet.id}
         setName={resolvedSet.name}

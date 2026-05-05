@@ -1,4 +1,4 @@
-export type ProviderName = 'mock' | 'etri' | 'whisper' | 'azure' | 'browser' | 'claude' | 'openai'
+export type ProviderName = 'mock' | 'etri' | 'whisper' | 'azure' | 'browser' | 'claude' | 'openai' | 'no-speech'
 
 export type ProviderMeta = {
   providerName: ProviderName
@@ -80,6 +80,9 @@ export type SpeakingEvalInput = {
   transcript: string
   rubricId: string
   questionPrompt?: string
+  questionId?: string
+  questionType?: string
+  requiredElements?: string[]
   pronunciationScore?: number
   pronunciationFeedback?: string
 }
@@ -97,5 +100,10 @@ export type SpeakingEvalDetail = {
   teacher_note: string
   learner_feedback_ko: string
   learner_feedback_simple: string
+  required_elements_found?: string[]
+  missing_elements?: string[]
+  evidence?: string[]
+  needs_teacher_review?: boolean
+  grade?: 'A' | 'B' | 'C' | 'D' | 'F'
   raw_provider?: unknown
 }

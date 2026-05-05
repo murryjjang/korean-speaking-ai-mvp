@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { AppShell, type NavItem } from "@/src/components/layout/app-shell";
+import { AppShell, type NavItem, type UserRole } from "@/src/components/layout/app-shell";
 import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 
 const navItems: NavItem[] = [
@@ -11,6 +11,7 @@ const navItems: NavItem[] = [
 
 export default async function TeacherLayout({ children }: { children: ReactNode }) {
   let userName: string | undefined;
+  let actualRole: UserRole = "teacher";
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -21,10 +22,14 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
       if (user) {
         const { data: profile } = await supabase
           .from("user_profiles")
-          .select("display_name")
+          .select("display_name, role")
           .eq("user_id", user.id)
           .single();
         userName = (profile?.display_name as string | null) ?? user.email ?? undefined;
+        const fetchedRole = profile?.role as string | null;
+        if (fetchedRole === "admin" || fetchedRole === "teacher") {
+          actualRole = fetchedRole;
+        }
       }
     }
   } catch {
@@ -32,7 +37,7 @@ export default async function TeacherLayout({ children }: { children: ReactNode 
   }
 
   return (
-    <AppShell role="teacher" navItems={navItems} userName={userName}>
+    <AppShell role={actualRole} navItems={navItems} userName={userName}>
       {children}
     </AppShell>
   );

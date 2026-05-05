@@ -25,7 +25,7 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 | **D+3** — 최소기능 시연판 | 2026-05-07 | Supabase 연결 + 핵심 경로 저장 확인 | ✅ 완료 (Phase 6-B1~B2) |
 | **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 | ✅ 완료 (Phase 6-B2~B5) |
 | **D+10** — 로그인/역할 분기 | 2026-05-14 | Supabase Auth 기반 로그인 + 역할별 route 보호 | ✅ 완료 (Phase 9-A) |
-| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | 진행 예정 |
+| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | **P0 처리 완료 (10-E-1), P1 진행 중** |
 
 ---
 
@@ -229,6 +229,32 @@ VALUES ('<student-auth-user-uuid>', 'student', '홍길동', '<students-table-uui
 
 ---
 
+### 이미지 소스 원칙 (파일럿 전 필수 확인)
+
+그림 묘사 문항(`qt-picture`)에 사용하는 이미지는 다음 원칙을 따른다.
+
+**권장 소스:**
+- 기관/교수자 직접 촬영 사진
+- [Pexels](https://www.pexels.com/) / [Unsplash](https://unsplash.com/) CC0 라이선스 이미지
+- [Wikimedia Commons](https://commons.wikimedia.org/) 적합 라이선스 이미지
+- 직접 제작한 일러스트 (현재 q-003 SVG 등)
+
+**금지:**
+- Getty Images 무단 사용 (royalty-free는 유료 라이선스 구매 필요, 무료/저작권 없음이 아님)
+- Google 이미지 검색 결과 무단 사용
+- 출처·라이선스가 불명확한 이미지 삽입
+
+**q-003 교체 절차 (파일럿 전):**
+1. 적합 라이선스 이미지 확보
+2. `public/images/q-003-park-exercise.jpg` (또는 적합한 파일명)로 저장
+3. `src/content/questions.json`의 `q-003.imageUrl`을 새 경로로 변경
+4. `imageAlt`, `imageCaption`, `imageLicenseNote` 실제 정보로 업데이트
+5. 코드 변경 없이 데이터 경로 변경만으로 교체 완료
+
+각 문항 `questions.json`에 `imageUrl`, `imageAlt`, `imageCaption`, `imageLicenseNote` 필드가 명시적으로 관리되므로, 이미지 교체 시 코드 수정은 필요 없다.
+
+---
+
 ### RLS 적용/보류 최종 판단
 
 현재 MVP는 anon key 기반 server action으로 제출/저장 흐름이 구성되어 있다. RLS를 전면 활성화하면 기존 INSERT/SELECT가 차단될 수 있으므로, Auth 기반 제출 전환 완료 후 단계적으로 적용한다.
@@ -328,6 +354,7 @@ VALUES ('<student-auth-user-uuid>', 'student', '홍길동', '<students-table-uui
 
 | 이슈 | 영향도 | 방지/회피 방법 |
 |---|---|---|
+| ~~**무음/초단기 녹음 제출 차단**~~ — **Phase 10-D 3차에서 해소** | 해소 | duration<2초 또는 blob<3000bytes 시 제출 버튼 disabled. 서버에서도 no-speech/빈 transcript 시 ai_evaluations 생성 안 함. 결과 화면에서 전용 "음성 미감지" 뷰 표시 |
 | ~~**인증 없음**~~ — **Phase 9에서 해소** (Supabase Auth 로그인 + proxy.ts role 분기 적용) | 해소 | Phase 9-A/9-B/9-C 완료. 실제 계정 생성 + user_profiles role 연결 필요 |
 | **학생 ID 고정** — 모든 제출이 동일 학생으로 저장 | 높 | 파일럿 시 학생별 URL 파라미터 분기 (임시 workaround) |
 | **MissionSession 서버 재시작 소실** — 진행 중 세션 끊길 수 있음 | 중 | 미션은 짧은 시간 내 완료 권장, Vercel 재시작 최소화 |
@@ -348,6 +375,8 @@ VALUES ('<student-auth-user-uuid>', 'student', '홍길동', '<students-table-uui
 | **iOS Safari 빈 Blob** — 일부 기기에서 0바이트 Blob 생성 | 중 | Phase 8-D: blob.size 체크 추가, blobUrl=null 시 빈 transcript fallback 제출 유지 |
 | **마이크 권한 거부 시 제출 불가** — 브라우저 권한 거부 시 녹음 진행 불가 | 중 | Phase 8-D: 권한 거부 안내 메시지 + 녹음 없이 fallback 제출 가능 (UI 명시) |
 | **음성 파일 장기 저장 미처리** — 현재 오디오 파일 비영구 저장 | 낮 | Phase 8-C에서 Supabase Storage 연동 완료. audio_url DB 저장 |
+| **q-003 그림 묘사 임시 placeholder 이미지** — `/public/images/q-003-placeholder.svg`는 SVG 일러스트 임시 파일 | 중 | 파일럿 전 실제 사진/그림으로 교체 필요. `questions.json`의 `imageUrl` 필드 수정 후 재배포. q-004 등 다른 그림 묘사 문항도 실제 이미지 등록 필요 |
+| **발음 평가 세부 기준 mock 파생값** — `normalizePronunciationDisplay` 헬퍼가 word scores에서 기준별 점수를 근사 파생. 실제 ETRI 데이터와 일치하지 않음 | 낮 | ETRI 실제 연동 후 헬퍼를 criterion-level 데이터 직접 매핑으로 교체 필요 |
 
 ---
 
@@ -945,3 +974,39 @@ Redirect URLs:
 | 9 | LLM 실제 success 전환 및 평가 품질 검증 미완 | 중간 |
 | 10 | RLS 전면 적용 미완 — Auth 기반 제출 전환 후 진행 | 낮음 (Phase 10 이후) |
 | 11 | recordings signed URL 전환 미완 — 현재 public bucket | 낮음 (Phase 10 이후) |
+
+---
+
+## Phase 10-D — 배포 후 품질 수정 1차 (2026-05-05)
+
+### 수정 내용
+
+| 항목 | 수정 방법 | 결과 |
+|---|---|---|
+| 관리자 역할 배지 오표시 | `teacher/layout.tsx` role 하드코딩 제거 → DB role 조회 후 AppShell 전달 | ✅ admin은 "관리자", teacher는 "교수자" 정상 표시 |
+| TTS 버튼 시인성 부족 | `variant="ghost"` → `variant="secondary"` (border-slate-300 + bg-white) | ✅ 테두리와 배경색 추가 |
+| 아랍어 RTL 처리 | `lang-hint.tsx`에 `getTextDir()` 헬퍼 추가 — AR/FA/HE/UR 감지 시 `dir="rtl"` + CSS 적용 | ✅ 구현 완료, crash 없음 확인 |
+| 다문항 이동 버튼 누락 | result 페이지에 "다음 문항으로 →" 버튼 추가 (세트 내 마지막이면 "문항 목록으로") | ✅ 구현 완료 |
+| smoke test 추가 | q-002 접근, 문항 목록, TTS 버튼, 아랍어 RTL 4개 테스트 추가 | ✅ 25 passed |
+
+### 검증 결과
+
+| 명령 | 결과 |
+|---|---|
+| `npm run lint` | ✅ 통과 |
+| `npx tsc --noEmit` | ✅ 통과 |
+| `npm run build` | ✅ 성공 |
+| `npm run test:smoke` | ✅ 25 passed |
+
+### 남은 Known Issues
+
+| # | 이슈 |
+|---|---|
+| 1 | 교수자/관리자 전체 기능 시나리오 추가 검증 필요 |
+| 2 | 문항 콘텐츠 전면 정비 필요 (현재 q-001~q-008 mock 콘텐츠) |
+| 3 | 아랍어/다국어 문장 검수 필요 (번역 품질) |
+| 4 | iPhone Safari 녹음/재생 수동 테스트 미완 |
+| 5 | ETRI 실제 발음평가 연동 테스트 미완 |
+| 6 | LLM 실제 success 전환 및 평가 품질 검증 미완 |
+| 7 | RLS 전면 적용 미완 |
+| 8 | recordings signed URL 전환 미완 |

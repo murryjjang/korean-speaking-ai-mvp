@@ -4,6 +4,293 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-1 — 평가 루브릭·모범표현·결과화면 긴급 개선
+
+**날짜**: 2026-05-05  
+**목표**: P0 이슈 6개 해결. 결과 화면을 파일럿 납득 수준으로 끌어올림.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/types/providers.ts` | `SpeakingEvalInput`에 `questionId`, `questionType`, `requiredElements` 추가. `SpeakingEvalDetail`에 `required_elements_found`, `missing_elements`, `evidence`, `needs_teacher_review`, `grade` 추가 |
+| `src/content/questions.json` | 모든 문항(q-001~q-008)에 `requiredElements` 배열 추가. q-003 `imageLicenseNote` 내부 메모 제거(학습자 노출 방지) |
+| `src/providers/llm-eval/index.ts` | `getMockDetail(input)` 시그니처 변경. `MOCK_MODEL_ANSWERS`(문항별 고정 모범표현) 추가. `detectRequiredElements`(키워드 기반), `extractMockEvidence`, `isLikelyOffTask`, `scoreToGrade` 헬퍼 추가. `corrected_answer: transcript` 복사 제거. SYSTEM_PROMPT 전면 개선(corrected_answer 독립 생성 강제, 무관 발화 감점 지시, required_elements/evidence/grade 스키마 추가). `callOpenAI` 파싱에 신규 필드 추가. user 프롬프트에 `[필수 포함 요소]` 주입 |
+| `app/student/speaking/actions.ts` | `evaluateSpeakingDetail`에 `questionId`, `questionType`, `requiredElements` 전달 |
+| `app/student/speaking/[questionId]/result/page.tsx` | `gradeVariant` 헬퍼 추가. 총점 카드에 `grade` 배지 추가. AI 피드백 카드에 "포함한 요소(✓)" / "빠진 요소(✗)" / "평가 근거(인용)" 섹션 추가. 발음 참고 단어 `<details>` 영역에서 ScoreBar 제거 → chip 텍스트 목록으로 교체. "채점 기준 아닌 참고용" 안내 추가 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `imageLicenseNote` 학습자 화면 렌더링 제거 |
+| `tests/smoke/api-smoke.spec.ts` | 4개 테스트 추가: corrected_answer transcript 복사 금지 / required_elements_found·missing_elements 필드 확인 / 과제 무관 발화 낮은 task_completion_score + needs_teacher_review / grade 필드 확인 |
+| `docs/spec/WORK_LOG.md` | 이 항목 추가 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | P0 처리 완료 항목 업데이트 |
+
+### 핵심 변경 내용
+
+**모범표현 복사 방지**:
+- `getMockDetail` 내 `corrected_answer: transcript` 제거
+- 문항별 고정 `MOCK_MODEL_ANSWERS` 맵 사용 (transcript와 완전히 독립)
+- SYSTEM_PROMPT에 "corrected_answer는 transcript 복사 절대 금지" 명시
+
+**과제 무관 발화 처리**:
+- `isLikelyOffTask`: 뉴스/앵커 패턴 검출, requiredElements가 2개 이상인데 하나도 매칭 안 되면 off-task 판정
+- off-task 시 `task_completion_score: 8`, `needs_teacher_review: true`
+- SYSTEM_PROMPT: 무관 발화 시 task_completion_score ≤ 10 지시
+
+**required_elements / missing_elements / evidence**:
+- 8개 문항 전체 `requiredElements` 데이터 추가
+- `detectRequiredElements`: 한국어 키워드 기반 매칭
+- `extractMockEvidence`: transcript에서 단문 발췌
+- 결과 화면에서 ✓/✗ 목록과 인용 근거로 표시
+
+**발음 참고 단어 UI**:
+- `<details>` 내 ScoreBar 완전 제거
+- "단어(점수)" 형태의 chip으로 교체
+- "채점 기준 아닌 참고용" 안내 텍스트 추가
+
+### 방어 로직 유지 확인
+
+- `MIN_VALID_DURATION_SEC=2`, `MIN_VALID_BLOB_SIZE=3000` 차단 로직 유지
+- `no-speech` guard → LLM eval 스킵, ai_evaluations 생성 안 함 유지
+- STT fallback `transcript: ''` 유지
+
+### 테스트 결과
+
+`35 passed (22.5s)` — 기존 31개 + 신규 4개 전부 통과
+
+### 남은 Known Issues (P1/P2)
+
+- 4유형 문항 체계 미정비 (낭독/자료설명/듣고답하기/대화미션) — 10-E-2
+- 문항별 배점 15/25/25/35 미반영 — 10-E-2
+- 초급/중급/고급 평가세트 미구조화 — 10-E-3
+- q-003 실제 사진 미교체 (placeholder SVG 유지) — 10-E-4
+- 듣기 음원 asset 없음 — 10-E-4
+- 교수자 최종확정 화면 required_elements 미반영 — 10-E-5
+- OpenAI 실제 호출 시 모범표현 품질 검증 필요
+- ETRI 발음평가 연동 후 기준 매핑 필요
+
+---
+
+## Phase 10-E-0 — 전면 갭 분석 (평가 설계 정렬)
+
+**날짜**: 2026-05-05  
+**목표**: 첨부 통합문서의 평가 설계 강점과 현재 구현의 기술 구조를 절충하여 전면 갭 분석 수행. 코드 수정 없음.
+
+### 산출물
+
+| 파일 | 변경 내용 |
+|---|---|
+| `docs/spec/PHASE_10E_GAP_ANALYSIS.md` | 신규 작성 — 전면 갭 분석, P0/P1/P2 분류, 10-E-1 프롬프트 초안 |
+| `docs/spec/WORK_LOG.md` | 이 항목 추가 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | 분석 진행 중 항목 추가 |
+
+### 주요 발견 사항
+
+**P0 (즉시 수정)**:
+- `corrected_answer: transcript` — mock 모범표현이 발화 복사 (`llm-eval/index.ts:138`)
+- `required_elements_found` / `missing_elements` / `evidence` 필드 없음 (types + llm-eval + result page)
+- 과제 무관 발화 처리 SYSTEM_PROMPT 미대응
+- 발음 참고 단어 ScoreBar UI가 채점 기준처럼 오인 가능
+- q-003 placeholder SVG 미교체
+
+**P1 (파일럿 전)**:
+- 4유형 체계 미정비 (낭독/자료설명/듣고답하기/대화미션)
+- 문항별 배점 15/25/25/35 미반영
+- 초급/중급/고급 평가세트 미구조화
+- 교수자 확정 화면에 required_elements/evidence 없음
+- T1~T8 테스트 자동화 불완전
+
+**P2 (운영 안정화 후)**:
+- attempt 단위 DB 구조, RLS 전면, signed URL, 파일럿 통계
+
+### 유지 확인 (후퇴 금지)
+
+- `MIN_VALID_DURATION_SEC=2`, `MIN_VALID_BLOB_SIZE=3000` 차단 로직
+- no-speech guard (ai_evaluations 생성 방지)
+- STT `transcript: ''` fallback (환각 방지)
+- provider_events, mock store, Supabase 분기, smoke test 구조
+
+### 다음 단계
+
+10-E-1: 평가 루브릭·모범표현·결과화면 긴급 개선 (P0 전체)  
+상세 구현 프롬프트: `docs/spec/PHASE_10E_GAP_ANALYSIS.md` 섹션 6 참조
+
+---
+
+## Phase 10-D (추가 3차 재작업) — 무음/초단기 녹음 제출 차단
+
+**날짜**: 2026-05-05  
+**목표**: 짧은 녹음이 경고만 표시되고 제출로 이어지는 버그 수정. 제출 자체를 차단하고, 서버에서도 방어.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `MIN_VALID_BLOB_SIZE=3000` 추가. `blobSize` 상태로 blob 크기 반응형 추적. `isInvalidAudio` 계산(duration<2 또는 blob<3000). 제출 버튼 `disabled={isInvalidAudio}`. `handleSubmit` 내 방어 guard 추가. 경고 메시지 "녹음 시간이 너무 짧습니다. 다시 녹음해 주세요."로 통일 |
+| `app/api/stt/route.ts` | `MOCK_TRANSCRIPT` 상수 제거. STT 제공자 오류 시 fallback을 `transcript: ''`로 변경(임의 mock 문장 생성 금지) |
+| `app/student/speaking/actions.ts` | `isNoSpeech` guard 추가. `providerName==='no-speech'` 또는 빈 transcript이면 LLM eval/pronunciation eval 건너뜀. mock store에만 최소 레코드 저장, Supabase `ai_evaluations` 생성 금지 |
+| `app/student/speaking/[questionId]/result/page.tsx` | `isNoSpeech` 감지 후 전용 뷰 렌더링. "음성이 감지되지 않았습니다. 다시 녹음해 주세요." 표시. 총점/AI피드백/발음평가 카드 비표시 |
+| `tests/smoke/mobile-speaking.spec.ts` | `TinyRecorder` mock으로 짧은 녹음 시뮬레이션 후 제출 버튼 disabled + 경고 메시지 확인 테스트 추가 |
+| `tests/smoke/api-smoke.spec.ts` | STT error-fallback이 빈 transcript 반환하는지 확인 테스트 추가 |
+| `docs/spec/WORK_LOG.md` | 이 항목 추가 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | "무음/초단기 녹음 제출 차단" 항목 추가 |
+
+### 제출 차단 로직
+
+**클라이언트 (review 단계)**:
+- `isInvalidAudio = recorder.state==='stopped' && (durationSec < 2 OR blob.size < 3000)`
+- 조건 충족 시 제출 버튼 `disabled` → 클릭 불가
+- `handleSubmit` 내에도 동일 검사(방어 중첩)
+
+**서버 (submitSpeaking)**:
+- `sttResult.providerName === 'no-speech'` 또는 `transcript.trim() === ''` 시 LLM/발음 평가 건너뜀
+- `ai_evaluations` Supabase 저장 없음
+
+**결과 화면**:
+- `isNoSpeech` 감지 시 전용 뷰(메시지 + "다시 도전하기" 버튼만) 렌더링
+
+---
+
+## Phase 10-D (추가 2차) — q-003 이미지 구조 개선 + 무음/짧은 녹음 STT 방어
+
+**날짜**: 2026-05-05  
+**목표**: 파일럿 품질 이슈 2건 수정. q-003 이미지 메타 구조화 및 무음 STT 환각 방지.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/types/providers.ts` | `ProviderName`에 `'no-speech'` 추가 |
+| `app/api/stt/route.ts` | `MIN_AUDIO_SIZE_BYTES=3000` 방어. 빈/짧은 오디오는 STT 제공자 호출 없이 `no-speech` 응답 반환 + `provider_events` 기록 |
+| `app/student/speaking/actions.ts` | `sttProviderName === 'no-speech'` 시 `confidence: 0` 설정 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `QuestionData`에 `imageAlt/Caption/LicenseNote` 필드 추가. 이미지 아래 캡션·라이선스 노트 표시. `MIN_VALID_DURATION_SEC=2` 상수. review 단계에서 짧은 녹음 경고 배너 (`data-testid="short-recording-warning"`) |
+| `app/student/speaking/[questionId]/page.tsx` | 새 image 필드들 SpeakingClient에 전달 |
+| `app/student/speaking/[questionId]/result/page.tsx` | STT 결과 카드에 무음 경고(`no-speech` 시) 및 mock fallback 안내 추가. 빈 transcript 처리 |
+| `src/content/questions.json` | 모든 문항에 `imageAlt`, `imageCaption`, `imageLicenseNote` 필드 추가. q-003에 의미 있는 값 설정 |
+| `public/images/q-003-placeholder.svg` | SVG 전면 개선. 그라디언트·그림자·PLACEHOLDER 스탬프 추가. 이전보다 더 정돈된 일러스트 |
+| `tests/smoke/api-smoke.spec.ts` | `/api/stt` 무음 방어 테스트 3개 추가 (0 bytes, 1000 bytes, audio 없음) |
+| `docs/spec/WORK_LOG.md` | 이 항목 추가 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | 이미지 소스 원칙 섹션 추가 |
+
+### 이미지 소스 원칙 (파일럿 전 적용 필요)
+
+**권장 소스:**
+- 기관/교수자 직접 촬영 사진
+- Pexels / Unsplash CC0 라이선스 이미지
+- Wikimedia Commons 적합 라이선스 이미지
+- 직접 제작 일러스트
+
+**금지:**
+- Getty Images 무단 사용 (royalty-free ≠ 무료/저작권 없음)
+- Google 이미지 검색 결과 무단 사용
+- 출처 불명 이미지 삽입
+
+**q-003 파일 교체 절차:**
+1. 적합 라이선스 이미지 확보 (권장 파일명: `public/images/q-003-park-exercise.jpg`)
+2. `questions.json`의 `q-003.imageUrl`을 `/images/q-003-park-exercise.jpg`로 변경
+3. `imageAlt`, `imageCaption`, `imageLicenseNote` 실제 정보로 업데이트
+4. 코드 변경 없이 데이터 경로 변경만으로 교체 완료
+
+### STT 무음/짧은 녹음 방어 로직
+
+**API 레벨 (`/api/stt`)**:
+- `blob.size < 3000 bytes` → STT 제공자 호출 없이 `{ transcript: '', providerName: 'no-speech', warning: 'audio_too_short' }` 반환
+- `provider_events`에 `errorCode: 'audio_too_short'` 기록
+- Whisper 등 실제 STT가 빈 오디오에서 그럴듯한 문장을 생성하는 환각 방지
+
+**클라이언트 레벨 (review 단계)**:
+- `recorder.durationSec < 2` 이면 amber 경고 배너 표시
+- "녹음이 너무 짧습니다 (N초). 최소 2초 이상 말씀해 주세요."
+
+**결과 화면**:
+- `sttResult.providerName === 'no-speech'` → "음성이 감지되지 않았습니다" 경고
+- `sttResult.providerName === 'mock'` → "테스트용 텍스트로 평가됨" 안내
+
+### 남은 Known Issues (이 수정 이후)
+
+- q-003 placeholder SVG를 파일럿 전 실제 사진으로 교체 필요 (교체 절차 문서화 완료)
+- 짧은 녹음 UI 경고는 표시하나 제출을 차단하지는 않음 (사용자 선택에 맡김)
+- Whisper가 충분한 크기지만 무음인 파일(패딩 포함 등)에는 서버측 크기 체크가 충분하지 않을 수 있음
+
+---
+
+## Phase 10-D (추가) — 발음평가 라벨 오류 수정 + q-003 이미지 표시
+
+**날짜**: 2026-05-05  
+**목표**: 커밋 전 발견된 품질 이슈 2개 수정.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/student/speaking/[questionId]/result/page.tsx` | `normalizePronunciationDisplay` 헬퍼 추가. 발음 평가 세부 막대 라벨을 단어 → 평가 기준 5개(발음 정확도/유창성/억양강세/속도리듬/명료도)로 교체. 단어별 점수는 `<details>` 접기 영역("발음 참고 단어")으로 분리 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `QuestionData` 타입에 `typeId`, `imageUrl` 추가. 문항 카드에 이미지 영역 렌더링(`qt-picture` 타입에만). `imageUrl` 있으면 `next/image`로 표시, 없으면 미등록 안내 |
+| `app/student/speaking/[questionId]/page.tsx` | SpeakingClient에 `typeId`, `imageUrl` 전달 |
+| `src/content/questions.json` | 모든 문항에 `imageUrl` 필드 추가. q-003: `/images/q-003-placeholder.svg`, 나머지: `""` |
+| `public/images/q-003-placeholder.svg` | 공원 운동 장면 SVG 임시 일러스트 생성 (파일럿 전 실제 사진으로 교체 필요) |
+| `tests/smoke/auth-routes.spec.ts` | q-003 이미지/미등록 안내 표시 테스트 추가 |
+| `tests/smoke/mobile-speaking.spec.ts` | q-003 모바일 360px 이미지 영역 테스트 추가 |
+| `docs/spec/WORK_LOG.md` | 이 항목 추가 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | Known Issues 갱신 |
+
+### 주요 결정사항
+
+**발음 평가 라벨 오류**: `pronunciationResult.wordScores[].word`가 문항 텍스트의 단어 그대로 라벨에 표시되던 버그. ETRI mock이 단어별 점수만 제공하므로, `normalizePronunciationDisplay` 헬퍼로 정규화. 평가 기준 라벨 고정, 단어별 raw 데이터는 접기 섹션으로 분리.
+
+**q-003 이미지**: `questions.json`에 `imageUrl` 필드 추가. q-003에만 `/images/q-003-placeholder.svg` 경로 설정. SVG placeholder는 공원 운동 장면 일러스트. `next/image`로 렌더링(16:9 aspect-ratio 컨테이너). 이미지 없는 picture-type 문항은 "그림 자료가 아직 등록되지 않았습니다." 안내 표시.
+
+### 남은 Known Issues (이 수정 이후)
+
+- q-003 placeholder SVG를 파일럿 전 실제 사진/그림으로 교체 필요
+- q-004 등 다른 picture-type 문항도 실제 이미지 등록 필요
+- ETRI 연동 시 `normalizePronunciationDisplay` 헬퍼에 criterion-level 데이터 직접 매핑 필요
+
+---
+
+## Phase 10-D — 배포 후 품질 수정 1차
+
+**날짜**: 2026-05-05  
+**목표**: 배포된 MVP를 실제 파일럿 사용자가 보기 좋고 이해하기 쉽게 다듬는다. 역할 배지 오표시 수정, TTS 버튼 UI 개선, RTL 기반 적용, 다문항 흐름 보완.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/teacher/layout.tsx` | `role="teacher"` 하드코딩 제거 → DB에서 실제 role 조회 후 AppShell에 전달. admin 계정에서 "관리자" 배지 정상 표시 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | TTS 버튼 `variant="ghost"` → `variant="secondary"` 변경 (테두리·배경색 추가, 시인성 개선) |
+| `src/components/ui/lang-hint.tsx` | RTL 언어 감지 헬퍼(`getTextDir`) 추가. AR/FA/HE/UR 코드에 `dir="rtl"`, `unicodeBidi: 'plaintext'`, `textAlign: 'start'` 적용 |
+| `app/student/speaking/[questionId]/result/page.tsx` | 다음 문항 계산 로직 추가. "다음 문항으로 →" 버튼 추가 (세트 내 마지막 문항이면 "문항 목록으로") |
+| `tests/smoke/auth-routes.spec.ts` | q-002 직접 접근, 문항 목록 표시, TTS 버튼 렌더링, 아랍어 RTL crash 없음 테스트 4개 추가 |
+| `tests/smoke/mobile-speaking.spec.ts` | TTS 버튼 exact match → regex로 변경 (버튼 텍스트 변경 대응) |
+
+### 주요 결정사항
+
+**role 배지 버그 원인**: `teacher/layout.tsx`가 `role="teacher"` 하드코딩. admin이 `/teacher` 접근 시 "교수자"로 오표시됨. DB에서 `display_name, role` 함께 조회해 실제 role 사용.
+
+**TTS 버튼 ghost → secondary**: `ghost` variant는 `border-transparent`라 배경과 구분 없음. `secondary` variant(border-slate-300, bg-white)로 변경해 시각적 구분 추가.
+
+**RTL 처리 범위**: `lang-hint.tsx`에서만 다국어 텍스트를 렌더링함. AR/FA/HE/UR 언어 코드 감지 시 `dir="rtl"` + CSS 적용. LTR 텍스트는 영향 없음.
+
+**다음 문항 버튼 로직**: `evalRecord.questionSetId`로 세트를 찾고, 세트 내 `order` 기준으로 정렬 후 현재 문항 위치를 계산. 다음 문항이 있으면 "다음 문항으로 →", 없으면 "문항 목록으로" 표시.
+
+### 검증 결과
+
+- `npm run lint` → ✅
+- `npx tsc --noEmit` → ✅
+- `npm run build` → ✅ (18 routes, Proxy 정상)
+- `npm run test:smoke` → ✅ 25 passed
+
+### 남은 Known Issues (Phase 10-D 이후)
+
+1. 교수자/관리자 전체 기능 시나리오 추가 검증 필요
+2. 문항 콘텐츠 전면 정비 필요 (현재 q-001~q-008 mock 콘텐츠)
+3. 아랍어/다국어 문장 검수 필요 (번역 품질)
+4. 실제 iPhone Safari 녹음/재생 수동 테스트 미완
+5. ETRI 실제 발음평가 연동 테스트 미완
+6. LLM 실제 success 전환 및 평가 품질 검증 미완
+7. RLS 전면 적용 미완
+8. recordings signed URL 전환 미완
+
+---
+
 ## Phase 10-C — 배포 1차 검증 결과 문서화
 
 **날짜**: 2026-05-05  

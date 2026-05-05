@@ -1,8 +1,8 @@
 import { getSTTProvider } from '@/src/providers/stt'
 import { logProviderEvent } from '@/src/lib/supabase/provider-events'
 
-const MOCK_TRANSCRIPT =
-  '안녕하세요. 저는 한국어를 배우고 있습니다. 잘 부탁드립니다.'
+// Whisper hallucinates with near-silent audio (< ~1s). Block before calling the provider.
+const MIN_AUDIO_SIZE_BYTES = 3000
 
 export async function POST(request: Request) {
   let blob: Blob
@@ -22,6 +22,35 @@ export async function POST(request: Request) {
     }
   } catch {
     return Response.json({ error: 'invalid_form_data' }, { status: 400 })
+  }
+
+  // Guard: reject audio that is too small to contain real speech.
+  // Near-empty blobs cause STT providers (Whisper) to hallucinate plausible-sounding text.
+  if (blob.size < MIN_AUDIO_SIZE_BYTES) {
+    await logProviderEvent({
+      provider: 'no-speech',
+      feature: 'stt',
+      status: 'error',
+      latencyMs: 0,
+      questionId,
+      errorCode: 'audio_too_short',
+      errorMessage: `Audio blob too small: ${blob.size} bytes (minimum ${MIN_AUDIO_SIZE_BYTES})`,
+    })
+
+    console.info(
+      '[provider_events] stt.no_speech audio_size=%d questionId=%s',
+      blob.size,
+      questionId,
+    )
+
+    return Response.json({
+      transcript: '',
+      confidence: 0,
+      providerName: 'no-speech',
+      latencyMs: 0,
+      source: 'no-speech-detected',
+      warning: 'audio_too_short',
+    })
   }
 
   // Used to identify the intended provider in error-path logging.
@@ -82,11 +111,12 @@ export async function POST(request: Request) {
     console.error('[provider_events] stt.error', err)
 
     return Response.json({
-      transcript: MOCK_TRANSCRIPT,
+      transcript: '',
       confidence: 0,
       providerName: 'mock',
       latencyMs: 0,
-      source: 'mock-fallback',
+      source: 'error-fallback',
+      warning: 'stt_provider_error',
     })
   }
 }

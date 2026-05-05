@@ -90,4 +90,49 @@ test.describe('인증 우회 — Supabase 미설정 환경', () => {
     await expect(page.getByRole('heading', { name: /자기소개/ })).toBeVisible()
     await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
   })
+
+  test('/student/speaking/q-002 다문항 직접 접근', async ({ page }) => {
+    await page.goto('/student/speaking/q-002')
+
+    await expect(page.getByRole('heading', { name: /자기소개/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+
+  test('/student/speaking 문항 목록 표시', async ({ page }) => {
+    await page.goto('/student/speaking')
+
+    await expect(page.getByRole('heading', { name: '말하기 평가' })).toBeVisible()
+    // 최소 하나의 "시작하기" 링크가 있어야 함
+    await expect(page.getByRole('link', { name: '시작하기' }).first()).toBeVisible()
+  })
+
+  test('TTS 음성 안내 버튼 렌더링 확인', async ({ page }) => {
+    await page.goto('/student/speaking/q-001')
+
+    // secondary variant 버튼으로 교체 후 렌더링 확인
+    await expect(page.getByRole('button', { name: /문제 듣기/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /녹음 안내 듣기/ })).toBeVisible()
+  })
+
+  test('모국어 도움말 아랍어 RTL crash 없음', async ({ page }) => {
+    await page.goto('/student/speaking/q-001')
+
+    // 도움말 토글 클릭 — AR 텍스트 렌더링 시 crash 없어야 함
+    await page.getByRole('button', { name: /모국어 도움말 보기/ }).click()
+    await expect(page.getByText('[AR]')).toBeVisible()
+  })
+
+  test('/student/speaking/q-003 이미지 또는 미등록 안내 표시', async ({ page }) => {
+    await page.goto('/student/speaking/q-003')
+
+    await expect(page.getByRole('heading', { name: /그림 묘사/ })).toBeVisible()
+
+    // 이미지 컨테이너(data-testid) 또는 "그림 자료가 아직 등록되지 않았습니다." 안내 중 하나가 표시되어야 함
+    const hasImage = await page.locator('[data-testid="question-image-container"]').isVisible().catch(() => false)
+    const hasFallback = await page.getByText('그림 자료가 아직 등록되지 않았습니다').isVisible().catch(() => false)
+    expect(hasImage || hasFallback).toBe(true)
+
+    // 준비 시작 버튼도 정상 표시
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
 })

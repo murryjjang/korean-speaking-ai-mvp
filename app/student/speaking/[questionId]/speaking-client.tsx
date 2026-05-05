@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Button, Card, CardBody, Badge, LangHint } from '@/src/components/ui'
 import type { LangHintItem } from '@/src/components/ui'
 import { submitSpeaking } from '../actions'
@@ -13,13 +14,21 @@ type Phase = 'prep' | 'recording' | 'review' | 'submitting'
 
 export type QuestionData = {
   id: string
+  typeId: string
   title: string
   prompt: string
   prepTimeSec: number
   responseTimeSec: number
   difficulty: string
   typeLabel: string
+  imageUrl: string
+  imageAlt?: string
+  imageCaption?: string
+  imageLicenseNote?: string
 }
+
+const MIN_VALID_DURATION_SEC = 2
+const MIN_VALID_BLOB_SIZE = 3000
 
 const difficultyLabel: Record<string, string> = {
   beginner: '초급',
@@ -113,6 +122,8 @@ export function SpeakingClient({
   // Track recording elapsed seconds independently so auto-stop still works
   const [recordingElapsed, setRecordingElapsed] = useState(0)
   const autoStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Reactive blob size — populated when recorder.blobUrl is set after recording stops
+  const [blobSize, setBlobSize] = useState<number | null>(null)
 
   // Prep countdown
   useEffect(() => {
@@ -178,6 +189,19 @@ export function SpeakingClient({
     return () => clearTimeout(transition)
   }, [phase, recorder.state])
 
+  // Track blob size reactively — needed for submit-button disabled check.
+  // Only runs when blobUrl is non-null; isInvalidAudio guards on recorder.state==='stopped'
+  // so a stale blobSize from a previous recording is harmless while state is 'idle'/'recording'.
+  useEffect(() => {
+    if (!recorder.blobUrl) return
+    let active = true
+    fetch(recorder.blobUrl)
+      .then((r) => r.blob())
+      .then((b) => { if (active) setBlobSize(b.size) })
+      .catch(() => { if (active) setBlobSize(null) })
+    return () => { active = false }
+  }, [recorder.blobUrl])
+
   const handleStopRecording = useCallback(() => {
     if (autoStopTimerRef.current) {
       clearTimeout(autoStopTimerRef.current)
@@ -187,7 +211,21 @@ export function SpeakingClient({
     // Phase transition happens via the effect above when recorder.state becomes 'stopped'
   }, [recorder])
 
+  // True when stopped recording is too short or too small to contain real speech
+  const isInvalidAudio =
+    recorder.state === 'stopped' &&
+    (recorder.durationSec < MIN_VALID_DURATION_SEC ||
+      (blobSize !== null && blobSize < MIN_VALID_BLOB_SIZE))
+
   const handleSubmit = useCallback(async () => {
+    // Defense-in-depth: guard matches the disabled-button condition
+    if (recorder.state === 'stopped' && (
+      recorder.durationSec < MIN_VALID_DURATION_SEC ||
+      (blobSize !== null && blobSize < MIN_VALID_BLOB_SIZE)
+    )) {
+      return
+    }
+
     setPhase('submitting')
     setSubmitError(false)
 
@@ -287,7 +325,7 @@ export function SpeakingClient({
       setSubmitError(true)
       setPhase('review')
     }
-  }, [question.id, question.prompt, questionSetId, router, recorder.state, recorder.blobUrl, recorder.durationSec])
+  }, [question.id, question.prompt, questionSetId, router, recorder.state, recorder.blobUrl, recorder.durationSec, blobSize])
 
   const handleRetake = useCallback(() => {
     recorder.reset()
@@ -319,6 +357,36 @@ export function SpeakingClient({
           <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
             {question.prompt}
           </p>
+
+          {/* 그림 묘사 문항 이미지 영역 */}
+          {question.imageUrl ? (
+            <div className="mt-4">
+              <div
+                className="relative w-full overflow-hidden rounded-md border border-border bg-surface"
+                style={{ aspectRatio: '16/9' }}
+                data-testid="question-image-container"
+              >
+                <Image
+                  src={question.imageUrl}
+                  alt={question.imageAlt || `${question.title} - 묘사할 그림`}
+                  fill
+                  className="object-contain"
+                  priority
+                  data-testid="question-image"
+                />
+              </div>
+              {question.imageCaption && (
+                <p className="mt-1.5 text-xs text-text-secondary text-center">
+                  {question.imageCaption}
+                </p>
+              )}
+            </div>
+          ) : question.typeId === 'qt-picture' ? (
+            <div className="mt-4 flex items-center justify-center rounded-md border border-dashed border-border bg-surface py-8">
+              <p className="text-xs text-text-muted">그림 자료가 아직 등록되지 않았습니다.</p>
+            </div>
+          ) : null}
+
           <div className="mt-4 flex items-center gap-4 text-xs text-text-muted">
             <span>준비 시간: {question.prepTimeSec}초</span>
             <span>답변 시간: {formatTime(question.responseTimeSec)}</span>
@@ -332,14 +400,14 @@ export function SpeakingClient({
             {tts.state === 'idle' || tts.state === 'error' ? (
               <div className="flex flex-wrap gap-2">
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
                   onClick={() => tts.play(question.prompt, question.id, 'question')}
                 >
                   문제 듣기
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
                   onClick={() => tts.play(RECORDING_GUIDE_TEXT, question.id, 'recording-guide')}
                 >
@@ -347,13 +415,13 @@ export function SpeakingClient({
                 </Button>
               </div>
             ) : tts.state === 'loading' ? (
-              <Button variant="ghost" size="sm" loading disabled>
+              <Button variant="secondary" size="sm" loading disabled>
                 재생 준비 중
               </Button>
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-text-muted">재생 중</span>
-                <Button variant="ghost" size="sm" onClick={tts.stop}>
+                <Button variant="secondary" size="sm" onClick={tts.stop}>
                   정지
                 </Button>
               </div>
@@ -479,6 +547,19 @@ export function SpeakingClient({
                 </p>
               )}
 
+              {/* Short/silent recording — blocks submission */}
+              {isInvalidAudio && (
+                <div
+                  className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-left"
+                  data-testid="short-recording-warning"
+                >
+                  <p className="text-xs text-amber-700 leading-relaxed">
+                    <strong>녹음 시간이 너무 짧습니다.</strong>{' '}
+                    다시 녹음해 주세요.
+                  </p>
+                </div>
+              )}
+
               {/* Recorder error banner */}
               {recorder.state === 'error' && recorder.errorType && (
                 <div className="mb-4 p-3 bg-warning-50 border border-warning-200 rounded-md text-left">
@@ -519,7 +600,12 @@ export function SpeakingClient({
                 <Button variant="secondary" onClick={handleRetake} className="w-full sm:w-auto">
                   다시 녹음
                 </Button>
-                <Button variant="primary" onClick={handleSubmit} className="w-full sm:w-auto">
+                <Button
+                  variant="primary"
+                  onClick={handleSubmit}
+                  disabled={isInvalidAudio}
+                  className="w-full sm:w-auto"
+                >
                   제출하기
                 </Button>
               </div>

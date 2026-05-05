@@ -3,7 +3,7 @@
 import { getSTTProvider } from '@/src/providers/stt'
 import { getPronunciationProvider } from '@/src/providers/pronunciation'
 import { evaluateSpeakingDetail, detailToLLMEvalResult } from '@/src/providers/llm-eval'
-import { saveSpeakingEval } from '@/src/lib/mock/speaking-store'
+import { saveSpeakingEval, type SpeakingEvalRecord } from '@/src/lib/mock/speaking-store'
 import { getEvaluationRepository } from '@/src/lib/repositories'
 import { logProviderEvent } from '@/src/lib/supabase/provider-events'
 import questionsJson from '@/src/content/questions.json'
@@ -38,9 +38,10 @@ export async function submitSpeaking(
   // ── 1. Resolve transcript ────────────────────────────────────────────────
   let sttResult: STTResult
   if (meta?.sttTranscript !== undefined) {
+    const isNoSpeech = meta.sttProviderName === 'no-speech'
     sttResult = {
       transcript: meta.sttTranscript,
-      confidence: 0.5,
+      confidence: isNoSpeech ? 0 : 0.5,
       providerName: (meta.sttProviderName ?? 'mock') as ProviderName,
       providerVersion: '1.0.0',
       latencyMs: 0,
@@ -52,6 +53,44 @@ export async function submitSpeaking(
   }
 
   const { transcript } = sttResult
+
+  // ── Guard: no-speech / empty transcript — skip all AI eval ──────────────
+  // Covers: no-speech from /api/stt size check, empty STT result, STT error fallback.
+  // Prevents mock/hallucinated transcripts from generating ai_evaluations.
+  if (sttResult.providerName === 'no-speech' || !transcript.trim()) {
+    const submissionId = `mock-${questionId}-${Date.now()}`
+
+    const noSpeechRecord: SpeakingEvalRecord = {
+      submissionId,
+      questionId,
+      questionSetId,
+      submittedAt: new Date().toISOString(),
+      sttResult,
+      llmEvalResult: {
+        providerName: 'mock',
+        providerVersion: '1.0.0',
+        latencyMs: 0,
+        scores: [],
+        totalScore: 0,
+        normalizedScore: 0,
+        errorTags: [],
+        feedback: '음성이 감지되지 않아 평가를 진행할 수 없습니다.',
+      },
+      pronunciationResult: {
+        providerName: 'mock',
+        providerVersion: '1.0.0',
+        latencyMs: 0,
+        normalizedScore: 0,
+        wordScores: [],
+        feedback: '음성이 감지되지 않아 발음 평가를 진행할 수 없습니다.',
+      },
+      audioUrl: meta?.audioUrl ?? null,
+    }
+
+    saveSpeakingEval(noSpeechRecord)
+    // Supabase persistence intentionally skipped — no ai_evaluations for no-speech
+    return { submissionId }
+  }
 
   // ── 2. Resolve pronunciation result ──────────────────────────────────────
   const buildClientPronunciation = (): PronunciationResult | null => {
@@ -80,6 +119,9 @@ export async function submitSpeaking(
     transcript,
     rubricId: 'rubric-speaking-01',
     questionPrompt: question?.prompt,
+    questionId,
+    questionType: question?.typeId,
+    requiredElements: question?.requiredElements ?? [],
     pronunciationScore: pronunciationForEval?.normalizedScore,
     pronunciationFeedback: pronunciationForEval?.feedback,
   })
