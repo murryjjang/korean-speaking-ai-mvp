@@ -497,28 +497,32 @@ D+15 출시 전 아래 기기·브라우저 조합에서 핵심 경로 수동 �
 
 ## 환경변수 체크리스트 (파일럿 배포 전)
 
-```
-# Vercel 프로젝트 설정 > Environment Variables에서 설정
+아래는 실제 코드에서 사용하는 환경변수만 기재한다. 값은 기록하지 말 것.
 
-NEXT_PUBLIC_SUPABASE_URL=          # required (D+3+)
-NEXT_PUBLIC_SUPABASE_ANON_KEY=     # required (D+3+)
-SUPABASE_SERVICE_ROLE_KEY=         # required (D+3+), NEXT_PUBLIC 없이 서버 전용
-REPOSITORY_PROVIDER=supabase       # 'mock'|'supabase' (미설정 시 mock)
-
-# Optional (D+10+)
-STT_PROVIDER=mock                  # 'mock'|'etri'|'whisper'
-ETRI_API_KEY=                      # STT_PROVIDER=etri 시 필요
-PRONUNCIATION_PROVIDER=mock        # 'mock'|'etri'
-LLM_EVAL_PROVIDER=mock             # 'mock'|'claude'|'openai'
-ANTHROPIC_API_KEY=                 # LLM_EVAL_PROVIDER=claude 시 필요
-```
+| 변수명 | 필수 여부 | 기본값 | 설명 |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | 필수 | — | Supabase 프로젝트 URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 필수 | — | Supabase anon (public) key |
+| `REPOSITORY_PROVIDER` | 권장 | `mock` | `supabase` 설정 시 DB 저장 활성화 |
+| `STT_PROVIDER` | 선택 | `mock` | `whisper` 또는 `openai` 시 실제 STT |
+| `TTS_PROVIDER` | 선택 | `mock` | `openai` 시 OpenAI TTS, `browser` 시 Web Speech API |
+| `PRONUNCIATION_PROVIDER` | 선택 | `mock` | `etri` 시 ETRI 발음평가 |
+| `LLM_EVAL_PROVIDER` | 선택 | `mock` | `openai` 시 GPT 채점 |
+| `CONVERSATION_PROVIDER` | 선택 | `mock` | 현재 mock만 지원 |
+| `OPENAI_API_KEY` | 조건부 | — | STT/TTS/LLM 중 openai provider 사용 시 필요. 서버 전용 |
+| `OPENAI_EVAL_MODEL` | 선택 | `gpt-4o-mini` | LLM 채점 모델명 |
+| `TTS_MODEL` | 선택 | `tts-1` | TTS 모델 (`tts-1` 또는 `tts-1-hd`) |
+| `TTS_VOICE` | 선택 | `nova` | TTS 음성 (`alloy`·`echo`·`fable`·`onyx`·`nova`·`shimmer`) |
+| `ETRI_API_KEY` | 조건부 | — | `PRONUNCIATION_PROVIDER=etri` 시 필요. 서버 전용 |
+| `ETRI_API_BASE_URL` | 선택 | `https://aiopen.etri.re.kr:8000` | ETRI API base URL |
+| `SMOKE_TEST_MODE` | **금지** | — | **Vercel에 절대 설정하지 말 것** — proxy.ts auth 우회 전용 |
 
 ---
 
 ## 성공 기준 (D+15 파일럿)
 
-- 교수자 1명이 로그인 없이 URL 직접 접근 후 3명 학생 채점 완료
-- 학생 3명이 말하기 평가 1회 제출 + 결과 확인
+- 교수자 1명이 **/login으로 로그인** 후 3명 학생 채점 완료
+- 학생 3명이 **/login으로 로그인** 후 말하기 평가 1회 제출 + 결과 확인
 - 학생 2명이 미션 대화 1회 완료
 - 모든 제출 데이터가 Supabase DB에 저장됨을 확인
 - 교수자 채점 결과가 DB에 저장됨을 확인
@@ -635,3 +639,122 @@ sudo npx playwright install-deps chromium
 - **자동재생 제한**: 자동재생 없음 — 사용자 버튼 클릭 후 재생만 지원 (브라우저 정책 준수).
 - **iOS Safari speechSynthesis**: iOS 15+ Safari에서 `speechSynthesis.speak()` 지원하나 `onend` 이벤트 발화가 불안정할 수 있음.
 - **audioBase64 크기**: 긴 문장의 경우 base64 오디오 데이터가 커질 수 있음. 추후 스트리밍 또는 presigned URL 방식으로 전환 고려.
+
+---
+
+## Phase 10-A — Vercel 배포 준비 점검 (2026-05-05)
+
+> 실제 배포는 Phase 10-B에서 진행. 이 섹션은 배포 전 점검 및 체크리스트만 포함.
+
+### Vercel 배포 가능성 점검 결과
+
+| 항목 | 상태 | 비고 |
+|---|---|---|
+| `npm run build` 통과 | ✅ | 18개 route, Turbopack |
+| API route runtime | ✅ Node.js (기본값) | `Buffer` 사용 route handler가 있으나 Node.js runtime이므로 안전 |
+| proxy.ts runtime | ✅ Node.js (기본값) | Next.js 16에서 proxy.ts는 Node.js runtime 기본값 |
+| Edge runtime 충돌 없음 | ✅ | `export const runtime = 'edge'` 선언 없음 |
+| FormData/Blob 처리 | ✅ | `/api/stt`, `/api/storage/upload` 모두 Node.js runtime |
+| 외부 API fallback | ✅ | 모든 provider가 mock fallback 유지 |
+| SMOKE_TEST_MODE 격리 | ✅ | proxy.ts에서만 사용, Vercel에 설정하지 않으면 항상 auth 적용 |
+
+### Supabase 배포 전 점검
+
+#### DB Schema 상태
+
+| 테이블 | 적용 상태 | 비고 |
+|---|---|---|
+| `speaking_submissions` | ✅ 적용 완료 | |
+| `ai_evaluations` | ✅ 적용 완료 | |
+| `teacher_reviews` | ✅ 적용 완료 | |
+| `mission_submissions` | ✅ 적용 완료 | |
+| `provider_events` | ✅ 적용 완료 | Phase 8-E 컬럼 수동 적용 필요 (SUPABASE_SCHEMA.sql 참조) |
+| `user_profiles` | ✅ 적용 완료 (Phase 9-A 수동 적용) | own profile read RLS 적용됨 |
+| Storage `recordings` bucket | ⚠️ 수동 생성 필요 | 아래 절차 참조 |
+
+#### Storage `recordings` bucket 생성 절차
+
+1. Supabase Dashboard > **Storage** > **New bucket**
+2. Bucket name: `recordings`
+3. Public bucket: **ON** (getPublicUrl을 signed URL 없이 사용하기 위함)
+4. **Storage > Policies** > `recordings` bucket > **New policy**
+   - 대상: `INSERT`
+   - Role: `anon`
+   - 정책 정의: `true` (파일럿 기간 동안 모든 anon 업로드 허용)
+5. 파일럿 종료 후 signed URL 방식으로 전환 검토 (Phase 10 이후)
+
+> ⚠️ public bucket + anon INSERT 허용은 파일럿 운영 기간에만 적용. 운영 전환 시 인증된 사용자만 업로드 가능하도록 정책 수정 필요.
+
+#### provider_events 기록 확인 방법
+
+- Supabase Dashboard > Table Editor > `provider_events`
+- 또는 SQL Editor: `SELECT * FROM provider_events ORDER BY created_at DESC LIMIT 20;`
+- 파일럿 중 STT/TTS/LLM 실패 이벤트를 여기서 확인
+
+### Supabase Auth Redirect URL 점검
+
+배포 후 Supabase Dashboard > **Authentication** > **URL Configuration**에서 설정 필요:
+
+| 항목 | 설정값 | 비고 |
+|---|---|---|
+| **Site URL** | `https://<project>.vercel.app` | 실제 Vercel 배포 URL로 교체 |
+| **Redirect URLs** | `https://<project>.vercel.app/**` | wildcard로 모든 경로 허용 |
+
+이 설정 없이는 Supabase Auth 쿠키 기반 세션이 배포 도메인에서 작동하지 않을 수 있음.
+
+**커스텀 도메인 사용 시**: Site URL과 Redirect URLs를 커스텀 도메인으로 추가.
+
+**로컬 개발 병행 시**: `http://localhost:3000/**`도 Redirect URLs에 추가.
+
+### Vercel 배포 체크리스트 (Phase 10-B에서 실행)
+
+#### 사전 준비
+- [ ] `main` 브랜치 최신 push 확인
+- [ ] Supabase `recordings` bucket 생성 완료
+- [ ] Supabase `user_profiles`에 파일럿 참가자 계정 및 role 연결 완료
+- [ ] Supabase Auth Redirect URL 설정 예정 URL 파악
+
+#### Vercel 프로젝트 설정
+- [ ] vercel.com > New Project > Import from GitHub
+- [ ] 저장소 선택: `korean-speaking-ai-mvp`
+- [ ] Framework: Next.js (자동 감지)
+- [ ] Build Command: `npm run build` (기본값)
+- [ ] Output Directory: `.next` (기본값)
+- [ ] Root Directory: `/` (기본값)
+
+#### Environment Variables 입력
+- [ ] `NEXT_PUBLIC_SUPABASE_URL` (필수)
+- [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` (필수)
+- [ ] `REPOSITORY_PROVIDER=supabase`
+- [ ] `STT_PROVIDER` (선택, 미설정 시 mock)
+- [ ] `TTS_PROVIDER` (선택, 미설정 시 mock)
+- [ ] `PRONUNCIATION_PROVIDER` (선택, 미설정 시 mock)
+- [ ] `LLM_EVAL_PROVIDER` (선택, 미설정 시 mock)
+- [ ] `OPENAI_API_KEY` (STT/TTS/LLM 중 openai 사용 시)
+- [ ] `OPENAI_EVAL_MODEL` (선택)
+- [ ] `TTS_MODEL` (선택)
+- [ ] `TTS_VOICE` (선택)
+- [ ] `ETRI_API_KEY` (PRONUNCIATION_PROVIDER=etri 시)
+- [ ] `SMOKE_TEST_MODE` **설정하지 말 것** ← 운영 auth bypass 방지
+
+#### 배포 후 확인
+- [ ] Vercel 배포 URL 접속
+- [ ] Supabase Auth Redirect URL에 배포 URL 등록
+- [ ] `/login` 화면 정상 표시
+- [ ] 실제 student 계정 로그인 → `/student` 이동
+- [ ] `/student/speaking/q-001` 접속 + "준비 시작" 버튼 표시
+- [ ] 녹음 → 제출 → 결과 페이지 이동
+- [ ] Supabase `speaking_submissions` 행 생성 확인
+- [ ] Supabase `ai_evaluations` 행 생성 확인
+- [ ] `/api/tts` TTS 버튼 정상 작동 (또는 fallback)
+- [ ] 실제 teacher 계정 로그인 → `/teacher` 이동
+- [ ] teacher dashboard 최근 제출 현황 표시 (DB 연결 시)
+- [ ] `/api/health` → 200 응답 확인
+- [ ] Supabase `provider_events` 최근 이벤트 확인
+
+### Known Issues (Phase 10-B 배포 시 확인 필요)
+
+- Supabase Auth Redirect URL은 배포 URL 확인 후 Dashboard에서 수동 설정 필요
+- recordings bucket anon INSERT 정책은 파일럿 기간 한정. 운영 전환 시 재검토
+- RLS 전면 적용은 Phase 10 Auth 기반 제출 전환 후 진행
+- Vercel cold start 초기 응답 지연(1~3초) 파일럿 참가자에게 사전 안내 필요

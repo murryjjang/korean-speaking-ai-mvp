@@ -4,6 +4,52 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-A — Vercel 배포 준비 및 운영 환경 점검
+
+**날짜**: 2026-05-05  
+**목표**: 코드 수정 없이 Vercel 배포 가능 여부를 점검하고, 환경변수·Supabase·Auth redirect 설정 절차를 문서화한다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `.env.local.example` | `CONVERSATION_PROVIDER=mock` 추가 (누락분 보완). `SMOKE_TEST_MODE=` 주석 + 운영 환경 사용 금지 경고 추가 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | 환경변수 체크리스트 수정(SUPABASE_SERVICE_ROLE_KEY·ANTHROPIC_API_KEY 오기입 제거, CONVERSATION_PROVIDER·SMOKE_TEST_MODE 추가). 성공 기준 "로그인 없이" → "/login으로 로그인" 정정. Phase 10-A 절(Vercel 배포 체크리스트, Supabase 배포 전 확인사항, Auth redirect URL 설정, recordings 버킷 절차) 신규 추가 |
+| `docs/spec/WORK_LOG.md` | Phase 10-A 기록 |
+
+### 주요 결정사항
+
+**코드 수정 없음**: 런타임 호환성 검토 결과 Node.js 전용 API(Buffer)를 사용하는 API route들은 이미 Node.js runtime이므로 `export const runtime = 'edge'` 선언 불필요. 기존 코드 그대로 Vercel 배포 가능.
+
+**SUPABASE_SERVICE_ROLE_KEY 오기입 수정**: 코드 전체를 grep한 결과 service role key를 사용하는 코드가 없음을 확인. 환경변수 체크리스트에서 제거.
+
+**ANTHROPIC_API_KEY 오기입 수정**: 코드 전체를 grep한 결과 ANTHROPIC_API_KEY를 사용하는 코드가 없음을 확인. 환경변수 체크리스트에서 제거.
+
+### Vercel 배포 시 필요한 환경변수
+
+| 변수 | Vercel 필요 여부 |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ 필수 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ 필수 |
+| `REPOSITORY_PROVIDER` | `supabase` 설정 필요 |
+| `STT_PROVIDER` | `openai` 또는 `mock` |
+| `TTS_PROVIDER` | `openai` 또는 `mock` |
+| `PRONUNCIATION_PROVIDER` | `etri` 또는 `mock` |
+| `LLM_EVAL_PROVIDER` | `openai` 또는 `mock` |
+| `CONVERSATION_PROVIDER` | `mock` (현재 mock만 지원) |
+| `OPENAI_API_KEY` | STT/TTS/LLM_EVAL=openai 시 필수 |
+| `ETRI_API_KEY` | PRONUNCIATION_PROVIDER=etri 시 필수 |
+| `ETRI_API_BASE_URL` | PRONUNCIATION_PROVIDER=etri 시 필수 |
+| `SMOKE_TEST_MODE` | **절대 설정 금지** |
+
+### Known Issues (Phase 10 이후)
+
+- Supabase RLS 전면 적용 (Auth 기반 제출 전환 후)
+- recordings 버킷 signed URL 전환 (보안 강화)
+- display_name 수정 UI
+
+---
+
 ## Phase 9-C — Phase 9 최종 안정화
 
 **날짜**: 2026-05-05  
