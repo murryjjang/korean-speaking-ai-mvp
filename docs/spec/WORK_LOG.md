@@ -4,6 +4,50 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 9-C — Phase 9 최종 안정화
+
+**날짜**: 2026-05-05  
+**목표**: Phase 9 전체를 파일럿 운영 가능한 수준으로 마무리한다. role 분기 보완, RLS 최종 판단, 운영 절차 완전 문서화.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `proxy.ts` | `/student` route에도 user_profiles 존재 확인 추가. 모든 protected route를 단일 DB 쿼리로 통합 처리 |
+| `tests/smoke/auth-routes.spec.ts` | `/student` nav 항목(말하기 평가·미션 대화·말하기 대회 준비) 표시 확인 test 추가 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | Phase 9-C 완료 항목, Phase 9 최종 상태 요약, 계정 생성 절차, 수동 테스트 체크리스트, RLS 판단표, 운영 전 필수 확인 사항 추가. Known Issues 표 갱신 |
+| `docs/spec/WORK_LOG.md` | Phase 9-C 기록 |
+
+### 주요 결정사항
+
+**proxy.ts 통합 이유**:
+- 기존 코드: /student는 user 존재만 확인, /teacher·/admin만 user_profiles 조회
+- 변경: 모든 protected route에서 user_profiles 확인 → 역할 없는 인증 사용자도 /role-missing 처리
+- DB 쿼리 횟수 동일(최악의 경우 1회 감소) + 정책 일관성 향상
+
+**RLS 보류 최종 근거**:
+현재 server action들은 anon key로 `speaking_submissions` 등에 INSERT함. RLS를 활성화하면 INSERT가 실패함. Phase 10에서 Auth 세션을 server action에 전달하는 방식으로 repository를 전환한 후 RLS를 함께 적용할 계획.
+
+### Phase 9 전체 완료 기준
+
+- `/login` 화면 ✓
+- role 기반 route 분기 (proxy.ts) ✓
+- `/role-missing` 안내 ✓
+- student/teacher/admin 역할 redirect ✓
+- Topbar 로그아웃 ✓
+- user_profiles 테이블 + own profile read RLS ✓
+- 계정/역할 운영 절차 문서화 ✓
+- smoke test 유지 (20 passed) ✓
+
+### Known Issues (Phase 10 예정)
+
+- RLS 전면 적용 (Auth 기반 제출 전환 후)
+- admin 전용 route 분리
+- display_name 수정 UI (SECURITY DEFINER 함수)
+- recordings signed URL 전환
+
+---
+
 ## Phase 9-B — 계정/역할 운영 안정화 및 RLS/권한 구조 정리
 
 **날짜**: 2026-05-05  

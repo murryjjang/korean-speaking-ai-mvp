@@ -40,18 +40,19 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Teacher and admin routes require a matching role in user_profiles.
+  // All protected routes require a user_profiles row. One query covers all paths.
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!profile) {
+    return NextResponse.redirect(new URL('/role-missing', request.url))
+  }
+
+  // Teacher and admin routes additionally require the matching role.
   if (pathname.startsWith('/teacher') || pathname.startsWith('/admin')) {
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.redirect(new URL('/role-missing', request.url))
-    }
-
     if (profile.role !== 'teacher' && profile.role !== 'admin') {
       return NextResponse.redirect(new URL('/student', request.url))
     }

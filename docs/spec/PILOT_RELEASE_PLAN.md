@@ -128,14 +128,148 @@ After:  Server Action → mock store (항상, result 페이지 read 의존)
 - [x] student nav "말하기 대회 준비" 명칭 명확화
 - [x] proxy.ts = Next.js 16 middleware 파일 규약 확인 (정상 동작)
 
-**Known Issues (Phase 9-C / 파일럿 배포 전 해소 필요):**
-- Supabase Auth 실제 계정 생성 필요 (Supabase Dashboard에서 수동)
-- `user_profiles` role 수동 등록 필요 (SUPABASE_SCHEMA.sql 계정 절차 참조)
-- 실제 student/teacher/admin 계정 로그인 E2E 테스트는 계정 준비 후 수동 확인 필요
-- RLS 전면 적용은 Phase 9-C에서 최종 확인 필요 (현재 최소 정책만 적용)
-- recordings public URL 정책은 운영 전 재검토 필요 (Phase 9-C)
-- provider_events RLS 미적용 (Phase 9-C)
+**Phase 9-C 완료 내용:**
+- [x] `/student` route에 user_profiles 존재 확인 추가 (role 없는 인증 사용자 → /role-missing)
+- [x] proxy.ts role check 통합 (모든 protected route 단일 DB 쿼리)
+- [x] smoke test에 /student nav 항목(말하기 평가·미션 대화·말하기 대회 준비) 표시 확인 추가
+- [x] 파일럿 운영 절차 (계정 생성, role 연결, 수동 테스트 체크리스트) 완전 문서화
+- [x] RLS 적용/보류 최종 판단 문서화 완료
+
+**Phase 9 최종 Known Issues (Phase 10 또는 운영 안정화 단계):**
+- `user_profiles` display_name 수정 UI 없음 (Dashboard에서 직접 변경)
+- speaking_submissions 등 핵심 테이블 RLS 미적용 (Auth 기반 제출 전환 완료 후 적용 예정)
+- recordings public URL 정책 재검토 필요 (signed URL 전환 예정)
+- provider_events RLS 미적용 (admin/service role만 접근 예정)
 - admin 전용 route 분리 미완료 (현재 teacher와 동일 접근 권한)
+- 실제 student/teacher/admin 계정 로그인 E2E 테스트는 계정 준비 후 수동 확인 필요
+
+---
+
+## Phase 9 최종 상태 및 파일럿 운영 절차 (2026-05-05)
+
+### Phase 9 완료 기준
+
+| 기능 | 상태 |
+|---|---|
+| `/login` 이메일/비밀번호 로그인 화면 | ✅ |
+| role 기반 route 분기 (proxy.ts) | ✅ |
+| student → `/student` redirect | ✅ |
+| teacher/admin → `/teacher` redirect | ✅ |
+| role 없는 계정 → `/role-missing` 안내 | ✅ |
+| 미인증 사용자 → `/login` 유도 | ✅ |
+| 로그아웃 버튼 (Topbar) | ✅ |
+| `user_profiles` 테이블 + own profile read RLS | ✅ (수동 적용 완료) |
+| 계정 생성/role 연결 수동 절차 문서화 | ✅ |
+| smoke test auth 우회 (SMOKE_TEST_MODE=1) | ✅ |
+| 기존 AI 말하기 평가 파이프라인 유지 | ✅ |
+| RLS 전면 적용 (Phase 10 예정) | ⏳ |
+
+---
+
+### Supabase Auth 계정 생성 절차
+
+1. Supabase Dashboard > **Authentication** > **Users** 탭 이동
+2. **"Add user"** 클릭 → 이메일 + 비밀번호 입력 → 생성
+3. 생성된 사용자의 **User UID** 복사
+4. **SQL Editor** 탭에서 아래 INSERT 실행 (role에 맞게 선택):
+
+```sql
+-- 학습자 계정
+INSERT INTO public.user_profiles (user_id, role, display_name)
+VALUES ('<student-auth-user-uuid>', 'student', '학습자 테스트');
+
+-- 교수자 계정
+INSERT INTO public.user_profiles (user_id, role, display_name)
+VALUES ('<teacher-auth-user-uuid>', 'teacher', '교사 테스트');
+
+-- 관리자 계정
+INSERT INTO public.user_profiles (user_id, role, display_name)
+VALUES ('<admin-auth-user-uuid>', 'admin', '관리자 테스트');
+```
+
+> ⚠️ `<...-uuid>` 부분은 실제 auth user UUID로 교체. 실제 UUID/이메일/비밀번호는 이 문서에 기록하지 말 것.
+
+학습자의 경우 `students` 테이블 row와 연결할 때 `student_id`도 함께 지정:
+```sql
+INSERT INTO public.user_profiles (user_id, role, display_name, student_id)
+VALUES ('<student-auth-user-uuid>', 'student', '홍길동', '<students-table-uuid>');
+```
+
+---
+
+### 수동 로그인 테스트 체크리스트
+
+파일럿 배포 후 실제 계정으로 아래 항목을 순서대로 확인한다.
+
+**학습자(student) 계정 테스트**
+- [ ] `/login`에서 student 이메일/비밀번호 입력 → 로그인 성공
+- [ ] 로그인 후 `/student`로 자동 이동
+- [ ] 사이드바에 "말하기 평가", "미션 대화", "말하기 대회 준비(준비중)" 표시
+- [ ] `/student/speaking/q-001` 접근 및 말하기 평가 화면 표시
+- [ ] `/teacher` 직접 접근 시 `/student`로 redirect (권한 없음)
+- [ ] Topbar 로그아웃 버튼 → 클릭 후 `/login` 이동
+- [ ] 로그아웃 후 `/student` 직접 접근 → `/login` redirect
+
+**교수자(teacher) 계정 테스트**
+- [ ] `/login`에서 teacher 이메일/비밀번호 입력 → 로그인 성공
+- [ ] 로그인 후 `/teacher`로 자동 이동
+- [ ] 교사 대시보드에서 "채점 관리" 헤더 표시
+- [ ] (DB 연결 시) 최근 제출 현황 테이블 표시
+- [ ] `/teacher/submissions`에서 제출 목록 확인
+- [ ] Topbar 로그아웃 버튼 → 클릭 후 `/login` 이동
+
+**관리자(admin) 계정 테스트**
+- [ ] `/login`에서 admin 계정 로그인 → `/teacher`로 이동 (admin 전용 route는 Phase 10)
+- [ ] 교사 대시보드 접근 가능 확인
+
+**역할 미설정 계정 테스트**
+- [ ] user_profiles row 없는 계정으로 로그인 → `/role-missing` 화면 표시
+- [ ] "역할 정보 없음" 메시지 및 로그아웃 버튼 표시
+- [ ] 로그아웃 후 `/login`으로 이동
+
+---
+
+### RLS 적용/보류 최종 판단
+
+현재 MVP는 anon key 기반 server action으로 제출/저장 흐름이 구성되어 있다. RLS를 전면 활성화하면 기존 INSERT/SELECT가 차단될 수 있으므로, Auth 기반 제출 전환 완료 후 단계적으로 적용한다.
+
+| 테이블 | 현재 상태 | 판단 | 예정 시기 |
+|---|---|---|---|
+| `user_profiles` | own profile read 적용 완료 | ✅ 적용 | Phase 9-A |
+| `user_profiles` UPDATE | 미적용 (role self-update 위험) | ❌ 적용 금지 | Phase 10에서 SECURITY DEFINER 함수로 대체 |
+| `speaking_submissions` | RLS 미적용 | ⏳ 보류 | Phase 10 (Auth 기반 제출 전환 후) |
+| `ai_evaluations` | RLS 미적용 | ⏳ 보류 | Phase 10 |
+| `teacher_reviews` | RLS 미적용 | ⏳ 보류 | Phase 10 |
+| `mission_submissions` | RLS 미적용 | ⏳ 보류 | Phase 10 |
+| `provider_events` | RLS 미적용 | ⏳ 보류 | Phase 10 (내부 로그용, anon 노출 불필요) |
+| Storage `recordings` | public URL 정책 | ⏳ 재검토 | Phase 10 (signed URL 전환 고려) |
+
+**보류 근거**: "현재 MVP는 익명/파일럿 제출 흐름을 일부 유지하므로, 인증 기반 repository 전환 전 RLS 전면 적용 시 `speaking_submissions` 등의 INSERT/SELECT가 실패할 수 있음. Phase 10에서 Auth 세션을 server action에 전달하는 방식으로 전환한 뒤 RLS 정책을 함께 적용한다."
+
+---
+
+### 운영 전 필수 확인 사항
+
+배포 전 아래 항목을 반드시 점검한다.
+
+**환경변수 (Vercel 프로젝트 설정)**
+- [ ] `NEXT_PUBLIC_SUPABASE_URL` 설정
+- [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` 설정
+- [ ] `SMOKE_TEST_MODE` 미설정 또는 `0` (운영 환경에서 auth 우회 금지)
+- [ ] `REPOSITORY_PROVIDER=supabase` 설정 (미설정 시 mock 모드)
+
+**Supabase 설정**
+- [ ] `user_profiles` 테이블 생성 완료 (`SUPABASE_SCHEMA.sql` Phase 9-A 블록 참조)
+- [ ] `user_profiles` own profile read RLS 활성화 완료
+- [ ] 파일럿 참가자(학습자/교수자) 계정 생성 완료
+- [ ] 각 계정의 `user_profiles` role 연결 완료
+
+**배포 후 동작 확인**
+- [ ] `/login` 화면 정상 표시
+- [ ] 실제 학습자 계정 로그인 → `/student` 이동 확인
+- [ ] 실제 교수자 계정 로그인 → `/teacher` 이동 확인
+- [ ] 미인증 상태에서 `/student` 직접 접근 → `/login` redirect 확인
+- [ ] `SMOKE_TEST_MODE` 환경변수 없음 확인 (운영 서버에서 auth bypass 금지)
 
 ---
 
@@ -175,7 +309,7 @@ After:  Server Action → mock store (항상, result 페이지 read 의존)
 
 | 제외 기능 | 사유 | 예정 시기 |
 |---|---|---|
-| Supabase Auth / 로그인 | 파일럿 규모에서 URL 직접 접근으로 충분 | Phase 8+ |
+| ~~Supabase Auth / 로그인~~ | **Phase 9에서 구현 완료** | ✅ Phase 9-A/B/C |
 | 학생 관리 UI (등록/수정/삭제) | 교수자가 DB seed로 대체 | Phase 8+ |
 | 대회(contest) 모드 | 미구현 | Phase 10+ |
 | i18n 다국어 UI | 구조만 준비, 렌더링 미구현 | Phase 9+ |
@@ -194,7 +328,7 @@ After:  Server Action → mock store (항상, result 페이지 read 의존)
 
 | 이슈 | 영향도 | 방지/회피 방법 |
 |---|---|---|
-| **인증 없음** — URL 알면 누구나 접근 | 중 | 파일럿 URL 비공개 배포, 참가자에게만 공유 |
+| ~~**인증 없음**~~ — **Phase 9에서 해소** (Supabase Auth 로그인 + proxy.ts role 분기 적용) | 해소 | Phase 9-A/9-B/9-C 완료. 실제 계정 생성 + user_profiles role 연결 필요 |
 | **학생 ID 고정** — 모든 제출이 동일 학생으로 저장 | 높 | 파일럿 시 학생별 URL 파라미터 분기 (임시 workaround) |
 | **MissionSession 서버 재시작 소실** — 진행 중 세션 끊길 수 있음 | 중 | 미션은 짧은 시간 내 완료 권장, Vercel 재시작 최소화 |
 | **SpeakingEvalRecord 서버 재시작 소실** — 결과 페이지 접근 불가 | 중 | D+5에서 DB 저장으로 해소 |
