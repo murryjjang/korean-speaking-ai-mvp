@@ -4,6 +4,72 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 8-E — Provider Event Logging (STT)
+
+**날짜**: 2026-05-05  
+**목표**: 외부 AI/음성 provider 호출 이력을 `provider_events` 테이블에 기록한다. `/api/stt` OpenAI Whisper 호출부터 시작하며, 이후 ETRI/LLM/TTS 등에 재사용 가능한 구조로 만든다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/lib/supabase/provider-events.ts` | **신규** — `logProviderEvent(input)` 헬퍼. Supabase `provider_events` 테이블에 INSERT. 실패 시 `console.warn` 처리, 호출자 예외 전파 없음 |
+| `app/api/stt/route.ts` | `logProviderEvent` 호출 추가. FormData에서 `questionId` 파싱. 성공/오류/fallback 3종 이벤트 기록 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | STT FormData에 `questionId` 추가 |
+| `docs/spec/SUPABASE_SCHEMA.sql` | `provider_events` 테이블에 새 컬럼 추가 (status, model, request_id, question_id, error_code, metadata) + Phase 8-E Migration ALTER TABLE 섹션 추가 |
+| `docs/spec/SUPABASE_SCHEMA.md` | `provider_events` 섹션 업데이트 |
+| `docs/spec/WORK_LOG.md` | Phase 8-E 항목 추가 (이 문서) |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | Provider event logging Known Issues 추가 |
+
+### provider_events 테이블 변경 (Phase 8-E)
+
+기존 컬럼에 추가:
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `status` | text NULL | `'success'` / `'fallback'` / `'error'` |
+| `model` | text NULL | 모델명 (예: `'whisper-1'`) |
+| `request_id` | text NULL | 외부 API 요청 ID |
+| `question_id` | text NULL | 문항/시나리오 ID |
+| `error_code` | text NULL | 짧은 오류 키 (예: `'provider_error'`) |
+| `metadata` | jsonb NULL | provider별 추가 정보 |
+
+**DB 수동 적용 필요**: `SUPABASE_SCHEMA.sql` 하단 `Phase 8-E Migration` 섹션의 ALTER TABLE 명령을 Supabase Dashboard > SQL Editor에서 실행해야 함.
+
+### /api/stt 기록 항목
+
+| 상황 | provider_name | status | 기록 내용 |
+|---|---|---|---|
+| Whisper 성공 | `whisper` | `success` | latency_ms, model(whisper-1), question_id |
+| mock 정상 사용 | `mock` | `success` | latency_ms, question_id |
+| OpenAI 실패 후 fallback | `openai` | `error` | error_code=provider_error, error_message |
+| mock fallback 응답 | `mock` | `fallback` | latency_ms=0, metadata.reason, metadata.configuredProvider |
+
+### 기록 흐름 요약
+
+```
+/api/stt POST
+  ├─ FormData 파싱: audio + questionId
+  ├─ getSTTProvider() → provider.transcribe(blob)
+  │   ├─ 성공 → logProviderEvent(status=success) → Response.json(transcript)
+  │   └─ 실패 → logProviderEvent(status=error) [openai인 경우]
+  │           → logProviderEvent(status=fallback, provider=mock)
+  │           → Response.json(MOCK_TRANSCRIPT)
+  │
+  └─ logProviderEvent 실패 → console.warn (흐름 차단 없음)
+```
+
+### Known Issues (Phase 8-E 기준)
+
+| 이슈 | 설명 |
+|---|---|
+| **DB 수동 적용 필요** | 기존 Supabase 인스턴스에는 Phase 8-E Migration ALTER TABLE 실행 필요 |
+| **request_id 미수집** | OpenAI Whisper API 응답에서 request ID를 별도 추출하지 않음 — Phase 8-F에서 개선 예정 |
+| **anon key 기반 INSERT** | `provider_events`는 anon key로 INSERT. RLS 도입(Phase 9) 후 정책 추가 필요 |
+| **ETRI/LLM/TTS 미적용** | Phase 8-E에서는 STT만 적용. 다른 provider는 Phase 8-F+ |
+
+---
+
 ## Phase 8-D — 모바일/iOS 녹음 예외 처리 보완
 
 **날짜**: 2026-05-05  

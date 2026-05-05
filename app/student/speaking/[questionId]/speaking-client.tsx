@@ -205,6 +205,7 @@ export function SpeakingClient({
             try {
               const fd = new FormData()
               fd.append('audio', blob, 'recording.webm')
+              fd.append('questionId', question.id)
               const res = await fetch('/api/stt', { method: 'POST', body: fd })
               if (res.ok) {
                 // Response.json() returns any; safe to access known fields directly.

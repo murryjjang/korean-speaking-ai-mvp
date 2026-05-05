@@ -199,6 +199,7 @@ create index if not exists idx_teacher_review_is_finalized  on teacher_reviews(i
 
 -- ── provider_events ─────────────────────────────────────────────────
 -- API call log for observability. Consider PII in request/response payloads.
+-- Phase 8-E: added status, model, request_id, question_id, error_code, metadata columns.
 create table if not exists provider_events (
   id               uuid        primary key default gen_random_uuid(),
   provider_type    text        not null
@@ -206,18 +207,27 @@ create table if not exists provider_events (
                                    'stt', 'tts', 'pronunciation', 'llm-eval', 'conversation'
                                  )),
   provider_name    text        not null,
+  status           text,       -- 'success' | 'fallback' | 'error'
   submission_id    uuid,
   student_id       uuid,
+  question_id      text,       -- question/scenario ID for correlation
+  model            text,       -- model name/version (e.g. 'whisper-1')
+  request_id       text,       -- external API request ID for tracing
   request_payload  jsonb,
   response_payload jsonb,
   latency_ms       integer,
   is_error         boolean     not null default false,
+  error_code       text,       -- short error key (e.g. 'provider_error', 'timeout')
   error_message    text,
+  metadata         jsonb,      -- catch-all for provider-specific extras
   created_at       timestamptz not null default now()
 );
 
 create index if not exists idx_provider_events_type          on provider_events(provider_type);
+create index if not exists idx_provider_events_provider_name on provider_events(provider_name);
+create index if not exists idx_provider_events_status        on provider_events(status);
 create index if not exists idx_provider_events_submission_id on provider_events(submission_id);
+create index if not exists idx_provider_events_question_id   on provider_events(question_id);
 create index if not exists idx_provider_events_created_at    on provider_events(created_at desc);
 
 -- ── content_versions ────────────────────────────────────────────────
@@ -253,3 +263,19 @@ create index if not exists idx_content_versions_type_id on content_versions(cont
 -- alter table teacher_reviews      enable row level security;
 -- alter table provider_events      enable row level security;
 -- alter table content_versions     enable row level security;
+
+-- ── Phase 8-E Migration — provider_events new columns ───────────────
+-- Run this block in Supabase Dashboard > SQL Editor if provider_events
+-- already exists (Phase 6-B or later). Safe to re-run (IF NOT EXISTS guard
+-- is not available for ADD COLUMN in PostgreSQL, but duplicate column errors
+-- are harmless — just skip if column already exists).
+--
+-- alter table provider_events add column if not exists status       text;
+-- alter table provider_events add column if not exists question_id  text;
+-- alter table provider_events add column if not exists model        text;
+-- alter table provider_events add column if not exists request_id   text;
+-- alter table provider_events add column if not exists error_code   text;
+-- alter table provider_events add column if not exists metadata     jsonb;
+-- create index if not exists idx_provider_events_provider_name on provider_events(provider_name);
+-- create index if not exists idx_provider_events_status        on provider_events(status);
+-- create index if not exists idx_provider_events_question_id   on provider_events(question_id);

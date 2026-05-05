@@ -224,21 +224,30 @@ updated_at         timestamptz
 
 ### `provider_events`
 
+Phase 8-E에서 `status`, `model`, `request_id`, `question_id`, `error_code`, `metadata` 컬럼 추가.  
+기존 DB에 적용하려면 `SUPABASE_SCHEMA.sql` 파일 하단 **Phase 8-E Migration** 섹션의 ALTER TABLE 명령을 실행한다.
+
 ```
 id               uuid PK
 provider_type    text    -- 'stt'|'tts'|'pronunciation'|'llm-eval'|'conversation'
-provider_name    text    -- 'mock'|'etri'|'claude' 등
+provider_name    text    -- 'mock'|'openai'|'etri'|'claude' 등
+status           text NULL  -- 'success'|'fallback'|'error' (Phase 8-E+)
 submission_id    uuid NULL
 student_id       uuid NULL
-request_payload  jsonb   -- PII 포함 가능, 암호화 고려
-response_payload jsonb
-latency_ms       integer
+question_id      text NULL  -- 문항/시나리오 ID (Phase 8-E+)
+model            text NULL  -- 모델명 e.g. 'whisper-1' (Phase 8-E+)
+request_id       text NULL  -- 외부 API 요청 ID (Phase 8-E+)
+request_payload  jsonb NULL -- PII 포함 가능, 암호화 고려
+response_payload jsonb NULL
+latency_ms       integer NULL
 is_error         boolean DEFAULT false
-error_message    text
+error_code       text NULL  -- 짧은 오류 키 e.g. 'provider_error' (Phase 8-E+)
+error_message    text NULL
+metadata         jsonb NULL -- provider별 추가 정보 (Phase 8-E+)
 created_at       timestamptz
 ```
 
-인덱스: `provider_type`, `submission_id`, `created_at DESC`
+인덱스: `provider_type`, `provider_name`, `status`, `submission_id`, `question_id`, `created_at DESC`
 
 ---
 
