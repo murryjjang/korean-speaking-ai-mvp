@@ -905,3 +905,43 @@ Redirect URLs:
 | `npm run build` | ✅ 성공 |
 | `npm run test:smoke` | ✅ 21 passed |
 | 코드 수정 여부 | 없음 (docs만 수정) |
+
+---
+
+## Phase 10-C — 배포 1차 검증 결과 (2026-05-05)
+
+> **현재 상태**: 배포 1차 성공, 핵심 저장 흐름 확인 완료. 파일럿 운영 전 UI·역할·문항·다국어 품질 보완 필요.
+
+### 수동 검증 결과
+
+| 항목 | 결과 |
+|---|---|
+| Vercel 배포 성공 | ✅ |
+| 배포 URL 접속 | ✅ |
+| Supabase Auth Redirect URL 설정 | ✅ |
+| student 계정 로그인 | ✅ |
+| 말하기 제출 일부 성공 | ✅ |
+| `speaking_submissions` 행 저장 | ✅ |
+| `audio_url` 저장 | ✅ |
+| `provider_events` (stt / pronunciation / llm-eval / tts) 기록 | ✅ |
+| `ai_evaluations.scores` 저장 | ✅ |
+| `ai_evaluations.pronunciation_result` 저장 | ✅ |
+| 교수자 전체 기능 검증 | ⏳ 미완 |
+| 관리자 전체 기능 검증 | ⏳ 미완 |
+| iPhone Safari 녹음/재생 수동 테스트 | ⏳ 미완 |
+
+### Known Issues — 운영 전 보완 필요
+
+| # | 이슈 | 우선순위 |
+|---|---|---|
+| 1 | 다문항 평가 흐름 미완 — 한두 문항 중심으로만 동작, 문항 이동·수정 필요 | 높음 |
+| 2 | 교수자 로그인 후 전체 기능 정상작동 검증 미완 | 높음 |
+| 3 | 관리자 로그인 후 전체 기능 정상작동 검증 미완 | 높음 |
+| 4 | 관리자 계정 role 배지가 "교수자"로 오표시 — 버그 수정 필요 | 높음 |
+| 5 | RTL 언어(아랍어 등) 문장부호·방향 처리 미적용 — `dir="rtl"`, `unicode-bidi`, punctuation 처리 필요 | 중간 |
+| 6 | 음성 버튼 UI 시인성 부족 — "문제 듣기", "녹음 안내 듣기", 재생/정지 버튼 테두리·글자 대비 개선 필요 | 중간 |
+| 7 | iPhone Safari 녹음/재생 수동 테스트 미완 | 중간 |
+| 8 | ETRI API Key 발급 후 실제 발음평가 연동 테스트 미완 | 중간 |
+| 9 | LLM 실제 success 전환 및 평가 품질 검증 미완 | 중간 |
+| 10 | RLS 전면 적용 미완 — Auth 기반 제출 전환 후 진행 | 낮음 (Phase 10 이후) |
+| 11 | recordings signed URL 전환 미완 — 현재 public bucket | 낮음 (Phase 10 이후) |

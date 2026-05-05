@@ -4,6 +4,53 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-C — 배포 1차 검증 결과 문서화
+
+**날짜**: 2026-05-05  
+**목표**: Vercel 배포 후 실제 접속·로그인·제출 흐름을 수동으로 확인하고, 확인된 사항과 남은 이슈를 정확하게 기록한다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `docs/spec/PILOT_RELEASE_PLAN.md` | Phase 10-C 절 추가 — 배포 1차 검증 결과, Known Issues 목록 |
+| `docs/spec/WORK_LOG.md` | Phase 10-C 기록 |
+
+### 배포 1차 검증 결과 요약
+
+| 항목 | 결과 |
+|---|---|
+| Vercel 배포 성공 | ✅ |
+| 배포 URL 접속 | ✅ |
+| Supabase Auth Redirect URL 설정 | ✅ |
+| student 계정 로그인 | ✅ |
+| 말하기 제출 일부 성공 | ✅ |
+| `speaking_submissions` 저장 | ✅ |
+| `audio_url` 저장 | ✅ |
+| `provider_events` (stt/pronunciation/llm-eval/tts) 기록 | ✅ |
+| `ai_evaluations.scores` 저장 | ✅ |
+| `ai_evaluations.pronunciation_result` 저장 | ✅ |
+
+### 운영 전 보완 필요 이슈 (Phase 10-D 이후)
+
+1. 다문항 평가 흐름·문항 이동·문항 수정
+2. 교수자 전체 기능 검증 미완
+3. 관리자 전체 기능 검증 미완
+4. 관리자 계정 role 배지 "교수자" 오표시 버그
+5. RTL 언어(아랍어 등) 문장부호·방향 처리 미적용
+6. 음성 관련 버튼(문제 듣기·녹음 안내 듣기·재생/정지) UI 시인성 부족
+7. 실제 iPhone Safari 녹음/재생 수동 테스트 미완
+8. ETRI 발음평가 실제 연동 테스트 미완
+9. LLM 평가 실제 success 전환 및 품질 검증 미완
+10. RLS 전면 적용 미완 (Auth 기반 제출 전환 후)
+11. recordings signed URL 전환 미완
+
+### 현재 상태 평가
+
+**배포 1차 성공, 핵심 저장 흐름 확인 완료. 운영 전 UI·역할·문항·다국어 품질 보완 필요.**
+
+---
+
 ## Phase 10-A — Vercel 배포 준비 및 운영 환경 점검
 
 **날짜**: 2026-05-05  
