@@ -3,6 +3,7 @@ import type { UserRole } from "./app-shell";
 
 interface TopbarProps {
   role: UserRole;
+  userName?: string;
 }
 
 const roleConfig: Record<
@@ -14,7 +15,7 @@ const roleConfig: Record<
   admin: { label: "관리자", variant: "default" },
 };
 
-export function Topbar({ role }: TopbarProps) {
+export function Topbar({ role, userName }: TopbarProps) {
   const { label, variant } = roleConfig[role];
 
   return (
@@ -32,9 +33,22 @@ export function Topbar({ role }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {userName && (
+          <span className="hidden sm:inline text-xs text-text-secondary truncate max-w-[12rem]">
+            {userName}
+          </span>
+        )}
         <Badge variant={variant} size="sm">
           {label}
         </Badge>
+        <form action="/api/auth/signout" method="POST">
+          <button
+            type="submit"
+            className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+          >
+            로그아웃
+          </button>
+        </form>
       </div>
     </header>
   );

@@ -4,6 +4,62 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 9-A — Supabase Auth 기반 로그인/역할 분기
+
+**날짜**: 2026-05-05  
+**목표**: Supabase Auth 기반 이메일/비밀번호 로그인과 역할(student/teacher/admin) 분기를 구현한다. 기존 STT·녹음·평가·TTS·smoke test 흐름을 유지한다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/lib/supabase/server.ts` | **신규** — @supabase/ssr `createServerClient` 래퍼. `await cookies()` (Next.js 16 async) 사용. Supabase 미설정 시 null 반환 |
+| `src/lib/supabase/auth.ts` | **신규** — `getCurrentUser`, `getCurrentProfile`, `requireRole` 재사용 헬퍼. `user_profiles` 테이블 조회 |
+| `middleware.ts` | **신규** — `/student`, `/teacher`, `/admin` route 보호. Supabase 미설정 시 auth 체크 skip (smoke test 환경 호환). `/teacher`, `/admin`은 role=teacher\|admin만 허용 |
+| `app/login/page.tsx` | **신규** — 이메일/비밀번호 로그인 UI. `useActionState` (React 19) 사용. 오류 메시지 표시 |
+| `app/login/actions.ts` | **신규** — `loginAction` server action. `signInWithPassword` → role 조회 → role별 redirect |
+| `app/api/auth/signout/route.ts` | **신규** — POST /api/auth/signout. `signOut` 후 /login redirect |
+| `app/role-missing/page.tsx` | **신규** — user_profiles 미설정 안내 화면. 로그아웃 버튼 포함 |
+| `app/student/layout.tsx` | async Server Component로 변경. 로그인 사용자 display_name 조회 → AppShell에 전달 |
+| `app/teacher/layout.tsx` | async Server Component로 변경. display_name 조회. 제출 내역 nav 활성화 |
+| `app/admin/layout.tsx` | async Server Component로 변경. display_name 조회 |
+| `app/teacher/db-submissions-section.tsx` | **신규** — speaking_submissions + ai_evaluations + teacher_reviews 실시간 쿼리 테이블. DB 미설정/실패 시 렌더링 skip |
+| `app/teacher/page.tsx` | `DbSubmissionsSection` 추가 (최상단) |
+| `src/components/layout/app-shell.tsx` | `userName?: string` prop 추가 |
+| `src/components/layout/topbar.tsx` | `userName` 표시 + 로그아웃 form 버튼 추가 |
+| `docs/spec/SUPABASE_SCHEMA.sql` | Phase 9-A Migration 블록 추가 (`user_profiles` 테이블 DDL + RLS 정책) |
+| `tests/smoke/auth-routes.spec.ts` | **신규** — /login, /role-missing, /student, /teacher 접근 smoke test |
+| `playwright.config.ts` | auth-routes.spec.ts → chromium 프로젝트에 추가 |
+
+### Auth/Role 설계
+
+- **인증**: Supabase Auth 이메일/비밀번호
+- **역할 저장**: `user_profiles` 테이블 (auth.users FK)
+- **역할 분기**:
+  - `student` → `/student`
+  - `teacher` | `admin` → `/teacher`
+  - no profile → `/role-missing`
+- **route 보호 정책**:
+  - `/student/*` — 인증된 모든 역할 허용 (teacher도 확인 목적 접근 가능)
+  - `/teacher/*` — teacher, admin만 허용
+  - `/admin/*` — teacher, admin만 허용 (admin 전용 분리는 Phase 9-B)
+- **mock/smoke 환경**: SUPABASE_URL/ANON_KEY 없으면 middleware가 auth 체크 skip → 기존 smoke test 그대로 통과
+
+### 계정 생성 방침
+
+- 회원가입 UI 없음 — 관리자가 Supabase Dashboard에서 계정 생성 후 `user_profiles`에 role 부여
+- 학습자 계정 생성 → role='student' INSERT → /login으로 전달
+
+### Known Issues
+
+- Supabase Auth 계정 생성 필요 (수동)
+- `user_profiles` role 수동 준비 필요
+- RLS 고도화는 Phase 9-B에서 진행
+- 실제 학습자/교사 계정 로그인 수동 테스트 필요
+- admin 전용 route 분리는 Phase 9-B에서 진행
+
+---
+
 ## Phase 8-G — LLM 실제 채점 연동 (OpenAI)
 
 **날짜**: 2026-05-05  

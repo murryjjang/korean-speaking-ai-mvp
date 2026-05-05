@@ -22,14 +22,16 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: '**/mobile-speaking.spec.ts',
+      testMatch: ['**/mobile-speaking.spec.ts', '**/auth-routes.spec.ts'],
     },
   ],
 
   webServer: {
-    command: 'next dev --port 3099',
+    // SMOKE_TEST_MODE=1 tells proxy.ts to skip Supabase Auth enforcement so
+    // smoke tests can access /student and /teacher without real credentials.
+    command: 'SMOKE_TEST_MODE=1 next dev --port 3099',
     url: 'http://localhost:3099',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 60_000,
   },
 })

@@ -24,7 +24,7 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 | **D+0** — Phase 6-A 완료 | 2026-05-04 | 저장소 추상화 구조, 스키마 초안 | ✅ 완료 |
 | **D+3** — 최소기능 시연판 | 2026-05-07 | Supabase 연결 + 핵심 경로 저장 확인 | ✅ 완료 (Phase 6-B1~B2) |
 | **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 | ✅ 완료 (Phase 6-B2~B5) |
-| **D+10** — API/녹음 연동 2차 보완판 | 2026-05-14 | 실제 녹음 + STT 연동 (옵션) | 진행 예정 |
+| **D+10** — 로그인/역할 분기 | 2026-05-14 | Supabase Auth 기반 로그인 + 역할별 route 보호 | ✅ 완료 (Phase 9-A) |
 | **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | 진행 예정 |
 
 ---
@@ -106,21 +106,26 @@ After:  Server Action → mock store (항상, result 페이지 read 의존)
 
 ---
 
-## D+10 — API/녹음 연동 2차 보완판 (2026-05-14)
+## D+10 — 로그인/역할 분기 (2026-05-14) ✅ 완료 (Phase 9-A)
 
-**목표**: 실제 음성 녹음 + 외부 API 연동. (선택적 — 환경에 따라 조정)
+**목표**: Supabase Auth 기반 로그인과 역할 분기 구현.
 
-**완료 조건 (핵심):**
-- `MediaRecorder` 기반 실제 오디오 녹음 UI
-- 녹음 파일 Supabase Storage 업로드
-- STT Provider 교체 가능 구조 확인 (ETRI 또는 Whisper)
+**완료 조건 및 결과:**
+- [x] `/login` 이메일/비밀번호 로그인 화면 (Phase 9-A)
+- [x] `user_profiles` 테이블 DDL + RLS 정책 (수동 적용 필요)
+- [x] middleware route 보호 (`/student`, `/teacher`, `/admin`)
+- [x] 역할별 redirect: student→/student, teacher/admin→/teacher
+- [x] `/role-missing` 안내 화면
+- [x] 로그아웃 버튼 (Topbar)
+- [x] Supabase 미설정 시 auth bypass (smoke test 호환)
+- [x] 교사 대시보드 DB 실시간 제출 테이블 추가
 
-**완료 조건 (선택):**
-- ETRI STT API 연동 (ETRI 계정/키 필요)
-- 실제 발음 평가 Provider 연동
-- Claude API LLM 평가 Provider 연동
-
-**비고**: 외부 API 키가 없는 경우 mock provider 유지하고 D+15 출시 진행 가능.
+**Known Issues (Phase 9-B 해소 예정):**
+- Supabase Auth 계정 수동 생성 필요
+- `user_profiles` role 수동 준비 필요
+- RLS 정책 고도화 (현재 최소 정책만 DDL에 명시)
+- admin 전용 route 분리 미완료
+- 실제 학습자/교사 계정 로그인 E2E 테스트는 계정 준비 후 수동 확인 필요
 
 ---
 

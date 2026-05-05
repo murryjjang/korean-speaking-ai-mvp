@@ -10,6 +10,7 @@ import type { RiskLevel } from "@/src/types/data";
 import { TeacherDashboard } from "./dashboard-client";
 import type { TeacherSubmissionRow } from "./submissions-table";
 import type { ClassSummary } from "./class-summary-cards";
+import { DbSubmissionsSection } from "./db-submissions-section";
 
 function calcRisk(score: number | undefined): RiskLevel {
   if (score === undefined) return "medium";
@@ -114,6 +115,7 @@ export default function TeacherDashboardPage() {
         title="채점 관리"
         description="학생 제출 현황을 확인하고 AI 평가를 검토하세요."
       />
+      <DbSubmissionsSection />
       <TeacherDashboard
         allRows={allRows}
         classSummaries={classSummaries}

@@ -293,3 +293,48 @@ create index if not exists idx_content_versions_type_id on content_versions(cont
 -- create index if not exists idx_provider_events_provider_name on provider_events(provider_name);
 -- create index if not exists idx_provider_events_status        on provider_events(status);
 -- create index if not exists idx_provider_events_question_id   on provider_events(question_id);
+
+-- ── Phase 9-A Migration — user_profiles (Supabase Auth role mapping) ─
+-- Run this block in Supabase Dashboard > SQL Editor.
+-- Prerequisite: Supabase Auth must be enabled on the project.
+-- Safe to re-run (create if not exists guards).
+--
+-- create table if not exists user_profiles (
+--   id           uuid        primary key default gen_random_uuid(),
+--   user_id      uuid        not null references auth.users(id) on delete cascade,
+--   role         text        not null
+--                              check (role in ('student', 'teacher', 'admin')),
+--   display_name text,
+--   student_id   uuid,       -- nullable FK → students(id); set when role='student'
+--   created_at   timestamptz not null default now(),
+--   updated_at   timestamptz not null default now()
+-- );
+--
+-- create unique index if not exists idx_user_profiles_user_id on user_profiles(user_id);
+-- create index if not exists idx_user_profiles_role       on user_profiles(role);
+-- create index if not exists idx_user_profiles_student_id on user_profiles(student_id);
+--
+-- Row Level Security (enable after table is created):
+-- alter table user_profiles enable row level security;
+--
+-- Policy: each user can read only their own profile (anon key safe).
+-- create policy "own profile read"
+--   on user_profiles for select
+--   using (auth.uid() = user_id);
+--
+-- Policy: each user can update their own profile (display_name only; role must be set by admin).
+-- create policy "own profile update"
+--   on user_profiles for update
+--   using (auth.uid() = user_id)
+--   with check (auth.uid() = user_id);
+--
+-- Note: role assignment must be done by a privileged operation (service role or
+-- Supabase Dashboard). Users cannot self-assign roles via the anon key.
+--
+-- Manual steps after applying:
+--   1. Create auth users via Supabase Dashboard > Authentication > Users.
+--   2. Insert user_profiles rows with correct role for each user.
+--      Example:
+--        INSERT INTO user_profiles (user_id, role, display_name)
+--        VALUES ('<auth-user-uuid>', 'teacher', '김선생');
+--   3. Test login via /login with the created credentials.

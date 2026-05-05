@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { AppShell, type NavItem } from "@/src/components/layout/app-shell";
+import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 
 const navItems: NavItem[] = [
   { label: "내 학습 현황", href: "/student" },
@@ -8,9 +9,30 @@ const navItems: NavItem[] = [
   { label: "말하기 대회", href: "/student/contest", disabled: true },
 ];
 
-export default function StudentLayout({ children }: { children: ReactNode }) {
+export default async function StudentLayout({ children }: { children: ReactNode }) {
+  let userName: string | undefined;
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (supabase) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("display_name")
+          .eq("user_id", user.id)
+          .single();
+        userName = (profile?.display_name as string | null) ?? user.email ?? undefined;
+      }
+    }
+  } catch {
+    // Silently ignore — no user info shown
+  }
+
   return (
-    <AppShell role="student" navItems={navItems}>
+    <AppShell role="student" navItems={navItems} userName={userName}>
       {children}
     </AppShell>
   );
