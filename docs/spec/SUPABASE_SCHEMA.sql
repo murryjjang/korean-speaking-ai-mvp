@@ -264,6 +264,20 @@ create index if not exists idx_content_versions_type_id on content_versions(cont
 -- alter table provider_events      enable row level security;
 -- alter table content_versions     enable row level security;
 
+-- ── Phase 8-G Notes — ai_evaluations schema change ─────────────────
+-- Phase 8-G stores SpeakingEvalDetail (rich LLM output) in the `scores` JSONB
+-- column instead of the previous LLMEvalScore[] array. The shape changes from:
+--   scores: [{ rubricItemId, score, rationale }, ...]
+-- to:
+--   scores: { overall_score, task_completion_score, fluency_score, grammar_score,
+--             vocabulary_score, pronunciation_reference_score?, strengths[],
+--             improvements[], corrected_answer, teacher_note,
+--             learner_feedback_ko, learner_feedback_simple, raw_provider? }
+--
+-- No DDL migration is required — `scores` is already JSONB and accepts any shape.
+-- No DB manual apply needed for Phase 8-G.
+-- provider_events.provider_type='llm-eval' is used (matches existing check constraint).
+
 -- ── Phase 8-E Migration — provider_events new columns ───────────────
 -- Run this block in Supabase Dashboard > SQL Editor if provider_events
 -- already exists (Phase 6-B or later). Safe to re-run (IF NOT EXISTS guard

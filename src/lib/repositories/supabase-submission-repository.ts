@@ -340,6 +340,12 @@ export class SupabaseEvaluationRepository implements EvaluationRepository {
     )
 
     // 4. Insert ai_evaluation (submission_id is the DB UUID, not the mock string)
+    // Phase 8-G: when speakingEvalDetail is present, store it in `scores` JSONB for
+    // richer querying; total_score and feedback map to the corresponding top-level fields.
+    const evalScores = record.speakingEvalDetail ?? record.llmEvalResult.scores
+    const evalTotalScore = record.speakingEvalDetail?.overall_score ?? record.llmEvalResult.totalScore
+    const evalFeedback = record.speakingEvalDetail?.learner_feedback_ko ?? record.llmEvalResult.feedback
+
     const { data: evalRow, error: evalError } = await db(this.supabase)
       .from('ai_evaluations')
       .insert({
@@ -347,11 +353,11 @@ export class SupabaseEvaluationRepository implements EvaluationRepository {
         submission_type: 'speaking',
         transcript: record.sttResult.transcript,
         rubric_id: 'rubric-speaking-01',
-        scores: record.llmEvalResult.scores,
-        total_score: record.llmEvalResult.totalScore,
-        normalized_score: record.llmEvalResult.normalizedScore,
+        scores: evalScores,
+        total_score: evalTotalScore,
+        normalized_score: evalTotalScore,
         error_tags: record.llmEvalResult.errorTags,
-        feedback: record.llmEvalResult.feedback,
+        feedback: evalFeedback,
         stt_result: record.sttResult,
         pronunciation_result: record.pronunciationResult,
         provider_name: record.llmEvalResult.providerName,

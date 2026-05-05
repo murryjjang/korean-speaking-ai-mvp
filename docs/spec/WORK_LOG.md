@@ -4,6 +4,107 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 8-G — LLM 실제 채점 연동 (OpenAI)
+
+**날짜**: 2026-05-05  
+**목표**: 말하기 제출 후 transcript를 바탕으로 OpenAI LLM 채점을 수행하고 결과를 ai_evaluations에 저장한다. LLM 실패/키 없음/JSON 파싱 실패 시 mock fallback으로 제출 흐름을 계속 유지한다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/types/providers.ts` | `SpeakingEvalInput`, `SpeakingEvalDetail` 타입 추가 |
+| `src/providers/llm-eval/index.ts` | **재작성** — `evaluateSpeakingDetail()` 함수 추가. OpenAI (`gpt-4o-mini` 기본) 또는 mock fallback. `detailToLLMEvalResult()` 변환 헬퍼. 기존 `getLLMEvalProvider()` 후방 호환 유지 |
+| `app/api/evaluate-speaking/route.ts` | **신규** — POST `/api/evaluate-speaking`. `{ questionId, transcript, pronunciationResult?, referenceText?, rubricId? }` 입력. `evaluateSpeakingDetail` 호출, provider_events 기록, `SpeakingEvalDetail` 반환. 실패해도 fallback JSON 반환 |
+| `app/student/speaking/actions.ts` | `evaluateSpeakingDetail` 직접 호출로 교체. question 프롬프트 lookup 추가. provider_events 기록 추가. `speakingEvalDetail` 포함하여 record 저장 |
+| `src/lib/mock/speaking-store.ts` | `SpeakingEvalRecord`에 `speakingEvalDetail?: SpeakingEvalDetail` 추가 |
+| `src/lib/repositories/types.ts` | `SpeakingEvalRecord`에 `speakingEvalDetail?: SpeakingEvalDetail` 추가 |
+| `src/lib/repositories/supabase-submission-repository.ts` | `saveSpeakingEvalRecord`에서 `speakingEvalDetail` 있으면 `scores` JSONB에 저장, `total_score`/`feedback` 매핑 |
+| `app/student/speaking/[questionId]/result/page.tsx` | `speakingEvalDetail` 있을 때 강점/보완점/피드백/모범표현 표시 |
+| `.env.local.example` | `OPENAI_EVAL_MODEL` 변수 추가 |
+| `docs/spec/SUPABASE_SCHEMA.sql` | Phase 8-G 스키마 변경 노트 추가 (DDL 변경 없음) |
+
+### LLM 평가 연동 방식
+
+- `LLM_EVAL_PROVIDER=openai` + `OPENAI_API_KEY` 모두 설정 → OpenAI `gpt-4o-mini` (또는 `OPENAI_EVAL_MODEL`) 호출
+- 둘 중 하나라도 없으면 mock fallback (600ms 지연 시뮬레이션)
+- OpenAI 호출 실패 또는 JSON 파싱 실패 시 catch → mock fallback 반환 (throw 없음)
+
+### 평가 JSON 스키마 (`SpeakingEvalDetail`)
+
+```typescript
+{
+  overall_score: number            // 0-100
+  task_completion_score: number    // 0-100
+  fluency_score: number            // 0-100
+  grammar_score: number            // 0-100
+  vocabulary_score: number         // 0-100
+  pronunciation_reference_score?: number  // 발음평가 참고 (optional)
+  strengths: string[]              // 1-3개 강점 (한국어)
+  improvements: string[]           // 1-3개 보완점 (한국어)
+  corrected_answer: string         // 모범/교정 답안 (한국어)
+  teacher_note: string             // 교수자용 내부 메모 (한국어)
+  learner_feedback_ko: string      // 학습자용 피드백 2-3문장 (한국어)
+  learner_feedback_simple: string  // 기초 한국어 짧은 피드백
+  raw_provider?: unknown           // 모델명, 토큰 사용량 등 메타데이터
+}
+```
+
+### ai_evaluations 저장 방식
+
+- `scores` JSONB: `SpeakingEvalDetail` 전체 객체 (기존 `LLMEvalScore[]` 배열에서 변경, DDL 변경 없음)
+- `total_score` / `normalized_score`: `overall_score`
+- `feedback`: `learner_feedback_ko`
+- `stt_result`, `pronunciation_result`: 기존과 동일
+- `speakingEvalDetail` 없으면 기존 `llmEvalResult.scores` / `feedback` 사용 (후방 호환)
+
+### provider_events 기록 항목
+
+| 상황 | provider_type | provider_name | status |
+|---|---|---|---|
+| OpenAI 성공 | `llm-eval` | `openai` | `success` |
+| 키 없음 / mock 설정 | `llm-eval` | `mock` | `fallback` |
+| OpenAI 실패 | `llm-eval` | `openai` | `error` |
+| OpenAI 실패 후 fallback | `llm-eval` | `mock` | `fallback` |
+
+- `latency_ms`, `question_id`, `model`, `error_code`, `error_message`, `metadata` 기록
+- 기록 실패 시 `console.warn`만 — 사용자 흐름 차단 없음
+
+### fallback 처리
+
+아래 상황에서도 제출 흐름 정상 유지:
+- `OPENAI_API_KEY` 없음 → mock fallback
+- `LLM_EVAL_PROVIDER` 미설정 (기본 `mock`) → mock fallback
+- OpenAI API 호출 실패 → catch → mock fallback
+- JSON 파싱 실패 → catch → mock fallback
+- transcript 없음 → `overall_score: 15` 이하 mock 반환
+- `pronunciationResult` 없음 → `pronunciationScore` 없이 평가 (정상 처리)
+
+### DB 수동 적용 필요 여부
+
+**없음.** `ai_evaluations.scores`는 이미 JSONB이므로 어떤 JSON 형태도 저장 가능.  
+`provider_events.provider_type` check constraint에 `'llm-eval'`이 이미 포함됨.  
+기존 ai_evaluations 행의 `scores` 컬럼은 파싱이 필요할 때만 영향받음 (현재 read path 미구현이므로 안전).
+
+### known issues
+
+- 결과 페이지가 mock store(in-memory)에서 읽으므로, 서버 재시작 시 결과 조회 불가 (Phase 9+ DB 읽기로 해소 예정)
+- `provider_events.provider_type` DB check constraint 값이 `'llm-eval'`이나 과제 명세의 `'llm_evaluation'`과 다름 — 기존 DB 제약을 유지 (`llm-eval` 사용)
+- `corrected_answer`는 mock 시 transcript를 그대로 반환 (교정 없음)
+- OpenAI eval 결과는 결과 페이지에서 표시하나, teacher review 화면은 별도 작업 필요 (known issue)
+
+### lint 결과
+- `npm run lint` → 에러 0, 경고 0
+
+### tsc 결과
+- `npx tsc --noEmit` → 에러 0
+
+### build 결과
+- `npm run build` → 빌드 성공
+- `/api/evaluate-speaking` 라우트가 `ƒ (Dynamic)` 서버 렌더 라우트로 등록됨
+
+---
+
 ## Phase 8-F — ETRI 발음평가 API 연동 구조
 
 **날짜**: 2026-05-05  

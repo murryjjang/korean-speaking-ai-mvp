@@ -1,10 +1,12 @@
 'use server'
 
 import { getSTTProvider } from '@/src/providers/stt'
-import { getLLMEvalProvider } from '@/src/providers/llm-eval'
 import { getPronunciationProvider } from '@/src/providers/pronunciation'
+import { evaluateSpeakingDetail, detailToLLMEvalResult } from '@/src/providers/llm-eval'
 import { saveSpeakingEval } from '@/src/lib/mock/speaking-store'
 import { getEvaluationRepository } from '@/src/lib/repositories'
+import { logProviderEvent } from '@/src/lib/supabase/provider-events'
+import questionsJson from '@/src/content/questions.json'
 import type { ProviderName, STTResult, PronunciationResult } from '@/src/types/providers'
 
 export type ClientPronunciationResult = {
@@ -33,10 +35,7 @@ export async function submitSpeaking(
   questionSetId: string,
   meta?: SpeakingSubmitMeta,
 ): Promise<{ submissionId: string }> {
-  const llmProvider = getLLMEvalProvider()
-
-  // Use client-provided transcript when available (from /api/stt).
-  // Fall back to mock STT when no recording was sent or STT failed.
+  // ── 1. Resolve transcript ────────────────────────────────────────────────
   let sttResult: STTResult
   if (meta?.sttTranscript !== undefined) {
     sttResult = {
@@ -54,8 +53,7 @@ export async function submitSpeaking(
 
   const { transcript } = sttResult
 
-  // Build PronunciationResult from client-provided data when available (real audio via /api/pronunciation).
-  // Fall back to server-side provider (mock unless PRONUNCIATION_PROVIDER=etri) otherwise.
+  // ── 2. Resolve pronunciation result ──────────────────────────────────────
   const buildClientPronunciation = (): PronunciationResult | null => {
     const p = meta?.pronunciationResult
     if (!p) return null
@@ -74,10 +72,76 @@ export async function submitSpeaking(
     ? Promise.resolve(clientPronunciation)
     : getPronunciationProvider().evaluate(new Blob([], { type: 'audio/webm' }), transcript)
 
-  const [pronunciationResult, llmEvalResult] = await Promise.all([
+  // ── 3. LLM evaluation ────────────────────────────────────────────────────
+  const question = questionsJson.find((q) => q.id === questionId)
+  const pronunciationForEval = clientPronunciation ?? null
+
+  const llmEvalPromise = evaluateSpeakingDetail({
+    transcript,
+    rubricId: 'rubric-speaking-01',
+    questionPrompt: question?.prompt,
+    pronunciationScore: pronunciationForEval?.normalizedScore,
+    pronunciationFeedback: pronunciationForEval?.feedback,
+  })
+
+  const [pronunciationResult, llmEvalRaw] = await Promise.all([
     pronunciationPromise,
-    llmProvider.evaluate(transcript, 'rubric-speaking-01'),
+    llmEvalPromise,
   ])
+
+  // ── 4. Log provider events for LLM eval ─────────────────────────────────
+  const configuredProvider = process.env.LLM_EVAL_PROVIDER ?? 'mock'
+  try {
+    if (llmEvalRaw.status === 'success') {
+      await logProviderEvent({
+        provider: llmEvalRaw.providerName,
+        feature: 'llm-eval',
+        status: 'success',
+        latencyMs: llmEvalRaw.latencyMs,
+        questionId,
+        model: process.env.OPENAI_EVAL_MODEL ?? 'gpt-4o-mini',
+      })
+    } else if (llmEvalRaw.errorMessage) {
+      await logProviderEvent({
+        provider: configuredProvider,
+        feature: 'llm-eval',
+        status: 'error',
+        questionId,
+        errorCode: 'provider_error',
+        errorMessage: llmEvalRaw.errorMessage,
+      })
+      await logProviderEvent({
+        provider: 'mock',
+        feature: 'llm-eval',
+        status: 'fallback',
+        latencyMs: llmEvalRaw.latencyMs,
+        questionId,
+        metadata: { reason: 'provider_error', configuredProvider },
+      })
+    } else {
+      const reason =
+        configuredProvider === 'openai' && !process.env.OPENAI_API_KEY
+          ? 'no_api_key'
+          : 'mock_configured'
+      await logProviderEvent({
+        provider: 'mock',
+        feature: 'llm-eval',
+        status: 'fallback',
+        latencyMs: llmEvalRaw.latencyMs,
+        questionId,
+        metadata: { reason, configuredProvider },
+      })
+    }
+  } catch (logErr) {
+    console.warn('[provider_events] llm-eval log failed:', logErr)
+  }
+
+  // ── 5. Build evaluation records ──────────────────────────────────────────
+  const llmEvalResult = detailToLLMEvalResult(
+    llmEvalRaw.detail,
+    llmEvalRaw.providerName,
+    llmEvalRaw.latencyMs,
+  )
 
   const submissionId = `mock-${questionId}-${Date.now()}`
 
@@ -89,6 +153,7 @@ export async function submitSpeaking(
     sttResult,
     llmEvalResult,
     pronunciationResult,
+    speakingEvalDetail: llmEvalRaw.detail,
     audioUrl: meta?.audioUrl ?? null,
     meta: {
       hasRecording: meta?.hasRecording ?? false,
@@ -97,11 +162,10 @@ export async function submitSpeaking(
     },
   }
 
-  // Always save to mock store — result page reads from here regardless of provider.
+  // Always save to mock store — result page reads from here.
   saveSpeakingEval(record)
 
   // Supabase persistence: only when REPOSITORY_PROVIDER=supabase.
-  // Failure does NOT block the result page (mock store is the fallback).
   if (process.env.REPOSITORY_PROVIDER === 'supabase') {
     try {
       const evalRepo = getEvaluationRepository()

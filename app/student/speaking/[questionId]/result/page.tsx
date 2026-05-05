@@ -81,7 +81,7 @@ export default async function SpeakingResultPage({
     )
   }
 
-  const { sttResult, llmEvalResult, pronunciationResult } = evalRecord
+  const { sttResult, llmEvalResult, pronunciationResult, speakingEvalDetail } = evalRecord
 
   const set = questionSetsJson.find((qs) => qs.id === evalRecord.questionSetId)
   const submittedAt = new Date(evalRecord.submittedAt).toLocaleString('ko-KR')
@@ -103,9 +103,13 @@ export default async function SpeakingResultPage({
     }
   })
 
-  // 강점: 점수 비율 상위 2항목
+  // LLM 직접 제공 strengths/improvements 우선, 없으면 점수 기반 파생
+  const llmStrengths: string[] = speakingEvalDetail?.strengths ?? []
+  const llmImprovements: string[] = speakingEvalDetail?.improvements ?? []
+
+  // 강점: 점수 비율 상위 2항목 (speakingEvalDetail 없을 때 fallback)
   const sorted = [...rubricScores].sort((a, b) => b.score / b.maxScore - a.score / a.maxScore)
-  const strengths = sorted.slice(0, 2).filter((s) => s.score / s.maxScore >= 0.6)
+  const scoreStrengths = sorted.slice(0, 2).filter((s) => s.score / s.maxScore >= 0.6)
   const weaknesses = sorted.slice(-2).filter((s) => s.score / s.maxScore < 0.75).reverse()
 
   return (
@@ -156,8 +160,13 @@ export default async function SpeakingResultPage({
             </ul>
 
             <p className="mt-4 text-xs text-text-secondary bg-surface border border-border rounded-md p-3 leading-relaxed">
-              {llmEvalResult.feedback}
+              {speakingEvalDetail?.learner_feedback_ko ?? llmEvalResult.feedback}
             </p>
+            {speakingEvalDetail?.learner_feedback_simple && (
+              <p className="mt-2 text-xs text-primary-700 bg-primary-50 border border-primary-100 rounded-md p-3 leading-relaxed">
+                {speakingEvalDetail.learner_feedback_simple}
+              </p>
+            )}
           </CardBody>
         </Card>
 
@@ -165,25 +174,53 @@ export default async function SpeakingResultPage({
         <Card>
           <CardHeader title="AI 피드백" description="루브릭 항목 기반 분석" />
           <CardBody>
-            {strengths.length > 0 && (
+            {/* LLM 직접 제공 strengths (Phase 8-G+) */}
+            {llmStrengths.length > 0 ? (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-success-700 uppercase tracking-wide mb-2">
+                  강점
+                </p>
+                <ul className="space-y-1.5">
+                  {llmStrengths.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0 w-1.5 h-1.5 rounded-full bg-success-500" />
+                      <p className="text-xs text-text-secondary leading-relaxed">{s}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : scoreStrengths.length > 0 ? (
               <div className="mb-4">
                 <p className="text-xs font-semibold text-success-700 uppercase tracking-wide mb-2">
                   강점
                 </p>
                 <ul className="space-y-2">
-                  {strengths.map((s) => (
+                  {scoreStrengths.map((s) => (
                     <li key={s.id} className="flex items-start gap-2">
                       <Badge variant="success">{s.label}</Badge>
-                      <p className="text-xs text-text-secondary leading-relaxed">
-                        {s.rationale}
-                      </p>
+                      <p className="text-xs text-text-secondary leading-relaxed">{s.rationale}</p>
                     </li>
                   ))}
                 </ul>
               </div>
-            )}
+            ) : null}
 
-            {weaknesses.length > 0 && (
+            {/* LLM 직접 제공 improvements (Phase 8-G+) */}
+            {llmImprovements.length > 0 ? (
+              <div>
+                <p className="text-xs font-semibold text-warning-700 uppercase tracking-wide mb-2">
+                  보완점
+                </p>
+                <ul className="space-y-1.5">
+                  {llmImprovements.map((imp, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0 w-1.5 h-1.5 rounded-full bg-warning-400" />
+                      <p className="text-xs text-text-secondary leading-relaxed">{imp}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : weaknesses.length > 0 ? (
               <div>
                 <p className="text-xs font-semibold text-warning-700 uppercase tracking-wide mb-2">
                   보완점
@@ -192,16 +229,26 @@ export default async function SpeakingResultPage({
                   {weaknesses.map((w) => (
                     <li key={w.id} className="flex items-start gap-2">
                       <Badge variant="warning">{w.label}</Badge>
-                      <p className="text-xs text-text-secondary leading-relaxed">
-                        {w.rationale}
-                      </p>
+                      <p className="text-xs text-text-secondary leading-relaxed">{w.rationale}</p>
                     </li>
                   ))}
                 </ul>
               </div>
+            ) : null}
+
+            {/* 모범 답안 (Phase 8-G+, corrected_answer가 있을 때만) */}
+            {speakingEvalDetail?.corrected_answer && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+                  모범 표현
+                </p>
+                <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3 leading-relaxed">
+                  {speakingEvalDetail.corrected_answer}
+                </p>
+              </div>
             )}
 
-            {llmEvalResult.errorTags.length > 0 && (
+            {llmEvalResult.errorTags.length > 0 && !speakingEvalDetail && (
               <div className="mt-4 pt-4 border-t border-border">
                 <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
                   오류 유형

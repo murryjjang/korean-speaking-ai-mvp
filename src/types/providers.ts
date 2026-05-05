@@ -71,3 +71,29 @@ export interface PronunciationProvider {
 export interface LLMEvalProvider {
   evaluate(transcript: string, rubricId: string): Promise<LLMEvalResult>
 }
+
+// ── Phase 8-G: rich speaking evaluation ─────────────────────────────────────
+
+export type SpeakingEvalInput = {
+  transcript: string
+  rubricId: string
+  questionPrompt?: string
+  pronunciationScore?: number
+  pronunciationFeedback?: string
+}
+
+export type SpeakingEvalDetail = {
+  overall_score: number
+  task_completion_score: number
+  fluency_score: number
+  grammar_score: number
+  vocabulary_score: number
+  pronunciation_reference_score?: number
+  strengths: string[]
+  improvements: string[]
+  corrected_answer: string
+  teacher_note: string
+  learner_feedback_ko: string
+  learner_feedback_simple: string
+  raw_provider?: unknown
+}

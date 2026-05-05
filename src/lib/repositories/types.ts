@@ -18,7 +18,7 @@ import type {
 } from '@/src/types/data'
 import type { TeacherEvalDraft } from '@/src/types/grading'
 import type { MissionSession, MissionSubmission } from '@/src/types/mission'
-import type { STTResult, LLMEvalResult, PronunciationResult } from '@/src/types/providers'
+import type { STTResult, LLMEvalResult, PronunciationResult, SpeakingEvalDetail } from '@/src/types/providers'
 
 // ── Input / Filter types ────────────────────────────────────────────
 
@@ -72,6 +72,8 @@ export type SpeakingEvalRecord = {
   pronunciationResult: PronunciationResult
   /** Supabase Storage public URL or null when upload was skipped/failed (Phase 8-C+). */
   audioUrl?: string | null
+  /** Rich LLM evaluation detail (Phase 8-G+). Undefined when only mock LLM is used. */
+  speakingEvalDetail?: SpeakingEvalDetail
 }
 
 // ── Repository interfaces ───────────────────────────────────────────

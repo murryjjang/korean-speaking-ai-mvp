@@ -191,6 +191,8 @@ After:  Server Action → mock store (항상, result 페이지 read 의존)
 | **모바일 관리자 화면** — 통계 테이블이 좁은 화면에서 가로 오버플로 가능 | 낮 | 관리자는 노트북 사용 권장 |
 | **provider_events DB 수동 적용 필요** — Phase 8-E 신규 컬럼(status, model 등)은 ALTER TABLE 수동 실행 필요 | 낮 | SUPABASE_SCHEMA.sql 하단 Phase 8-E Migration 섹션 참조. 미적용 시 STT 이벤트 INSERT 실패(기록 누락) — 제출 흐름은 영향 없음 |
 | **ETRI 발음평가 실제 미검증** — Phase 8-F에서 ETRI API 연동 구조 추가됨. `ETRI_API_KEY` 없으면 mock fallback | 낮 | `.env.local.example` 참조. 실제 키 없이도 mock provider로 파일럿 진행 가능. 기존 제출 흐름 무영향 |
+| **LLM 채점 실제 연동 안내** — Phase 8-G에서 OpenAI `gpt-4o-mini` LLM 채점 구조 추가. `LLM_EVAL_PROVIDER=openai` + `OPENAI_API_KEY` 없으면 mock fallback 자동 사용 | 낮 | `.env.local.example`의 `LLM_EVAL_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_EVAL_MODEL` 참조. 파일럿은 mock 채점으로도 진행 가능. 실제 LLM 채점 시 OpenAI 과금 발생 |
+| **LLM 채점 결과 teacher review 화면 미반영** — Phase 8-G LLM 평가 결과(`speakingEvalDetail`)가 결과 페이지에는 표시되나 교수자 채점 화면에는 미반영 | 낮 | 교수자는 학생 결과 페이지 URL을 직접 확인. Phase 9+에서 teacher review 화면 연동 예정 |
 | **ETRI 오디오 포맷** — 브라우저 WebM 녹음을 그대로 ETRI에 전송. ETRI는 PCM/WAV 권장 | 낮 | `PRONUNCIATION_PROVIDER=mock` 유지 시 영향 없음. 실제 ETRI 연동 시 ffmpeg 변환 검토 필요 |
 | **iOS Safari 녹음 포맷 차이** — mp4/aac 포맷, STT 제공자에 따라 변환 처리 필요 | 중 | Phase 8-D에서 iOS 경고 배너 추가. Phase 8-A에서 서버 측 포맷 변환 처리 예정 |
 | **iOS Safari < 15** — MediaRecorder 미지원, 녹음 불가 | 중 | Phase 8-D: 미지원 브라우저 안내 메시지 + 녹음 없이 fallback 제출 가능 |
