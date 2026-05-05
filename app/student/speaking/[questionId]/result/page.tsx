@@ -80,6 +80,15 @@ const NEXT_ACTIVITY_PLACEHOLDERS = [
   },
 ]
 
+const QUESTION_ID_ALIASES: Record<string, string> = {
+  'beginner-q2-material-desc': 'beginner-q2-material-description',
+  'beginner-q3-listening-resp': 'beginner-q3-listening-response',
+  'intermediate-q2-material-desc': 'intermediate-q2-material-description',
+  'intermediate-q3-listening-resp': 'intermediate-q3-listening-response',
+  'advanced-q2-material-desc': 'advanced-q2-material-description',
+  'advanced-q3-listening-resp': 'advanced-q3-listening-response',
+}
+
 export default async function SpeakingResultPage({
   params,
   searchParams,
@@ -87,7 +96,8 @@ export default async function SpeakingResultPage({
   params: Promise<{ questionId: string }>
   searchParams: Promise<{ sub?: string }>
 }) {
-  const { questionId } = await params
+  const { questionId: rawId } = await params
+  const questionId = QUESTION_ID_ALIASES[rawId] ?? rawId
   const { sub: submissionId } = await searchParams
 
   const question = questionsJson.find((q) => q.id === questionId)
@@ -421,11 +431,20 @@ export default async function SpeakingResultPage({
               </div>
             ) : null}
 
-            {/* 모범 답안 (Phase 8-G+, corrected_answer가 있을 때만) */}
+            {/* dialogue_mission 임시 평가 안내 */}
+            {question?.typeId === 'qt-dialogue-mission' && (
+              <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
+                <p className="text-xs text-purple-700 leading-relaxed">
+                  대화형 평가 UI는 다음 단계에서 활성화됩니다. 현재 결과는 단발 녹음 기반 임시 평가입니다.
+                </p>
+              </div>
+            )}
+
+            {/* 모범 답안 — reading은 "낭독 포인트", 그 외는 "모범 표현" */}
             {speakingEvalDetail?.corrected_answer && (
               <div className="mt-4 pt-4 border-t border-border">
                 <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
-                  모범 표현
+                  {question?.typeId === 'qt-reading' ? '낭독 포인트' : '모범 표현'}
                 </p>
                 <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3 leading-relaxed">
                   {speakingEvalDetail.corrected_answer}

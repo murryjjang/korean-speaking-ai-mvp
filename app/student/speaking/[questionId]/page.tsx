@@ -6,6 +6,21 @@ import questionTypesJson from '@/src/content/question-types.json'
 import { PageHeader } from '@/src/components/ui'
 import { SpeakingClient } from './speaking-client'
 
+// Canonical ID aliases — old short IDs redirect to canonical long IDs.
+// Used for backwards compat when old short IDs appear in URLs.
+const QUESTION_ID_ALIASES: Record<string, string> = {
+  'beginner-q2-material-desc': 'beginner-q2-material-description',
+  'beginner-q3-listening-resp': 'beginner-q3-listening-response',
+  'intermediate-q2-material-desc': 'intermediate-q2-material-description',
+  'intermediate-q3-listening-resp': 'intermediate-q3-listening-response',
+  'advanced-q2-material-desc': 'advanced-q2-material-description',
+  'advanced-q3-listening-resp': 'advanced-q3-listening-response',
+}
+
+function resolveQuestionId(id: string): string {
+  return QUESTION_ID_ALIASES[id] ?? id
+}
+
 export default async function SpeakingQuestionPage({
   params,
   searchParams,
@@ -13,8 +28,10 @@ export default async function SpeakingQuestionPage({
   params: Promise<{ questionId: string }>
   searchParams: Promise<{ setId?: string }>
 }) {
-  const { questionId } = await params
+  const { questionId: rawQuestionId } = await params
   const { setId } = await searchParams
+
+  const questionId = resolveQuestionId(rawQuestionId)
 
   const question = questionsJson.find((q) => q.id === questionId && q.isActive)
   if (!question) notFound()
@@ -61,6 +78,13 @@ export default async function SpeakingQuestionPage({
           imageAlt: question.imageAlt,
           imageCaption: question.imageCaption,
           imageLicenseNote: question.imageLicenseNote,
+          assetType: question.assetType ?? undefined,
+          // dialogue_mission: pass learner-visible fields only (never aiInformation)
+          missionGoals: (question as { missionGoals?: string[] }).missionGoals,
+          evaluationMode: (question as { evaluationMode?: string }).evaluationMode,
+          maxDialogueDurationSec: (question as { maxDialogueDurationSec?: number }).maxDialogueDurationSec,
+          // listening_response: pass only learner-visible elements (never listeningScriptForTeacherOnly)
+          learnerVisibleElements: (question as { learnerVisibleElements?: string[] }).learnerVisibleElements,
         }}
         questionSetId={resolvedSet.id}
         setName={resolvedSet.name}

@@ -25,6 +25,13 @@ export type QuestionData = {
   imageAlt?: string
   imageCaption?: string
   imageLicenseNote?: string
+  assetType?: string
+  // dialogue_mission — learner-facing only (never expose aiInformation)
+  missionGoals?: string[]
+  evaluationMode?: string
+  maxDialogueDurationSec?: number
+  // listening_response — learner-facing elements only (never expose listeningScriptForTeacherOnly)
+  learnerVisibleElements?: string[]
 }
 
 const MIN_VALID_DURATION_SEC = 2
@@ -386,6 +393,55 @@ export function SpeakingClient({
               <p className="text-xs text-text-muted">그림 자료가 아직 등록되지 않았습니다.</p>
             </div>
           ) : null}
+
+          {/* Asset-type notices — shown during prep/recording phases */}
+          {question.assetType === 'audio' && question.typeId !== 'qt-dialogue-mission' && (
+            <div className="mt-4 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-xs text-blue-700 leading-relaxed">
+                🔈 듣기 음원은 파일럿 전 등록 예정입니다. 위 안내 사항을 참고하여 답하세요.
+              </p>
+            </div>
+          )}
+          {(question.assetType === 'chart' || question.assetType === 'graph') && !question.imageUrl && (
+            <div className="mt-4 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-xs text-blue-700 leading-relaxed">
+                📊 자료(그래프/표)는 파일럿 전 등록 예정입니다. 위 안내를 참고하여 답하세요.
+              </p>
+            </div>
+          )}
+          {question.typeId === 'qt-dialogue-mission' && (
+            <div className="mt-4 px-3 py-2.5 bg-purple-50 border border-purple-200 rounded-md">
+              <p className="text-xs font-semibold text-purple-800 mb-1">
+                이 문항은 AI와 대화하며 미션을 달성하는 문항입니다.
+              </p>
+              <p className="text-xs text-purple-700 leading-relaxed mb-2">
+                실시간 AI 대화 기능은 다음 단계에서 활성화됩니다.
+              </p>
+              {question.missionGoals && question.missionGoals.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-purple-800 mb-1">미션 목표:</p>
+                  <ul className="space-y-0.5">
+                    {question.missionGoals.map((goal, i) => (
+                      <li key={i} className="text-xs text-purple-700 flex items-center gap-1.5">
+                        <span className="shrink-0 w-4 h-4 rounded-full bg-purple-200 text-purple-700 flex items-center justify-center text-[10px] font-bold">{i + 1}</span>
+                        {goal}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          {question.typeId === 'qt-listening-resp' && question.learnerVisibleElements && question.learnerVisibleElements.length > 0 && (
+            <div className="mt-4 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-xs font-medium text-blue-800 mb-1">답변에 포함할 내용:</p>
+              <ul className="flex flex-wrap gap-1.5">
+                {question.learnerVisibleElements.map((el, i) => (
+                  <li key={i} className="text-xs bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-0.5">{el}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="mt-4 flex items-center gap-4 text-xs text-text-muted">
             <span>준비 시간: {question.prepTimeSec}초</span>

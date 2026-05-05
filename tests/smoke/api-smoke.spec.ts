@@ -318,11 +318,11 @@ test.describe('/api/tts smoke', () => {
 })
 
 test.describe('/api/evaluate-speaking 정식 문항 유형 smoke (Phase 10-E-2)', () => {
-  test('qt-reading (q-b1-1) 낭독 평가 → valid response', async ({ request }) => {
+  test('qt-reading (beginner-q1-reading) 낭독 평가 → valid response', async ({ request }) => {
     const res = await request.post('/api/evaluate-speaking', {
       data: {
-        questionId: 'q-b1-1',
-        transcript: '학교 식당은 평일 오전 11시 30분부터 오후 1시 30분까지 운영합니다. 학생증을 가지고 오시면 할인이 됩니다.',
+        questionId: 'beginner-q1-reading',
+        transcript: '안녕하세요. 저는 오늘 오후에 병원에 갑니다. 병원에 가기 전에 약국에 들를 예정입니다.',
         rubricId: 'rubric-reading-01',
       },
     })
@@ -333,11 +333,11 @@ test.describe('/api/evaluate-speaking 정식 문항 유형 smoke (Phase 10-E-2)'
     expect(Array.isArray(body.required_elements_found)).toBe(true)
   })
 
-  test('qt-material-desc (q-b1-2) 자료 설명 평가 → valid response', async ({ request }) => {
+  test('qt-material-desc (beginner-q2-material-description) 자료 설명 평가 → valid response', async ({ request }) => {
     const res = await request.post('/api/evaluate-speaking', {
       data: {
-        questionId: 'q-b1-2',
-        transcript: '이 사진은 식당입니다. 사람들이 앉아서 밥을 먹고 있습니다. 분위기가 밝고 따뜻합니다.',
+        questionId: 'beginner-q2-material-description',
+        transcript: '이 사진은 식당입니다. 손님들이 앉아서 물을 마시고 있습니다. 직원이 주문을 받으러 오고 있습니다.',
         rubricId: 'rubric-material-desc-01',
       },
     })
@@ -347,11 +347,11 @@ test.describe('/api/evaluate-speaking 정식 문항 유형 smoke (Phase 10-E-2)'
     expect(Array.isArray(body.required_elements_found)).toBe(true)
   })
 
-  test('qt-dialogue-mission (q-b1-4) 대화 미션 평가 → valid response', async ({ request }) => {
+  test('qt-dialogue-mission (beginner-q4-dialogue-mission) 대화 미션 평가 → valid response', async ({ request }) => {
     const res = await request.post('/api/evaluate-speaking', {
       data: {
-        questionId: 'q-b1-4',
-        transcript: '안녕하세요. 아메리카노 한 잔 주세요. 얼마예요? 감사합니다.',
+        questionId: 'beginner-q4-dialogue-mission',
+        transcript: '안녕하세요. 아이스 아메리카노 하나 주세요. 포장해 주세요.',
         rubricId: 'rubric-dialogue-mission-01',
       },
     })
@@ -362,16 +362,65 @@ test.describe('/api/evaluate-speaking 정식 문항 유형 smoke (Phase 10-E-2)'
     expect(body.required_elements_found.length).toBeGreaterThan(0)
   })
 
-  test('qt-listening-resp (q-i1-3) 듣고 답하기 평가 → valid response', async ({ request }) => {
+  test('qt-listening-resp (intermediate-q3-listening-response) 듣고 답하기 평가 → valid response', async ({ request }) => {
     const res = await request.post('/api/evaluate-speaking', {
       data: {
-        questionId: 'q-i1-3',
-        transcript: '수업 방식이 강의식에서 발표 중심으로 바뀝니다. 이번 변경의 이유는 학생들의 의사소통 능력을 높이기 위해서입니다.',
+        questionId: 'intermediate-q3-listening-response',
+        transcript: '발표 수업은 수요일에서 금요일 오후 1시로 변경되었습니다. 장소는 본관 203호입니다. 발표 자료를 목요일까지 이메일로 제출해야 합니다.',
         rubricId: 'rubric-listening-resp-01',
       },
     })
     expect(res.ok()).toBe(true)
     const body = await res.json()
     expect(typeof body.overall_score).toBe('number')
+  })
+})
+
+test.describe('Phase 10-E-3: official question content validation', () => {
+  test('beginner set 4문항 prompt가 비어 있지 않음', async ({ request }) => {
+    for (const qId of ['beginner-q1-reading', 'beginner-q2-material-description', 'beginner-q3-listening-response', 'beginner-q4-dialogue-mission']) {
+      const res = await request.post('/api/evaluate-speaking', { data: { questionId: qId, transcript: '테스트입니다.' } })
+      expect(res.ok()).toBe(true)
+      const body = await res.json()
+      expect(typeof body.overall_score).toBe('number')
+    }
+  })
+
+  test('intermediate set 4문항 prompt가 비어 있지 않음', async ({ request }) => {
+    for (const qId of ['intermediate-q1-reading', 'intermediate-q2-material-description', 'intermediate-q3-listening-response', 'intermediate-q4-dialogue-mission']) {
+      const res = await request.post('/api/evaluate-speaking', { data: { questionId: qId, transcript: '테스트입니다.' } })
+      expect(res.ok()).toBe(true)
+      const body = await res.json()
+      expect(typeof body.overall_score).toBe('number')
+    }
+  })
+
+  test('advanced set 4문항 prompt가 비어 있지 않음', async ({ request }) => {
+    for (const qId of ['advanced-q1-reading', 'advanced-q2-material-description', 'advanced-q3-listening-response', 'advanced-q4-dialogue-mission']) {
+      const res = await request.post('/api/evaluate-speaking', { data: { questionId: qId, transcript: '테스트입니다.' } })
+      expect(res.ok()).toBe(true)
+      const body = await res.json()
+      expect(typeof body.overall_score).toBe('number')
+    }
+  })
+
+  test('공식 문항 12개 requiredElements 반응에 배열 포함', async ({ request }) => {
+    const res = await request.post('/api/evaluate-speaking', {
+      data: { questionId: 'beginner-q3-listening-response', transcript: '수업은 오전 10시에 시작합니다. 장소는 203호입니다. 교재와 필기구를 가져와야 합니다.' }
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(Array.isArray(body.required_elements_found)).toBe(true)
+    expect(body.required_elements_found.length).toBeGreaterThan(0)
+  })
+
+  test('requiredElementAliases가 detectRequiredElements에 적용됨', async ({ request }) => {
+    const res = await request.post('/api/evaluate-speaking', {
+      data: { questionId: 'beginner-q4-dialogue-mission', transcript: '아메리카노 한 잔 주세요. 아이스로 주세요. 포장해 주세요.' }
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(Array.isArray(body.required_elements_found)).toBe(true)
+    expect(body.required_elements_found.length).toBeGreaterThanOrEqual(2)
   })
 })

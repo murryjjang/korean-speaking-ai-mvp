@@ -99,6 +99,20 @@ export function detailToLLMEvalResult(
 
 // Model answers by question ID — used in mock fallback, never derived from transcript
 const MOCK_MODEL_ANSWERS: Record<string, string> = {
+  // Official questions (Phase 10-E-3)
+  'beginner-q1-reading': '이 문항은 정해진 지문을 자연스럽게 낭독하는 문항입니다. 지문을 빠뜨리지 않고 또박또박 읽는 것이 중요합니다.',
+  'beginner-q2-material-description': '이 사진은 식당 안 모습입니다. 손님 두 명이 있고, 한 사람은 물을 마시고 있습니다. 직원은 주문을 받으러 오고 있습니다. 벽에는 메뉴판과 시계가 보입니다.',
+  'beginner-q3-listening-response': '한국어 수업은 내일 오전 10시에 시작합니다. 장소는 2층 203호입니다. 학생들은 교재와 필기구를 가져와야 합니다.',
+  'beginner-q4-dialogue-mission': '안녕하세요. 아이스 아메리카노 하나 주세요. 포장해 주세요.',
+  'intermediate-q1-reading': '이 문항은 도서관 운영 시간 변경 안내문을 정확하고 자연스럽게 낭독하는 문항입니다.',
+  'intermediate-q2-material-description': '이 조사에서는 대면 수업을 선호하는 학생이 50%로 가장 많습니다. 온라인 수업은 30%, 혼합형 수업은 20%입니다. 학생들이 선생님과 직접 이야기할 수 있기 때문에 대면 수업을 더 선호하는 것 같습니다.',
+  'intermediate-q3-listening-response': '발표 수업은 수요일에서 금요일 오후 1시로 변경되었습니다. 장소는 본관 203호입니다. 학생들은 발표 자료를 목요일 오후 6시까지 이메일로 제출해야 합니다.',
+  'intermediate-q4-dialogue-mission': '안녕하세요. 말하기 수업 시간이 언제인지 알고 싶습니다. 그리고 제가 결석한 날의 자료를 받을 수 있을까요? 교수님과 상담할 수 있는 시간도 알려 주세요.',
+  'advanced-q1-reading': '이 문항은 외국어 교육과 의사소통 능력에 관한 설명문을 자연스럽고 논리적으로 낭독하는 문항입니다.',
+  'advanced-q2-material-description': '그래프를 보면 한국어 프로그램 등록 인원은 2024년 120명에서 2025년 180명, 2026년 260명으로 계속 증가했습니다. 특히 2025년에서 2026년 사이 증가 폭이 큽니다. 이는 프로그램 확대와 온라인 병행 운영의 영향으로 볼 수 있습니다. 앞으로도 한국어 학습 수요가 계속 늘어날 가능성이 있습니다.',
+  'advanced-q3-listening-response': '이 설명의 주제는 대면 수업과 온라인 수업을 함께 운영하는 혼합형 수업입니다. 장점은 시간과 장소의 제약이 줄어들고, 온라인 자료를 반복해서 복습할 수 있다는 점입니다. 단점은 자기 관리 능력이 부족하면 학습 효과가 떨어질 수 있다는 것입니다. 따라서 정기적인 피드백과 출석 관리가 필요합니다.',
+  'advanced-q4-dialogue-mission': '안녕하세요. 공동 행사 일정을 조정할 수 있는지 확인하고 싶습니다. 발표 주제는 AI 활용 언어교육 사례로 진행하는 것이 어떨까요? 진행 방식에 대해서도 의견을 듣고 싶습니다. 가능하다면 수요일 오후나 목요일 오전에 실무 협의를 위한 회의를 따로 잡으면 좋겠습니다.',
+  // Legacy questions
   'q-001': '안녕하세요. 저는 김민수입니다. 저는 베트남에서 왔습니다. 한국어를 배우는 이유는 한국 사람들과 더 잘 이야기하고 싶기 때문입니다.',
   'q-002': '안녕하세요. 저는 린입니다. 베트남에서 왔어요. 한국에 온 지 1년이 됐는데 한국 생활이 즐겁습니다. 특히 한국 음식이 맛있어서 자주 식당에 갑니다.',
   'q-003': '이 그림은 공원에서 사람들이 운동하는 모습입니다. 한 사람은 자전거를 타고 있고, 다른 사람들은 달리기하거나 스트레칭을 하고 있습니다. 날씨가 맑고 분위기가 밝습니다.',
@@ -128,6 +142,7 @@ const MOCK_MODEL_ANSWERS_BY_TYPE: Record<string, string> = {
 function detectRequiredElements(
   transcript: string,
   requiredElements: string[],
+  aliases?: Record<string, string[]>,
 ): { found: string[]; missing: string[] } {
   if (!requiredElements.length) return { found: [], missing: [] }
   const t = transcript.toLowerCase()
@@ -199,10 +214,11 @@ function detectRequiredElements(
   const missing: string[] = []
 
   for (const el of requiredElements) {
-    const keywords = elementKeywords[el] ?? []
+    // Prefer aliases when provided, fall back to elementKeywords table
+    const keywords = (aliases && aliases[el]) ? aliases[el] : (elementKeywords[el] ?? [])
     const matched = keywords.length === 0
       ? false
-      : keywords.some((kw) => t.includes(kw))
+      : keywords.some((kw) => t.includes(kw.toLowerCase()))
     if (matched) {
       found.push(el)
     } else {
@@ -270,7 +286,7 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
     }
   }
 
-  const { found, missing } = detectRequiredElements(transcript, requiredElements)
+  const { found, missing } = detectRequiredElements(transcript, requiredElements, input.requiredElementAliases)
   const offTask = isLikelyOffTask(transcript, requiredElements, found)
   const evidence = extractMockEvidence(transcript, found)
 
@@ -315,6 +331,52 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
   const taskScore = Math.round(Math.min(85, base + 5) * elementRatio)
   const overall = Math.round((taskScore + base) / 2)
 
+  const qType = input.questionType ?? ''
+  const isReading = qType === 'qt-reading'
+  const isMaterialDesc = qType === 'qt-material-desc'
+  const isListeningResp = qType === 'qt-listening-resp'
+  const isDialogueMission = qType === 'qt-dialogue-mission'
+
+  // Type-aware improvements — reading must NEVER suggest vocabulary variety or content expansion
+  const typeImprovements: string[] = isReading
+    ? [
+        '문장을 조금 더 또박또박 읽어 보세요.',
+        '쉼표와 문장 끝에서 자연스럽게 끊어 읽어 보세요.',
+        '너무 빠르거나 느리지 않게 일정한 속도로 읽어 보세요.',
+        '받침과 조사 발음을 정확하게 읽어 보세요.',
+        '문장의 의미가 드러나도록 억양을 살려 읽어 보세요.',
+        '지문을 빠뜨리지 않고 끝까지 읽어 보세요.',
+      ]
+    : isMaterialDesc
+    ? [
+        '자료의 핵심 정보를 더 구체적으로 설명해 보세요.',
+        '장소, 인물, 행동을 빠뜨리지 않고 말해 보세요.',
+        '수치나 변화가 보이면 정확히 말해 보세요.',
+        '처음에는 전체 상황을 말하고, 그다음 세부 내용을 설명해 보세요.',
+      ]
+    : isListeningResp
+    ? [
+        '들은 내용의 핵심 정보를 빠뜨리지 않도록 해 보세요.',
+        '시간, 장소, 해야 할 일을 정확히 말해 보세요.',
+        '들은 내용을 너무 길게 말하기보다 핵심만 정리해 보세요.',
+      ]
+    : isDialogueMission
+    ? [
+        '필요한 정보를 질문으로 확인해 보세요.',
+        '상대방의 대답을 듣고 다시 한 번 확인해 보세요.',
+        '미션 목표를 빠뜨리지 않도록 순서대로 말해 보세요.',
+        '부탁하거나 요청할 때 더 자연스러운 표현을 사용해 보세요.',
+      ]
+    : ['더 다양한 어휘를 사용해 보세요.', '문법적 정확도를 높이면 좋겠습니다.']
+
+  const improvements = missing.length > 0
+    ? [`"${missing[0]}"을(를) 포함하면 더 좋겠습니다.`, typeImprovements[0] ?? typeImprovements[0]]
+    : [typeImprovements[0] ?? '더 많이 말해 보세요.', typeImprovements[1] ?? '']
+
+  const readingCorrectedAnswer = isReading
+    ? (MOCK_MODEL_ANSWERS[input.questionId ?? ''] ?? '이 문항은 정해진 지문을 자연스럽게 낭독하는 문항입니다. 지문을 빠뜨리지 않고 또박또박 읽고, 문장 끝에서 자연스럽게 끊어 읽는 것이 중요합니다.')
+    : (MOCK_MODEL_ANSWERS[input.questionId ?? ''] ?? MOCK_MODEL_ANSWERS_BY_TYPE[qType] ?? '')
+
   return {
     overall_score: overall,
     task_completion_score: taskScore,
@@ -326,10 +388,8 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
     strengths: found.length > 0
       ? [`"${found[0]}"을(를) 잘 포함했습니다.`, '기본적인 문장 구조를 사용했습니다.']
       : ['기본적인 문장 구조를 사용했습니다.'],
-    improvements: missing.length > 0
-      ? [`"${missing[0]}"을(를) 포함하면 더 좋겠습니다.`, '다양한 어휘를 사용해 보세요.']
-      : ['더 다양한 어휘를 사용해 보세요.', '문법적 정확도를 높이면 좋겠습니다.'],
-    corrected_answer: MOCK_MODEL_ANSWERS[input.questionId ?? ''] ?? MOCK_MODEL_ANSWERS_BY_TYPE[input.questionType ?? ''] ?? '',
+    improvements: improvements.filter(Boolean),
+    corrected_answer: readingCorrectedAnswer,
     teacher_note: `필수 요소 ${found.length}/${requiredElements.length} 확인됨. 문법과 어휘 연습 권장.`,
     learner_feedback_ko:
       overall >= 60
@@ -389,6 +449,11 @@ CRITICAL rules:
 5. needs_teacher_review: true if overall_score < 30, task_completion_score < 20, or response is off-topic.
 6. If task_completion_score ≤ 10 (off-task response): strengths must be [] or at most 1 item. If the learner produced ≥5 words, you MAY include "문장 형태로 발화하려고 시도했습니다." NEVER include phrases that imply the task was addressed, such as "기본적인 문장 구조를 사용했습니다", "문법적으로 안정적입니다", "자연스럽게 말했습니다", "어휘를 잘 사용했습니다", or any phrase suggesting the content was relevant.
 7. If task_completion_score ≤ 10, improvements[0] MUST explicitly state the response was unrelated to the question (e.g., "주어진 그림과 관련 없는 내용입니다." for picture questions, or "주어진 질문과 관련 없는 내용입니다." for others). improvements[1] MUST provide specific guidance on what was required, referencing [필수 포함 요소] (e.g., for a picture description question: "그림 속 장소, 인물의 행동, 배경을 설명해 주세요.").
+8. READING (낭독) question rules — applies when questionType is "qt-reading" OR the prompt starts with "다음 글을 소리 내어 읽으세요":
+   - Focus improvements on: 발음 정확성, 억양·리듬, 끊어 읽기, 속도, 의미 전달력, 지문 누락 여부.
+   - NEVER suggest in improvements: 다양한 어휘를 사용해 보세요 / 더 많은 내용을 추가해 보세요 / 이유를 설명해 보세요 / 예시를 들어 보세요 / 자신의 생각을 더 말해 보세요 / 자료의 핵심 정보를 설명해 보세요.
+   - Improvements for reading MUST come only from: 또박또박 읽기, 끊어 읽기, 속도, 받침·조사 발음, 억양, 지문 누락 여부.
+   - corrected_answer for reading MUST describe ideal reading criteria, NOT copy the passage. Example: "이 문항은 정해진 지문을 자연스럽게 낭독하는 문항입니다. 지문을 빠뜨리지 않고 또박또박 읽고, 문장 끝에서 자연스럽게 끊어 읽는 것이 중요합니다."
 
 If transcript is empty or fewer than 5 words: set all scores to 20 or below and ask learner to try again.
 Strengths: 1-3 items in Korean. Improvements: 1-3 actionable suggestions in Korean.`

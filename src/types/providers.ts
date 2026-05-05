@@ -83,6 +83,7 @@ export type SpeakingEvalInput = {
   questionId?: string
   questionType?: string
   requiredElements?: string[]
+  requiredElementAliases?: Record<string, string[]>
   pronunciationScore?: number
   pronunciationFeedback?: string
 }

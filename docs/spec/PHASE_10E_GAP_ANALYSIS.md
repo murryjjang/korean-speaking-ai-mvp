@@ -3,7 +3,9 @@
 **Korean Speaking AI MVP — 평가 설계 정렬 분석**  
 **작성일**: 2026-05-05  
 **분석자**: Claude (Phase 10-E-0)  
-**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05)
+**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05) / 정식 문항 콘텐츠 입력 완료 (10-E-3 콘텐츠, 2026-05-05) / reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정, 2026-05-06)
+
+**4번 dialogue_mission 구현 방향**: 단발 녹음형으로 최종 운영하지 않음. 생성형 AI 쌍방 대화형 평가로 구현 예정. 실제 AI 대화 UI·대화 로그 저장·missionGoals 달성 평가는 **10-E-5**에서 구현. 현재는 임시 단발 녹음형으로 평가하며 `evaluationMode: "interactive_dialogue"` 필드로 명시.
 
 ---
 
@@ -233,7 +235,7 @@ attempt {
 | P1-2 | 문항별 배점 15/25/25/35 반영 | `rubrics.json`, `llm-eval/index.ts` | 10-E-2 | ✅ 처리 완료 |
 | P1-3 | 문항별 `requiredElements` 데이터 | `questions.json` | 10-E-2 | ✅ 10-E-1에서 처리 |
 | P1-4 | 초급/중급/고급 평가세트 구조 | `question-sets.json`, `/student/speaking/page.tsx` | 10-E-3 | ✅ 처리 완료 (10-E-2에서 선행) |
-| P1-5 | 듣고 답하기: 스크립트 비공개 + 음원 제공 구조 | `questions.json`, TTS/audio asset | 10-E-4 | 대기 |
+| P1-5 | 듣고 답하기: 스크립트 비공개 + 음원 제공 구조 | `questions.json`, TTS/audio asset | 10-E-4 | 콘텐츠 입력 완료 (10-E-3). `listeningScriptForTeacherOnly` 필드 분리 완료. 음원 파일 등록은 10-E-4 대기. |
 | P1-6 | 대화 미션: speaking 4문항 세트 연결 | `question-sets.json`, mission 라우트 연결 | 10-E-2 | ✅ 처리 완료 (qt-dialogue-mission 유형으로 연결) |
 | P1-7 | 실제 사진/그래프 asset 등록 | `public/images/`, `questions.json` | 10-E-4 | 대기 |
 | P1-8 | 교수자 최종확정 화면 강화 (required_elements/evidence) | `step-rubric-adjust.tsx`, `step-submission-view.tsx` | 10-E-5 | 대기 |

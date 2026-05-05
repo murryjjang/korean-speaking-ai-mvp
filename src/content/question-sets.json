@@ -1,16 +1,16 @@
 [
   {
-    "id": "qs-beginner-01",
+    "id": "beginner-set-1",
     "name": "초급 평가세트",
     "description": "초급 학습자를 위한 정식 말하기 평가 세트. 낭독 15점 + 자료 설명 25점 + 듣고 답하기 25점 + 대화 미션 35점 = 100점.",
     "purpose": "official",
     "level": "beginner",
     "totalMaxScore": 100,
     "questions": [
-      { "questionId": "q-b1-1", "order": 1 },
-      { "questionId": "q-b1-2", "order": 2 },
-      { "questionId": "q-b1-3", "order": 3 },
-      { "questionId": "q-b1-4", "order": 4 }
+      { "questionId": "beginner-q1-reading", "order": 1 },
+      { "questionId": "beginner-q2-material-description", "order": 2 },
+      { "questionId": "beginner-q3-listening-response", "order": 3 },
+      { "questionId": "beginner-q4-dialogue-mission", "order": 4 }
     ],
     "isActive": true,
     "isOfficial": true,
@@ -18,17 +18,17 @@
     "createdAt": "2026-05-05T00:00:00Z"
   },
   {
-    "id": "qs-intermediate-01",
+    "id": "intermediate-set-1",
     "name": "중급 평가세트",
     "description": "중급 학습자를 위한 정식 말하기 평가 세트. 낭독 15점 + 자료 설명 25점 + 듣고 답하기 25점 + 대화 미션 35점 = 100점.",
     "purpose": "official",
     "level": "intermediate",
     "totalMaxScore": 100,
     "questions": [
-      { "questionId": "q-i1-1", "order": 1 },
-      { "questionId": "q-i1-2", "order": 2 },
-      { "questionId": "q-i1-3", "order": 3 },
-      { "questionId": "q-i1-4", "order": 4 }
+      { "questionId": "intermediate-q1-reading", "order": 1 },
+      { "questionId": "intermediate-q2-material-description", "order": 2 },
+      { "questionId": "intermediate-q3-listening-response", "order": 3 },
+      { "questionId": "intermediate-q4-dialogue-mission", "order": 4 }
     ],
     "isActive": true,
     "isOfficial": true,
@@ -36,17 +36,17 @@
     "createdAt": "2026-05-05T00:00:00Z"
   },
   {
-    "id": "qs-advanced-01",
+    "id": "advanced-set-1",
     "name": "고급 평가세트",
     "description": "고급 학습자를 위한 정식 말하기 평가 세트. 낭독 15점 + 자료 설명 25점 + 듣고 답하기 25점 + 대화 미션 35점 = 100점.",
     "purpose": "official",
     "level": "advanced",
     "totalMaxScore": 100,
     "questions": [
-      { "questionId": "q-a1-1", "order": 1 },
-      { "questionId": "q-a1-2", "order": 2 },
-      { "questionId": "q-a1-3", "order": 3 },
-      { "questionId": "q-a1-4", "order": 4 }
+      { "questionId": "advanced-q1-reading", "order": 1 },
+      { "questionId": "advanced-q2-material-description", "order": 2 },
+      { "questionId": "advanced-q3-listening-response", "order": 3 },
+      { "questionId": "advanced-q4-dialogue-mission", "order": 4 }
     ],
     "isActive": true,
     "isOfficial": true,

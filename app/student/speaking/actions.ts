@@ -9,6 +9,19 @@ import { logProviderEvent } from '@/src/lib/supabase/provider-events'
 import questionsJson from '@/src/content/questions.json'
 import type { ProviderName, STTResult, PronunciationResult } from '@/src/types/providers'
 
+const QUESTION_ID_ALIASES: Record<string, string> = {
+  'beginner-q2-material-desc': 'beginner-q2-material-description',
+  'beginner-q3-listening-resp': 'beginner-q3-listening-response',
+  'intermediate-q2-material-desc': 'intermediate-q2-material-description',
+  'intermediate-q3-listening-resp': 'intermediate-q3-listening-response',
+  'advanced-q2-material-desc': 'advanced-q2-material-description',
+  'advanced-q3-listening-resp': 'advanced-q3-listening-response',
+}
+
+function resolveId(id: string): string {
+  return QUESTION_ID_ALIASES[id] ?? id
+}
+
 export type ClientPronunciationResult = {
   normalizedScore: number
   wordScores: Array<{ word: string; score: number }>
@@ -112,7 +125,7 @@ export async function submitSpeaking(
     : getPronunciationProvider().evaluate(new Blob([], { type: 'audio/webm' }), transcript)
 
   // ── 3. LLM evaluation ────────────────────────────────────────────────────
-  const question = questionsJson.find((q) => q.id === questionId)
+  const question = questionsJson.find((q) => q.id === resolveId(questionId))
   const pronunciationForEval = clientPronunciation ?? null
 
   const llmEvalPromise = evaluateSpeakingDetail({
@@ -122,6 +135,7 @@ export async function submitSpeaking(
     questionId,
     questionType: question?.typeId,
     requiredElements: question?.requiredElements ?? [],
+    requiredElementAliases: (question as { requiredElementAliases?: Record<string, string[]> })?.requiredElementAliases,
     pronunciationScore: pronunciationForEval?.normalizedScore,
     pronunciationFeedback: pronunciationForEval?.feedback,
   })

@@ -4,6 +4,134 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-3 추가 수정 — 낭독 피드백·404·대화 미션 재정의
+
+**날짜**: 2026-05-06  
+**목표**: 수동 확인에서 발견된 4가지 문제 수정. reading 피드백 유형 불일치, 공식 q2/q3 URL 404, dialogue_mission 생성형 AI 대화형 재정의.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/content/questions.json` | 공식 문항 ID 정규화: `*-material-desc` → `*-material-description`, `*-listening-resp` → `*-listening-response` (6개). q3 문항에 `listenLimit: 2` 추가. q4 문항에 `evaluationMode: "interactive_dialogue"`, `maxDialogueDurationSec`, `completionCondition`, `expectedStudentActions`, `successCriteria`, `dialogueTurns` 추가. q4 `teacherNotes`에 AI 쌍방 대화형 평가 명시 + TODO 10-E-5 기록. |
+| `src/content/question-sets.json` | 3개 공식 세트의 q2/q3 `questionId` 참조를 canonical 긴 ID로 업데이트. |
+| `src/providers/llm-eval/index.ts` | `MOCK_MODEL_ANSWERS` 키를 canonical ID로 업데이트. `getMockDetail`에 questionType별 improvements 분기 추가: reading은 발음·억양·끊어읽기·속도 계열 피드백만 허용, material_desc는 자료 설명 중심, listening_resp는 핵심 정보 계열, dialogue_mission은 미션 달성 계열. OpenAI SYSTEM_PROMPT에 낭독 문항 규칙(rule 8) 추가. |
+| `app/student/speaking/[questionId]/page.tsx` | `QUESTION_ID_ALIASES` 맵 추가로 구 ID → canonical ID 자동 정규화. `listeningScriptForTeacherOnly`·`aiInformation` 비노출 보장. `missionGoals`, `learnerVisibleElements`, `evaluationMode`, `maxDialogueDurationSec`를 student-facing prop으로 전달. |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `QuestionData` 타입에 `missionGoals`, `evaluationMode`, `maxDialogueDurationSec`, `learnerVisibleElements` 추가. `qt-dialogue-mission` 전용 UI: "AI와 대화하며 미션을 달성하는 문항" 안내 + 미션 목표 목록 표시. `qt-listening-resp` 전용 UI: 학습자 안내 요소 태그 표시. |
+| `app/student/speaking/[questionId]/result/page.tsx` | ID 정규화 추가. reading 문항 "모범 표현" → "낭독 포인트" 레이블. dialogue_mission 임시 평가 안내 배너 추가. |
+| `app/student/speaking/actions.ts` | `QUESTION_ID_ALIASES` + `resolveId()` 추가로 LLM eval 시 question 조회에 canonical ID 사용. |
+| `tests/smoke/api-smoke.spec.ts` | 구 ID → canonical ID 업데이트 (6개). |
+| `tests/smoke/auth-routes.spec.ts` | Phase 10-E-3 describe 블록 추가: 12개 공식 URL 접근성 테스트, dialogue_mission 미션 안내 표시, listening_response 학습자 요소 표시. |
+| `docs/spec/WORK_LOG.md` | 이 항목 추가 |
+| `docs/spec/PHASE_10E_GAP_ANALYSIS.md` | 10-E-3 추가 수정 처리 결과 반영 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | 공식 문항 12개 URL 접근성 확인 항목 추가 |
+
+### 핵심 변경 내용
+
+**reading 피드백 분리**:
+- `getMockDetail`에 `questionType`별 improvements 분기 추가
+- reading: 발음/억양/끊어읽기/속도/지문 누락 계열만 허용
+- "다양한 어휘", "문법 정확도", "내용 추가" 등 reading 부적합 피드백 방지
+- OpenAI SYSTEM_PROMPT에 reading 전용 rule 추가
+
+**공식 q2/q3 URL 404 수정**:
+- `beginner-q2-material-desc` → `beginner-q2-material-description` (캐노니컬)
+- `beginner-q3-listening-resp` → `beginner-q3-listening-response` (캐노니컬)
+- 동일하게 intermediate/advanced q2/q3 모두 정규화
+- page route에 alias 맵 추가로 구 ID 입력 시 자동 정규화
+
+**dialogue_mission 생성형 AI 대화형 재정의**:
+- `evaluationMode: "interactive_dialogue"` 필드 추가
+- AI 역할·첫 발화·미션 목표 유지, `aiInformation`은 student 화면 미노출
+- 학습자 화면에 "AI와 대화하며 미션 달성" 안내 + 미션 목표 목록 표시
+- result 페이지에 "대화형 평가 UI는 다음 단계(10-E-5)에서 활성화됩니다" 안내
+- 10-E-5 TODO: AI 대화 UI, dialogueTurns 저장, missionGoals 달성 평가
+
+**교수자 전용 정보 비노출 guard**:
+- `listeningScriptForTeacherOnly` → page.tsx에서 절대 전달 안 함
+- `aiInformation` → page.tsx에서 절대 전달 안 함
+- `learnerVisibleElements`만 학습자 화면에 표시
+
+### 남은 Known Issues (10-E-4 이후)
+
+- 10-E-4: 실제 사진/표/그래프 asset 등록
+- 10-E-4: 듣기 음원 mp3/aac 등록 및 listenLimit 실제 적용
+- 10-E-5: dialogue_mission AI 쌍방 대화 UI 구현
+- 10-E-5: 대화 로그 저장 및 missionGoals 달성 평가
+- 10-E-5: 교수자 최종확정 화면 official rubric 기반 강화
+- 10-E-6: attempt 단위 1~4번 전체 응시 흐름
+- 배포 후 실제 OpenAI LLM 평가 품질 검증
+- ETRI 발음평가 연동 후 기준 매핑
+- 모바일 Safari 공식 문항 수동 확인
+
+---
+
+## Phase 10-E-3 — 공식 평가 문항 PDF 기반 실제 콘텐츠 입력
+
+**날짜**: 2026-05-05  
+**목표**: 3세트 × 4문항 = 12개 정식 평가 문항에 PDF 기반 실제 콘텐츠 입력. 세트 및 문항 ID 체계 정비. 교수자 전용 필드 분리. `requiredElementAliases` 추가. 자산 타입별 학습자 안내 UI 추가.
+
+### ID 변경 사항
+
+| 이전 ID | 새 ID |
+|---|---|
+| `qs-beginner-01` | `beginner-set-1` |
+| `qs-intermediate-01` | `intermediate-set-1` |
+| `qs-advanced-01` | `advanced-set-1` |
+| `q-b1-1` ~ `q-b1-4` | `beginner-q1-reading` ~ `beginner-q4-dialogue-mission` |
+| `q-i1-1` ~ `q-i1-4` | `intermediate-q1-reading` ~ `intermediate-q4-dialogue-mission` |
+| `q-a1-1` ~ `q-a1-4` | `advanced-q1-reading` ~ `advanced-q4-dialogue-mission` |
+
+레거시 문항 q-001~q-008 및 세트 qs-diagnostic-01, qs-practice-01, qs-post-01 ID 유지.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/content/questions.json` | 정식 문항 12개 전면 재작성. PDF 기반 실제 prompt, guide, requiredElements 입력. `requiredElementAliases` 필드 신설. `qt-listening-resp` 문항에 `listeningScriptForTeacherOnly` + `learnerVisibleElements` 추가. `qt-dialogue-mission` 문항에 `aiRole`, `aiFirstUtterance`, `missionGoals`, `aiInformation` 추가. `qt-material-desc` 문항에 `assetDescription`, `assetPlaceholder` 추가. 세트 ID 및 문항 ID 모두 갱신. 레거시 q-001~q-008 변경 없음. |
+| `src/content/question-sets.json` | 3개 정식 세트 ID 갱신 + 각 세트의 questionId 참조 갱신. 레거시 세트 3개 변경 없음. |
+| `src/types/providers.ts` | `SpeakingEvalInput`에 `requiredElementAliases?: Record<string, string[]>` 추가 |
+| `src/providers/llm-eval/index.ts` | `MOCK_MODEL_ANSWERS`에 12개 정식 문항 모범 답안 추가. `detectRequiredElements` 함수 시그니처에 `aliases?: Record<string, string[]>` 파라미터 추가. aliases 우선, 없으면 elementKeywords 테이블 fallback. `getMockDetail`에서 `input.requiredElementAliases` 전달. |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `QuestionData` 타입에 `assetType?: string` 추가. 자산 유형별 안내 카드 렌더링: audio(🔈), chart/graph(📊), dialogue_profile(💬). |
+| `app/student/speaking/[questionId]/page.tsx` | `SpeakingClient`에 `assetType: question.assetType ?? undefined` 전달. |
+| `app/student/speaking/actions.ts` | `evaluateSpeakingDetail` 호출에 `requiredElementAliases` 전달. |
+| `app/api/evaluate-speaking/route.ts` | `evaluateSpeakingDetail` 호출에 `requiredElementAliases` 전달. |
+| `tests/smoke/api-smoke.spec.ts` | Phase 10-E-2 테스트의 문항 ID를 새 ID로 갱신. Phase 10-E-3 describe 블록 신설: 12개 문항 prompt 유효성, requiredElements 배열 반환, aliases 적용 확인 5개 테스트 추가. |
+| `tests/smoke/auth-routes.spec.ts` | 정식 세트 첫 문항 URL을 새 ID로 갱신 (`beginner-q1-reading?setId=beginner-set-1`). |
+| `docs/spec/WORK_LOG.md` | 이 항목 추가 |
+| `docs/spec/PHASE_10E_GAP_ANALYSIS.md` | P1-5 상태 메모 추가 (10-E-3 콘텐츠 입력 완료) |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | D+15 섹션에 정식 콘텐츠 입력 완료 기록 |
+
+### 핵심 변경 내용
+
+**PDF 기반 실제 콘텐츠 입력**:
+- 초급 세트: 낭독(병원 방문 지문), 사진 설명(식당 장면), 듣고 답하기(한국어 수업 안내), 카페 주문 대화
+- 중급 세트: 도서관 운영 시간 안내문 낭독, 수업 방식 선호도 차트 설명, 발표 수업 일정 변경 듣기, 행정실 문의 대화
+- 고급 세트: 외국어 교육 설명문 낭독, 한국어 프로그램 등록 인원 그래프, 혼합형 수업 분석 듣기, 공동 행사 협의 대화
+
+**교수자 전용 필드 분리** (클라이언트에 절대 노출 금지):
+- `listeningScriptForTeacherOnly`: 듣고 답하기 문항의 원본 청취 스크립트
+- `aiInformation`: 대화 미션 문항의 AI 역할 내부 정보
+- 학습자에게는 `learnerVisibleElements`(듣고 답하기) 또는 prompt/guide만 표시
+
+**requiredElementAliases**:
+- 각 필수 포함 요소에 대해 한국어 표현 변형을 aliases로 등록
+- mock detectRequiredElements가 aliases를 우선 활용 → 더 자연스러운 표현으로 작성해도 요소 감지 가능
+- e.g. "원하는 음료를 말함" → aliases: ["아메리카노", "라떼", "주스", "주세요"]
+
+**자산 타입별 학습자 안내**:
+- audio: "🔈 듣기 음원은 파일럿 전 등록 예정"
+- chart/graph: "📊 자료(그래프/표)는 파일럿 전 등록 예정"
+- dialogue_profile: "💬 AI 대화 기능은 다음 단계에서 활성화됩니다"
+
+### 잔여 작업 (10-E-4 이후)
+
+- 실제 음원 파일 등록 (beginner-korean-class-announcement-audio 등 3개)
+- 실제 사진/차트 이미지 등록 (식당 사진, 선호도 차트, 등록 인원 그래프 등)
+- listeningScriptForTeacherOnly 기반 TTS 자동 생성 또는 수동 녹음 연결
+
+---
+
 ## Phase 10-E-2 — 정식 문항 유형 체계 및 평가세트 구조 정비
 
 **날짜**: 2026-05-05  

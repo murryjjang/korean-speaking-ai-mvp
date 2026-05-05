@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     questionId,
     questionType: question?.typeId,
     requiredElements: question?.requiredElements ?? [],
+    requiredElementAliases: (question as { requiredElementAliases?: Record<string, string[]> })?.requiredElementAliases,
     pronunciationScore: pronunciationResult?.normalizedScore,
     pronunciationFeedback: pronunciationResult?.feedback,
   })

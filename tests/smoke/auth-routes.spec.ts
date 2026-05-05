@@ -167,7 +167,7 @@ test.describe('정식 평가세트 구조 smoke (Phase 10-E-2)', () => {
   })
 
   test('정식 세트 첫 문항(낭독) 페이지 접근 — 준비 시작 버튼 표시', async ({ page }) => {
-    await page.goto('/student/speaking/q-b1-1?setId=qs-beginner-01')
+    await page.goto('/student/speaking/beginner-q1-reading?setId=beginner-set-1')
 
     await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
   })
@@ -178,5 +178,42 @@ test.describe('정식 평가세트 구조 smoke (Phase 10-E-2)', () => {
 
     await page.goto('/student/speaking/q-003')
     await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+})
+
+test.describe('Phase 10-E-3: 공식 문항 12개 URL 접근성', () => {
+  const officialQuestions = [
+    { qId: 'beginner-q1-reading', setId: 'beginner-set-1' },
+    { qId: 'beginner-q2-material-description', setId: 'beginner-set-1' },
+    { qId: 'beginner-q3-listening-response', setId: 'beginner-set-1' },
+    { qId: 'beginner-q4-dialogue-mission', setId: 'beginner-set-1' },
+    { qId: 'intermediate-q1-reading', setId: 'intermediate-set-1' },
+    { qId: 'intermediate-q2-material-description', setId: 'intermediate-set-1' },
+    { qId: 'intermediate-q3-listening-response', setId: 'intermediate-set-1' },
+    { qId: 'intermediate-q4-dialogue-mission', setId: 'intermediate-set-1' },
+    { qId: 'advanced-q1-reading', setId: 'advanced-set-1' },
+    { qId: 'advanced-q2-material-description', setId: 'advanced-set-1' },
+    { qId: 'advanced-q3-listening-response', setId: 'advanced-set-1' },
+    { qId: 'advanced-q4-dialogue-mission', setId: 'advanced-set-1' },
+  ]
+
+  for (const { qId, setId } of officialQuestions) {
+    test(`${qId} — 404 없이 열림, 준비 시작 버튼 표시`, async ({ page }) => {
+      await page.goto(`/student/speaking/${qId}?setId=${setId}`)
+      await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    })
+  }
+
+  test('dialogue_mission 화면에 미션 목표 안내가 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    await expect(page.getByText('AI와 대화하며 미션을 달성하는 문항')).toBeVisible()
+    // 미션 목표 목록 중 하나 — exact match로 strict mode 위반 방지
+    await expect(page.getByText('차가운/따뜻한 음료 선택')).toBeVisible()
+  })
+
+  test('listening_response 화면에 학습자 안내 요소가 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    await expect(page.getByText('수업 시작 시간')).toBeVisible()
   })
 })
