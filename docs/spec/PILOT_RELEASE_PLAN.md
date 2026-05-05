@@ -735,6 +735,8 @@ sudo npx playwright install-deps chromium
 - [ ] `TTS_MODEL` (선택)
 - [ ] `TTS_VOICE` (선택)
 - [ ] `ETRI_API_KEY` (PRONUNCIATION_PROVIDER=etri 시)
+- [ ] `ETRI_API_BASE_URL` (PRONUNCIATION_PROVIDER=etri 시)
+- [ ] `CONVERSATION_PROVIDER=mock` (현재 mock만 지원, 미설정 시 자동 mock)
 - [ ] `SMOKE_TEST_MODE` **설정하지 말 것** ← 운영 auth bypass 방지
 
 #### 배포 후 확인
@@ -758,3 +760,148 @@ sudo npx playwright install-deps chromium
 - recordings bucket anon INSERT 정책은 파일럿 기간 한정. 운영 전환 시 재검토
 - RLS 전면 적용은 Phase 10 Auth 기반 제출 전환 후 진행
 - Vercel cold start 초기 응답 지연(1~3초) 파일럿 참가자에게 사전 안내 필요
+
+---
+
+## Phase 10-B — Vercel 실제 배포 절차 및 배포 후 점검 (2026-05-05)
+
+### 환경변수 이름 목록 (Vercel Dashboard 입력용)
+
+> 값은 직접 입력. 아래는 이름만 기재.
+
+| 변수명 | 필수 여부 | 비고 |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ 필수 | Supabase Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ 필수 | Supabase anon public key |
+| `REPOSITORY_PROVIDER` | ✅ 필수 | 값: `supabase` |
+| `STT_PROVIDER` | 선택 | 미설정 시 `mock`. 실제 음성인식: `openai` |
+| `TTS_PROVIDER` | 선택 | 미설정 시 `mock`. 실제 TTS: `openai` |
+| `PRONUNCIATION_PROVIDER` | 선택 | 미설정 시 `mock`. ETRI: `etri` |
+| `LLM_EVAL_PROVIDER` | 선택 | 미설정 시 `mock`. GPT 평가: `openai` |
+| `CONVERSATION_PROVIDER` | 선택 | 미설정 시 `mock` (현재 mock만 지원) |
+| `OPENAI_API_KEY` | 조건부 | STT/TTS/LLM 중 하나라도 `openai`이면 필수 |
+| `OPENAI_EVAL_MODEL` | 선택 | 미설정 시 `gpt-4o-mini` |
+| `TTS_MODEL` | 선택 | 미설정 시 `tts-1` |
+| `TTS_VOICE` | 선택 | 미설정 시 `nova` |
+| `ETRI_API_KEY` | 조건부 | `PRONUNCIATION_PROVIDER=etri` 시 필수 |
+| `ETRI_API_BASE_URL` | 조건부 | `PRONUNCIATION_PROVIDER=etri` 시 필수 |
+| `SMOKE_TEST_MODE` | ❌ 설정 금지 | Vercel에 절대 추가하지 말 것 — auth bypass |
+
+### Vercel Dashboard 배포 절차
+
+#### 1단계 — Vercel 프로젝트 생성
+
+1. [vercel.com](https://vercel.com) 로그인
+2. **Add New > Project**
+3. **Import Git Repository**: `korean-speaking-ai-mvp` 선택
+4. 자동 감지 확인:
+   - Framework: **Next.js**
+   - Build Command: `npm run build`
+   - Output Directory: `.next`
+   - Root Directory: `/`
+5. 아직 Deploy 누르지 말 것 → 환경변수 먼저 입력
+
+#### 2단계 — 환경변수 입력
+
+1. **Environment Variables** 섹션에서 위 표의 변수명 입력
+2. 모든 변수: **Environment** = `Production`, `Preview`, `Development` 전체 선택
+3. `SMOKE_TEST_MODE`는 추가하지 말 것
+4. 값 입력 후 **Save**
+
+#### 3단계 — 배포 실행
+
+1. **Deploy** 버튼 클릭
+2. 빌드 로그에서 오류 없이 완료 확인 (약 2~4분)
+3. 배포 완료 후 Vercel이 제공하는 URL 복사 (예: `https://korean-speaking-ai-mvp.vercel.app`)
+
+#### 4단계 — Supabase Auth Redirect URL 등록
+
+배포 URL 확인 즉시 Supabase Dashboard에서 설정:
+
+1. Supabase Dashboard > **Authentication** > **URL Configuration**
+2. **Site URL**: `https://<실제-배포-URL>`
+3. **Redirect URLs** 추가:
+   - `https://<실제-배포-URL>/**`
+   - (선택) `http://localhost:3000/**` (로컬 개발 병행 시)
+4. **Save**
+
+> 이 설정 없이는 로그인 후 쿠키 세션이 올바르게 설정되지 않아 `/student`, `/teacher` 접근이 `/login`으로 리디렉션될 수 있음.
+
+### 배포 후 테스트 체크리스트
+
+배포 URL: `https://<실제-배포-URL>` 로 교체하여 확인.
+
+#### 기본 접근
+
+| URL | 기대 결과 | 확인 |
+|---|---|---|
+| `/` | 홈 화면 정상 표시 | [ ] |
+| `/login` | 로그인 폼 표시 (이메일/비밀번호 입력 필드 + 로그인 버튼) | [ ] |
+| `/login` (미로그인 상태에서 `/student` 접근) | `/login?redirectTo=/student` 으로 리디렉션 | [ ] |
+| `/role-missing` | "역할 정보 없음" 헤딩 + 로그아웃 버튼 표시 | [ ] |
+
+#### 인증/역할 분기
+
+| 시나리오 | 기대 결과 | 확인 |
+|---|---|---|
+| student 계정 로그인 | `/student` 이동 | [ ] |
+| teacher 계정 로그인 | `/teacher` 이동 | [ ] |
+| student 계정으로 `/teacher` 직접 접근 | `/student` 으로 리디렉션 | [ ] |
+| Supabase에 user_profiles 없는 계정 로그인 | `/role-missing` 이동 | [ ] |
+| 로그아웃 후 `/student` 접근 | `/login` 으로 리디렉션 | [ ] |
+
+#### 학생 흐름
+
+| URL | 기대 결과 | 확인 |
+|---|---|---|
+| `/student` | student 홈, 사이드바 메뉴 표시 | [ ] |
+| `/student/speaking/q-001` | "자기소개" 제목 + "준비 시작" 버튼 표시 | [ ] |
+| 녹음 → 제출 → 결과 | Supabase `speaking_submissions` 행 생성 확인 | [ ] |
+
+#### 교사 흐름
+
+| URL | 기대 결과 | 확인 |
+|---|---|---|
+| `/teacher` | "채점 관리" 헤딩 + 제출 현황 표시 | [ ] |
+
+#### API fallback (mock 모드)
+
+| 엔드포인트 | 요청 | 기대 결과 | 확인 |
+|---|---|---|---|
+| `GET /api/health` | — | `200` + JSON | [ ] |
+| `POST /api/tts` | `{"text":"안녕하세요"}` | `200` (mock 오디오 URL 또는 fallback JSON) | [ ] |
+| `POST /api/pronunciation` | 빈 FormData + `referenceText` | `200` (mock normalizedScore) | [ ] |
+| `POST /api/evaluate-speaking` | `{"transcript":"안녕"}` | `200` (mock 평가 결과) | [ ] |
+
+#### DB 연결 확인
+
+- [ ] Supabase `speaking_submissions` 테이블에 제출 행 생성
+- [ ] Supabase `ai_evaluations` 테이블에 평가 행 생성
+- [ ] Supabase `provider_events` 최근 이벤트 확인
+
+### Supabase Auth Redirect 설정 요약
+
+배포 직후 **반드시** 수행:
+
+```
+Supabase Dashboard → Authentication → URL Configuration
+
+Site URL:
+  https://<실제-배포-URL>
+
+Redirect URLs:
+  https://<실제-배포-URL>/**
+  http://localhost:3000/**   ← 로컬 개발 병행 시 추가
+```
+
+이 설정을 누락하면 로그인 성공 후에도 세션 쿠키가 올바르게 전달되지 않아 모든 protected route가 `/login`으로 계속 리디렉션됨.
+
+### 배포 전 최종 점검 결과 (Phase 10-B 기준)
+
+| 항목 | 결과 |
+|---|---|
+| `npm run lint` | ✅ 통과 |
+| `npx tsc --noEmit` | ✅ 통과 |
+| `npm run build` | ✅ 성공 |
+| `npm run test:smoke` | ✅ 21 passed |
+| 코드 수정 여부 | 없음 (docs만 수정) |
