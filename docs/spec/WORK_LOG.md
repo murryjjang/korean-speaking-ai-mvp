@@ -4,6 +4,48 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 9-B — 계정/역할 운영 안정화 및 RLS/권한 구조 정리
+
+**날짜**: 2026-05-05  
+**목표**: Phase 9-A Auth/Role 구조를 파일럿 운영에 쓸 수 있게 안정화한다. RLS 정책을 안전하게 문서화하고 일부 적용 준비를 한다.
+
+### 생성/수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `docs/spec/SUPABASE_SCHEMA.sql` | Phase 9-A 블록 정리: 위험한 update policy 제거 + 계정 운영 절차 SQL 예시 추가 + Phase 9-C RLS 계획 블록 추가 |
+| `app/student/layout.tsx` | nav "말하기 대회" → "말하기 대회 준비" (미완성 메뉴 명칭 명확화) |
+| `app/teacher/db-submissions-section.tsx` | 제출 ID 컬럼(앞 8자리) 추가 — 교수자가 실제 DB 레코드 식별 가능 |
+| `tests/smoke/auth-routes.spec.ts` | 주석 개선(proxy.ts/Next.js 16 명시) + /teacher smoke test에 채점 관리 헤더 렌더링 확인 추가 |
+| `docs/spec/WORK_LOG.md` | Phase 9-B 기록 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | Phase 9-B Known Issue 업데이트 |
+
+### 주요 결정사항
+
+**proxy.ts 확인**: Next.js 16에서 middleware.ts는 deprecated → proxy.ts가 올바른 파일명. Phase 9-A 구현이 정확히 Next.js 16 규약을 따름.
+
+**user_profiles UPDATE 정책 제거 근거**:
+- Postgres RLS는 row-level이며 column-level 제어 없음
+- `with check (auth.uid() = user_id)` 단독 UPDATE 정책은 role/student_id 변경도 허용함 → 권한 상승 취약점
+- display_name만 업데이트하는 안전한 방법: SECURITY DEFINER 함수 또는 Edge Function (Phase 9-C)
+- 현재는 관리자가 Supabase Dashboard에서 직접 변경
+
+**RLS 전면 적용 보류 이유**:
+- 현재 speaking_submissions INSERT는 anon key 기반 server action 사용
+- RLS 활성화 시 INSERT 정책도 동시에 추가 필요 — 현재 기능 흐름 깨질 위험
+- Phase 9-C에서 INSERT + SELECT 정책을 함께 검토 후 적용 예정
+
+### Known Issues (Phase 9-C 해소 예정)
+
+- user_profiles display_name 수정 기능 미구현 (관리자 Dashboard 직접 변경)
+- speaking_submissions / ai_evaluations / teacher_reviews RLS 미적용 (Phase 9-C)
+- recordings bucket public URL 정책 재검토 필요 (Phase 9-C)
+- provider_events RLS 미적용 (Phase 9-C)
+- admin 전용 route 분리 미완료 (현재 teacher와 동일 권한)
+- 실제 student/teacher/admin 계정 로그인 E2E 테스트는 계정 생성 후 수동 확인 필요
+
+---
+
 ## Phase 9-A — Supabase Auth 기반 로그인/역할 분기
 
 **날짜**: 2026-05-05  

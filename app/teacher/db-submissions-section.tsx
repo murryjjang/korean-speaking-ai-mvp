@@ -87,6 +87,7 @@ export async function DbSubmissionsSection() {
         <table className="min-w-full text-xs">
           <thead className="bg-surface-raised border-b border-border">
             <tr>
+              <th className="text-left px-3 py-2 text-text-secondary font-medium">ID</th>
               <th className="text-left px-3 py-2 text-text-secondary font-medium">문항</th>
               <th className="text-left px-3 py-2 text-text-secondary font-medium">오디오</th>
               <th className="text-left px-3 py-2 text-text-secondary font-medium">전사</th>
@@ -100,6 +101,9 @@ export async function DbSubmissionsSection() {
           <tbody className="divide-y divide-border">
             {rows.map((row) => (
               <tr key={row.id} className="hover:bg-surface-raised transition-colors">
+                <td className="px-3 py-2 font-mono text-text-muted text-[10px]" title={row.id}>
+                  {row.id.slice(0, 8)}…
+                </td>
                 <td className="px-3 py-2 font-mono text-text-primary">{row.questionId}</td>
                 <td className="px-3 py-2">{row.audioUrlExists ? "✓" : "—"}</td>
                 <td className="px-3 py-2 text-text-secondary max-w-[160px] truncate">

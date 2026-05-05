@@ -120,12 +120,22 @@ After:  Server Action → mock store (항상, result 페이지 read 의존)
 - [x] Supabase 미설정 시 auth bypass (smoke test 호환)
 - [x] 교사 대시보드 DB 실시간 제출 테이블 추가
 
-**Known Issues (Phase 9-B 해소 예정):**
-- Supabase Auth 계정 수동 생성 필요
-- `user_profiles` role 수동 준비 필요
-- RLS 정책 고도화 (현재 최소 정책만 DDL에 명시)
-- admin 전용 route 분리 미완료
-- 실제 학습자/교사 계정 로그인 E2E 테스트는 계정 준비 후 수동 확인 필요
+**Phase 9-B 완료 내용:**
+- [x] user_profiles UPDATE 정책 위험성 확인 및 제거 (role 자기 변경 취약점 차단)
+- [x] 계정/역할 운영 절차 SQL 예시 문서화 (student/teacher/admin 계정 생성 방법)
+- [x] Phase 9-C RLS 계획 블록 작성 (speaking_submissions, ai_evaluations, teacher_reviews 등)
+- [x] 교사 대시보드 DB 실시간 테이블에 제출 ID 컬럼 추가
+- [x] student nav "말하기 대회 준비" 명칭 명확화
+- [x] proxy.ts = Next.js 16 middleware 파일 규약 확인 (정상 동작)
+
+**Known Issues (Phase 9-C / 파일럿 배포 전 해소 필요):**
+- Supabase Auth 실제 계정 생성 필요 (Supabase Dashboard에서 수동)
+- `user_profiles` role 수동 등록 필요 (SUPABASE_SCHEMA.sql 계정 절차 참조)
+- 실제 student/teacher/admin 계정 로그인 E2E 테스트는 계정 준비 후 수동 확인 필요
+- RLS 전면 적용은 Phase 9-C에서 최종 확인 필요 (현재 최소 정책만 적용)
+- recordings public URL 정책은 운영 전 재검토 필요 (Phase 9-C)
+- provider_events RLS 미적용 (Phase 9-C)
+- admin 전용 route 분리 미완료 (현재 teacher와 동일 접근 권한)
 
 ---
 

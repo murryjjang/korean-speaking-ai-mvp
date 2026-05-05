@@ -6,7 +6,7 @@ const navItems: NavItem[] = [
   { label: "내 학습 현황", href: "/student" },
   { label: "말하기 평가", href: "/student/speaking" },
   { label: "미션 대화", href: "/student/mission" },
-  { label: "말하기 대회", href: "/student/contest", disabled: true },
+  { label: "말하기 대회 준비", href: "/student/contest", disabled: true },
 ];
 
 export default async function StudentLayout({ children }: { children: ReactNode }) {

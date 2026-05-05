@@ -295,6 +295,8 @@ create index if not exists idx_content_versions_type_id on content_versions(cont
 -- create index if not exists idx_provider_events_question_id   on provider_events(question_id);
 
 -- ── Phase 9-A Migration — user_profiles (Supabase Auth role mapping) ─
+-- STATUS: 수동 적용 완료 (2026-05-05)
+--
 -- Run this block in Supabase Dashboard > SQL Editor.
 -- Prerequisite: Supabase Auth must be enabled on the project.
 -- Safe to re-run (create if not exists guards).
@@ -314,27 +316,145 @@ create index if not exists idx_content_versions_type_id on content_versions(cont
 -- create index if not exists idx_user_profiles_role       on user_profiles(role);
 -- create index if not exists idx_user_profiles_student_id on user_profiles(student_id);
 --
--- Row Level Security (enable after table is created):
+-- ── RLS 활성화 ───────────────────────────────────────────────────────────────
 -- alter table user_profiles enable row level security;
 --
--- Policy: each user can read only their own profile (anon key safe).
+-- ── 안전 정책: 본인 프로필 읽기만 허용 (anon key 안전) ─────────────────────
+-- STATUS: 수동 적용 완료 (2026-05-05)
+--
 -- create policy "own profile read"
 --   on user_profiles for select
 --   using (auth.uid() = user_id);
 --
--- Policy: each user can update their own profile (display_name only; role must be set by admin).
--- create policy "own profile update"
---   on user_profiles for update
---   using (auth.uid() = user_id)
---   with check (auth.uid() = user_id);
+-- ── IMPORTANT: UPDATE 정책은 의도적으로 제외함 ──────────────────────────────
+-- 이유: Postgres/Supabase RLS는 row-level이며 column-level이 아님.
+--   UPDATE 정책에 with check (auth.uid() = user_id)만 지정하면
+--   사용자가 role, student_id 등 민감 컬럼도 변경할 수 있어 보안 취약점이 됨.
 --
--- Note: role assignment must be done by a privileged operation (service role or
--- Supabase Dashboard). Users cannot self-assign roles via the anon key.
+-- 안전한 display_name UPDATE 구현 방법 (Phase 9-C 적용 예정):
+--   option A) Postgres 함수(SECURITY DEFINER) + 화이트리스트 파라미터로만 update
+--   option B) Supabase Edge Function에서 admin key로 제한된 컬럼만 업데이트
+--   현재는 display_name 수정 기능 없이 운영 (관리자가 Dashboard에서 직접 변경).
 --
--- Manual steps after applying:
---   1. Create auth users via Supabase Dashboard > Authentication > Users.
---   2. Insert user_profiles rows with correct role for each user.
---      Example:
---        INSERT INTO user_profiles (user_id, role, display_name)
---        VALUES ('<auth-user-uuid>', 'teacher', '김선생');
---   3. Test login via /login with the created credentials.
+-- ── 계정/역할 운영 절차 ──────────────────────────────────────────────────────
+--
+-- 1. Supabase Dashboard > Authentication > Users > "Add user" 클릭
+--    이메일/비밀번호 입력 → 생성 → 생성된 auth user UUID를 복사
+--
+-- 2. user_profiles에 역할 부여 (SQL Editor 또는 Table Editor에서 실행)
+--
+--    [학습자 계정 예시]
+--    INSERT INTO user_profiles (user_id, role, display_name, student_id)
+--    VALUES (
+--      '<auth-user-uuid>',     -- Supabase Dashboard에서 복사한 UUID
+--      'student',
+--      '홍길동',                -- 표시 이름 (선택)
+--      '<students-table-uuid>' -- students 테이블의 id (선택, 연결 시)
+--    );
+--
+--    [교수자 계정 예시]
+--    INSERT INTO user_profiles (user_id, role, display_name)
+--    VALUES (
+--      '<auth-user-uuid>',
+--      'teacher',
+--      '김선생'
+--    );
+--
+--    [관리자 계정 예시]
+--    INSERT INTO user_profiles (user_id, role, display_name)
+--    VALUES (
+--      '<auth-user-uuid>',
+--      'admin',
+--      '운영자'
+--    );
+--
+-- 3. /login에서 이메일/비밀번호로 로그인 확인
+--    - student → /student redirect
+--    - teacher / admin → /teacher redirect
+--    - user_profiles row 없으면 → /role-missing redirect
+--
+-- ── 주의사항 ──────────────────────────────────────────────────────────────────
+-- - 실제 UUID/이메일/비밀번호는 이 파일에 기록하지 말 것
+-- - role 변경은 반드시 Supabase Dashboard 또는 service_role 권한으로만 수행
+-- - anon key로는 INSERT/UPDATE 불가 (RLS가 막음)
+-- - 학습자 계정을 대량 생성할 경우 service_role key를 사용하는 별도 seed 스크립트 작성 권장
+
+-- ── Phase 9-C 계획 — RLS 전면 고도화 (배포 전 적용 예정) ────────────────────
+--
+-- 아래 정책은 기존 server action / repository 코드와의 충돌 여부를 검토한 후
+-- Phase 9-C 또는 배포 전 운영 안정화 단계에서 단계적으로 적용한다.
+-- 현재는 SQL 블록만 준비하고 실제 적용하지 않음 (주석 처리 유지).
+--
+-- ▸ speaking_submissions
+--   - student는 자기 제출만 조회
+--   - teacher / admin은 전체 조회
+--   ※ 현재 student_id가 auth user가 아닌 students 테이블 UUID → user_profiles.student_id 조인 필요
+--
+-- create policy "student own submissions read"
+--   on speaking_submissions for select
+--   using (
+--     student_id = (
+--       select student_id from user_profiles
+--       where user_id = auth.uid()
+--     )
+--   );
+--
+-- create policy "teacher all submissions read"
+--   on speaking_submissions for select
+--   using (
+--     exists (
+--       select 1 from user_profiles
+--       where user_id = auth.uid()
+--         and role in ('teacher', 'admin')
+--     )
+--   );
+--
+-- ▸ ai_evaluations
+--   - student는 자기 제출의 평가만 조회
+--   - teacher / admin은 전체 조회
+--
+-- create policy "student own ai_evaluations read"
+--   on ai_evaluations for select
+--   using (
+--     submission_id in (
+--       select id from speaking_submissions
+--       where student_id = (
+--         select student_id from user_profiles where user_id = auth.uid()
+--       )
+--     )
+--   );
+--
+-- create policy "teacher all ai_evaluations read"
+--   on ai_evaluations for select
+--   using (
+--     exists (
+--       select 1 from user_profiles
+--       where user_id = auth.uid() and role in ('teacher', 'admin')
+--     )
+--   );
+--
+-- ▸ teacher_reviews
+--   - student는 자기 제출의 리뷰만 조회 (교수자 피드백 공개 여부는 운영 정책에 따라 결정)
+--   - teacher / admin은 전체 조회 + INSERT + UPDATE
+--
+-- ▸ mission_submissions
+--   - speaking_submissions과 동일한 student/teacher 분리 정책 적용 예정
+--
+-- ▸ provider_events
+--   - 일반 학습자에게 직접 노출하지 않음 (internal 로깅용)
+--   - student / teacher 모두 select 정책 없음 → anon key로 접근 불가
+--   - service_role key 또는 Dashboard에서만 조회
+--
+-- ▸ recordings (Supabase Storage bucket)
+--   - 현재 public URL 정책: audio_url이 공개 URL로 저장됨
+--   - 운영 전 재검토 필요: signed URL(만료 시간 있음) 방식으로 전환 고려
+--   - Phase 9-C에서 bucket policy를 authenticated-only로 변경하고
+--     다운로드 시 signed URL 생성으로 전환 예정
+--
+-- ── 적용 전 검토 사항 ──────────────────────────────────────────────────────────
+-- 1. 현재 server actions / repositories는 SUPABASE_ANON_KEY를 사용함.
+--    RLS 활성화 시 anon key로 INSERT/SELECT가 가능해야 함.
+--    → INSERT 정책(student가 자기 제출 insert 가능)도 함께 추가 필요.
+-- 2. teacher dashboard DbSubmissionsSection은 anon key로 read — teacher RLS 정책 필요.
+-- 3. service_role key 사용 금지 방침 재확인 (현재 코드에 미포함).
+-- 4. 각 정책 적용 후 기존 smoke test + 실제 제출 흐름 재검증 필수.

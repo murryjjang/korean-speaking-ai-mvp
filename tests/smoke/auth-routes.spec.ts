@@ -4,9 +4,12 @@ import { test, expect } from '@playwright/test'
  * Auth route smoke tests.
  *
  * These tests verify page structure without real Supabase credentials.
- * When NEXT_PUBLIC_SUPABASE_URL / ANON_KEY are not set (smoke env), the
- * middleware skips auth enforcement, so /student and /teacher load normally.
- * /login always loads regardless of Supabase config.
+ * In the smoke dev server (SMOKE_TEST_MODE=1), proxy.ts skips auth
+ * enforcement when Supabase env vars are absent, so /student and /teacher
+ * load without a real login. /login always loads regardless of config.
+ *
+ * Note: Next.js 16 uses proxy.ts (not middleware.ts) for route interception.
+ * SMOKE_TEST_MODE=1 is set in playwright.config.ts webServer command.
  */
 
 test.describe('/login page smoke', () => {
@@ -56,12 +59,17 @@ test.describe('인증 우회 — Supabase 미설정 환경', () => {
     expect(isStudentOrLogin).toBe(true)
   })
 
-  test('/teacher는 Supabase 미설정 시 접근 가능', async ({ page }) => {
+  test('/teacher는 Supabase 미설정 시 접근 가능 + 채점 관리 헤더 표시', async ({ page }) => {
     await page.goto('/teacher')
 
     const url = page.url()
     const isTeacherOrLogin = url.includes('/teacher') || url.includes('/login')
     expect(isTeacherOrLogin).toBe(true)
+
+    // smoke 환경에서 auth bypass → 채점 관리 대시보드가 렌더링되어야 함
+    if (url.includes('/teacher')) {
+      await expect(page.getByRole('heading', { name: '채점 관리' })).toBeVisible()
+    }
   })
 
   test('/student/speaking/q-001 말하기 평가 흐름 유지', async ({ page }) => {
