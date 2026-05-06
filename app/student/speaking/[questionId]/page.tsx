@@ -95,6 +95,7 @@ export default async function SpeakingQuestionPage({
           missionGoals: (question as { missionGoals?: string[] }).missionGoals,
           evaluationMode: (question as { evaluationMode?: string }).evaluationMode,
           maxDialogueDurationSec: (question as { maxDialogueDurationSec?: number }).maxDialogueDurationSec,
+          aiFirstUtterance: (question as { aiFirstUtterance?: string }).aiFirstUtterance,
         }}
         questionSetId={resolvedSet.id}
         setName={resolvedSet.name}

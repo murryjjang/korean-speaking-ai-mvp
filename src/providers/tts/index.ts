@@ -66,6 +66,7 @@ export function getTTSProvider(): TTSProvider {
   if (providerName === 'openai' && process.env.OPENAI_API_KEY) {
     return new OpenAITTSProvider()
   }
+  // TODO: TTS_PROVIDER=azure일 때 Azure Speech TTS 연결 (ko-KR-SunHiNeural 등)
   if (providerName === 'mock') {
     return new MockTTSProvider()
   }

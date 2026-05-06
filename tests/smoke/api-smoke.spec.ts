@@ -424,3 +424,124 @@ test.describe('Phase 10-E-3: official question content validation', () => {
     expect(body.required_elements_found.length).toBeGreaterThanOrEqual(2)
   })
 })
+
+test.describe('Phase 10-E-5-A: /api/dialogue/respond smoke', () => {
+  test('mock conversation provider가 latestStudentText를 받아 AI 응답을 반환함', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+        ],
+        latestStudentText: '아메리카노 주세요.',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.aiText).toBe('string')
+    expect(body.aiText.length).toBeGreaterThan(0)
+    expect(typeof body.providerName).toBe('string')
+    expect(['success', 'fallback']).toContain(body.status)
+  })
+
+  test('beginner 카페: 음료만 말하면 온도(차가운/따뜻한)를 묻는 응답', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+          { role: 'student', text: '아메리카노 한 잔 주세요.' },
+        ],
+        latestStudentText: '아메리카노 한 잔 주세요.',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // 음료는 말했지만 온도 미선택 → 온도 확인 응답
+    expect(body.aiText).toContain('따뜻')
+  })
+
+  test('beginner 카페: 음료+온도 말했지만 포장 여부 없으면 포장/매장 묻는 응답', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+          { role: 'student', text: '아이스 아메리카노 주세요.' },
+          { role: 'ai', text: '차가운 음료로 드릴까요, 따뜻한 음료로 드릴까요?' },
+          { role: 'student', text: '아이스로 주세요.' },
+        ],
+        latestStudentText: '아이스로 주세요.',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // 음료+온도 모두 포함 → 포장 여부 확인 응답
+    expect(body.aiText).toContain('포장')
+  })
+
+  test('beginner 카페: 3개 미션 목표 모두 포함 시 완료 응답 반환', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+          { role: 'student', text: '아이스 아메리카노 주세요.' },
+          { role: 'ai', text: '드시고 가세요, 아니면 포장해 드릴까요?' },
+          { role: 'student', text: '포장해 주세요.' },
+        ],
+        latestStudentText: '포장해 주세요.',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // 3개 목표(음료+온도+포장) 모두 충족 → 감사 응답
+    expect(body.aiText).toContain('감사')
+  })
+
+  test('questionId 없이 전송 → 400 반환', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: { latestStudentText: '안녕하세요.' },
+    })
+    expect(res.status()).toBe(400)
+  })
+
+  test('latestStudentText 없이 전송 → 400 반환', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: { questionId: 'beginner-q4-dialogue-mission' },
+    })
+    expect(res.status()).toBe(400)
+  })
+
+  test('존재하지 않는 questionId → 404 반환', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'nonexistent-question',
+        latestStudentText: '안녕하세요.',
+      },
+    })
+    expect(res.status()).toBe(404)
+  })
+
+  test('intermediate 행정실: 말하기 수업 시간 질문 → 수업 시간 응답', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'intermediate-q4-dialogue-mission',
+        level: 'intermediate',
+        turns: [
+          { role: 'ai', text: '안녕하세요. 행정실입니다. 무엇을 도와드릴까요?' },
+          { role: 'student', text: '말하기 수업 시간이 언제인지 알고 싶습니다.' },
+        ],
+        latestStudentText: '말하기 수업 시간이 언제인지 알고 싶습니다.',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // 수업 시간 정보 응답 확인
+    expect(body.aiText).toContain('월요일')
+  })
+})

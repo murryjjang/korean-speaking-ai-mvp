@@ -199,10 +199,10 @@ test.describe('Phase 10-E-3: 공식 문항 12개 URL 접근성', () => {
 
   for (const { qId, setId } of officialQuestions) {
     const isDialogue = qId.endsWith('-dialogue-mission')
-    test(`${qId} — 404 없이 열림, ${isDialogue ? 'AI 대화 안내 표시' : '준비 시작 버튼 표시'}`, async ({ page }) => {
+    test(`${qId} — 404 없이 열림, ${isDialogue ? '대화 시작 버튼 표시' : '준비 시작 버튼 표시'}`, async ({ page }) => {
       await page.goto(`/student/speaking/${qId}?setId=${setId}`)
       if (isDialogue) {
-        await expect(page.getByRole('button', { name: 'AI 대화 준비 중' })).toBeVisible()
+        await expect(page.locator('[data-testid="start-dialogue-button"]')).toBeVisible()
       } else {
         await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
       }
@@ -211,9 +211,9 @@ test.describe('Phase 10-E-3: 공식 문항 12개 URL 접근성', () => {
 
   test('dialogue_mission 화면에 미션 목표 안내가 표시됨', async ({ page }) => {
     await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
-    await expect(page.getByText('AI와 대화하며 미션을 달성하는 문항')).toBeVisible()
+    await expect(page.getByText('AI와 대화하며 미션을 달성하는 평가입니다')).toBeVisible()
     // 미션 목표 목록 중 하나 — exact match로 strict mode 위반 방지
-    await expect(page.getByText('차가운/따뜻한 음료 선택')).toBeVisible()
+    await expect(page.getByText('차가운/따뜻한 음료 선택').first()).toBeVisible()
   })
 
   test('listening_response 화면에 학습자 안내 요소가 표시됨', async ({ page }) => {
@@ -325,21 +325,21 @@ test.describe('Phase 10-E-4: 공식 문항 asset rendering', () => {
 
   test('beginner q4 dialogue_mission card가 렌더링됨 — missionGoals 표시', async ({ page }) => {
     await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
-    // 10-E-4 추가: dialogue_mission은 준비 시작 대신 AI 대화 준비 중 버튼 표시
-    await expect(page.getByRole('button', { name: 'AI 대화 준비 중' })).toBeVisible()
-    await expect(page.getByText('AI와 대화하며 미션을 달성하는 문항')).toBeVisible()
+    // 10-E-5: dialogue_mission은 대화 시작 버튼 표시 (DialogueMissionPanel)
+    await expect(page.locator('[data-testid="start-dialogue-button"]')).toBeVisible()
+    await expect(page.getByText('AI와 대화하며 미션을 달성하는 평가입니다')).toBeVisible()
     // 미션 목표 중 타이틀과 겹치지 않는 항목 사용 (strict mode 위반 방지)
-    await expect(page.getByText('차가운/따뜻한 음료 선택')).toBeVisible()
+    await expect(page.getByText('차가운/따뜻한 음료 선택').first()).toBeVisible()
   })
 
   test('intermediate q4 missionGoals 표시됨', async ({ page }) => {
     await page.goto('/student/speaking/intermediate-q4-dialogue-mission?setId=intermediate-set-1')
-    await expect(page.getByText('말하기 수업 시간 확인')).toBeVisible()
+    await expect(page.getByText('말하기 수업 시간 확인').first()).toBeVisible()
   })
 
   test('advanced q4 missionGoals 표시됨', async ({ page }) => {
     await page.goto('/student/speaking/advanced-q4-dialogue-mission?setId=advanced-set-1')
-    await expect(page.getByText('일정 조정 가능 여부 확인')).toBeVisible()
+    await expect(page.getByText('일정 조정 가능 여부 확인').first()).toBeVisible()
   })
 
   test('q4 aiInformation이 학습자 화면에 노출되지 않음', async ({ page }) => {
@@ -350,10 +350,11 @@ test.describe('Phase 10-E-4: 공식 문항 asset rendering', () => {
     expect(bodyText).not.toContain('teacherOnlyNote')
   })
 
-  test('q4 dialogue_mission이 일반 녹음형 UI와 구분됨 — interactive_dialogue 안내 표시', async ({ page }) => {
+  test('q4 dialogue_mission이 일반 녹음형 UI와 구분됨 — 대화 패널 표시', async ({ page }) => {
     await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
-    // 일반 문항과 달리 AI 대화 안내가 보여야 함
-    await expect(page.getByText('실시간 AI 대화 기능은 다음 단계에서 활성화됩니다')).toBeVisible()
+    // 일반 문항과 달리 AI 대화 패널이 보여야 함
+    await expect(page.locator('[data-testid="dialogue-mission-panel"]')).toBeVisible()
+    await expect(page.locator('[data-testid="start-dialogue-button"]')).toBeVisible()
   })
 
   // --- teacher-only 필드 비노출 통합 확인 ---
@@ -376,8 +377,8 @@ test.describe('Phase 10-E-4: 공식 문항 asset rendering', () => {
     for (const route of routes) {
       await page.goto(route)
       if (route.includes('dialogue-mission')) {
-        // 10-E-4 추가: dialogue_mission은 AI 대화 준비 중 버튼으로 표시
-        await expect(page.getByRole('button', { name: 'AI 대화 준비 중' })).toBeVisible()
+        // 10-E-5: dialogue_mission은 대화 시작 버튼으로 표시 (DialogueMissionPanel)
+        await expect(page.locator('[data-testid="start-dialogue-button"]')).toBeVisible()
       } else {
         await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
       }
@@ -390,7 +391,7 @@ test.describe('Phase 10-E-4: 공식 문항 asset rendering', () => {
   })
 })
 
-test.describe('Phase 10-E-4 추가: dialogue_mission 기존 녹음→제출 UI 비표시', () => {
+test.describe('Phase 10-E-5-A: dialogue_mission 실제 AI 쌍방 대화 UI', () => {
   const dialogueCases = [
     { qId: 'beginner-q4-dialogue-mission', setId: 'beginner-set-1' },
     { qId: 'intermediate-q4-dialogue-mission', setId: 'intermediate-set-1' },
@@ -403,13 +404,40 @@ test.describe('Phase 10-E-4 추가: dialogue_mission 기존 녹음→제출 UI �
       await expect(page.getByRole('button', { name: '준비 시작' })).not.toBeVisible()
     })
 
-    test(`${qId} — AI 대화 준비 중 버튼(disabled) 표시`, async ({ page }) => {
+    test(`${qId} — 대화 시작 버튼(enabled)과 dialogue-mission-panel 표시`, async ({ page }) => {
       await page.goto(`/student/speaking/${qId}?setId=${setId}`)
-      const btn = page.getByRole('button', { name: 'AI 대화 준비 중' })
+      await expect(page.locator('[data-testid="dialogue-mission-panel"]')).toBeVisible()
+      const btn = page.locator('[data-testid="start-dialogue-button"]')
       await expect(btn).toBeVisible()
-      await expect(btn).toBeDisabled()
+      await expect(btn).toBeEnabled()
     })
   }
+
+  test('beginner q4 대화 시작 클릭 시 AI 첫 발화 turn이 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    await page.locator('[data-testid="start-dialogue-button"]').click()
+    // AI 첫 발화 turn 표시 확인
+    await expect(page.locator('[data-testid="ai-turn"]').first()).toBeVisible()
+    await expect(page.getByText('어서 오세요. 무엇을 드릴까요?')).toBeVisible()
+    // 대화 시작 후 녹음 버튼이 활성화되어야 함
+    await expect(page.locator('[data-testid="record-turn-button"]')).toBeVisible()
+  })
+
+  test('beginner q4 missionGoals가 dialogue panel에 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    await expect(page.locator('[data-testid="dialogue-mission-panel"]')).toBeVisible()
+    // goal-pending badges가 미달성 상태로 표시
+    const pendingGoals = page.locator('[data-testid="goal-pending"]')
+    await expect(pendingGoals.first()).toBeVisible()
+  })
+
+  test('beginner q4 aiInformation이 dialogue panel HTML에 노출되지 않음', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    const bodyText = await page.locator('body').innerText()
+    // aiInformation 필드 값의 일부가 학습자 화면에 노출되면 안 됨
+    expect(bodyText).not.toContain('점원은 아메리카노, 라떼, 주스를 주문받을 수 있다')
+    expect(bodyText).not.toContain('aiInformation')
+  })
 
   test('q1/q2/q3 녹음 흐름은 유지됨 — beginner q1 준비 시작 버튼 표시', async ({ page }) => {
     await page.goto('/student/speaking/beginner-q1-reading?setId=beginner-set-1')
@@ -419,5 +447,28 @@ test.describe('Phase 10-E-4 추가: dialogue_mission 기존 녹음→제출 UI �
   test('q1/q2/q3 녹음 흐름은 유지됨 — beginner q3 준비 시작 버튼 표시', async ({ page }) => {
     await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
     await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+
+  test('beginner q4 대화 시작 후 AI turn에 다시 듣기 버튼이 표시됨', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    await page.locator('[data-testid="start-dialogue-button"]').click()
+    await expect(page.locator('[data-testid="ai-turn"]').first()).toBeVisible()
+    await expect(page.locator('[data-testid="ai-replay-button"]').first()).toBeVisible()
+  })
+
+  test('speechSynthesis fallback이 없는 환경에서 dialogue panel crash 없음', async ({ page }) => {
+    // speechSynthesis를 undefined로 덮어씌워 fallback 없는 환경 시뮬레이션
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'speechSynthesis', {
+        value: undefined,
+        configurable: true,
+        writable: true,
+      })
+    })
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    await page.locator('[data-testid="start-dialogue-button"]').click()
+    // TTS 실패 후에도 대화 패널과 AI 첫 발화가 표시되어야 함
+    await expect(page.locator('[data-testid="dialogue-mission-panel"]')).toBeVisible()
+    await expect(page.locator('[data-testid="ai-turn"]').first()).toBeVisible()
   })
 })

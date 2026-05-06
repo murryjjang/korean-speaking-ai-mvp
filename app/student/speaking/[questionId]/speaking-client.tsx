@@ -11,6 +11,7 @@ import { useAudioRecorder } from '@/src/hooks/use-audio-recorder'
 import { useTTS } from '@/src/hooks/use-tts'
 import { QuestionAssetRenderer } from '@/src/components/question-asset-renderer'
 import type { StudentVisibleAsset } from '@/src/content/assessment-assets'
+import { DialogueMissionPanel } from '@/src/components/dialogue-mission-panel'
 
 type Phase = 'prep' | 'recording' | 'review' | 'submitting'
 
@@ -37,6 +38,7 @@ export type QuestionData = {
   missionGoals?: string[]
   evaluationMode?: string
   maxDialogueDurationSec?: number
+  aiFirstUtterance?: string
 }
 
 const MIN_VALID_DURATION_SEC = 2
@@ -412,10 +414,10 @@ export function SpeakingClient({
           {question.typeId === 'qt-dialogue-mission' && (
             <div className="mt-4 px-3 py-2.5 bg-purple-50 border border-purple-200 rounded-md">
               <p className="text-xs font-semibold text-purple-800 mb-1">
-                이 문항은 AI와 대화하며 미션을 달성하는 문항입니다.
+                AI와 대화하며 미션을 달성하는 평가입니다.
               </p>
               <p className="text-xs text-purple-700 leading-relaxed mb-2">
-                실시간 AI 대화 기능은 다음 단계에서 활성화됩니다.
+                아래 대화 패널에서 AI와 실시간으로 대화하며 미션을 완료하세요.
               </p>
               {question.missionGoals && question.missionGoals.length > 0 && (
                 <div>
@@ -695,23 +697,16 @@ export function SpeakingClient({
         </Card>
       )}
 
-      {/* Dialogue mission placeholder — 10-E-5에서 실제 AI 대화 UI로 교체 예정 */}
+      {/* Dialogue mission — 실제 AI 쌍방 대화 UI (Phase 10-E-5) */}
       {isDialogueMission && (
-        <Card>
-          <CardBody>
-            <div className="text-center py-8">
-              <p className="text-sm font-medium text-text-primary mb-1">
-                AI 대화형 평가 준비 중
-              </p>
-              <p className="text-xs text-text-secondary mb-6">
-                현재 상태: 다음 단계 구현 예정
-              </p>
-              <Button variant="secondary" disabled>
-                AI 대화 준비 중
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
+        <DialogueMissionPanel
+          questionId={question.id}
+          questionSetId={questionSetId}
+          difficulty={question.difficulty}
+          aiFirstUtterance={question.aiFirstUtterance ?? '안녕하세요.'}
+          missionGoals={question.missionGoals ?? []}
+          maxDialogueDurationSec={question.maxDialogueDurationSec ?? 180}
+        />
       )}
     </div>
   )

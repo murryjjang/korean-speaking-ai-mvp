@@ -2810,3 +2810,67 @@ TTS_PROVIDER=browser (기본)          → BrowserTTSProvider (서버 stub, 클�
 - `npx tsc --noEmit` → 에러 0
 - `npm run build` → 빌드 성공
 - `npm run test:smoke` → 결과 참조
+
+---
+
+## Phase 10-E-5-A (2026-05-06): dialogue_mission 실제 AI 쌍방 대화 UI 구현
+
+### 구현 내용
+
+**신규 파일:**
+- `src/types/dialogue.ts` — DialogueTurn, MissionGoalResult, DialogueMissionPanelStatus 타입 정의
+- `src/lib/dialogue-mission.ts` — detectMissionProgress, generateAggregatedTranscript 헬퍼
+- `src/providers/conversation/index.ts` (업데이트) — DialogueConversationProvider 인터페이스 + MockDialogueConversationProvider (mission-aware)
+- `app/api/dialogue/respond/route.ts` — POST /api/dialogue/respond API route
+- `src/components/dialogue-mission-panel.tsx` — DialogueMissionPanel 클라이언트 컴포넌트
+- `app/student/speaking/dialogue-actions.ts` — submitDialogue 서버 액션
+
+**수정 파일:**
+- `speaking-client.tsx` — placeholder를 DialogueMissionPanel로 교체, aiFirstUtterance 필드 추가
+- `page.tsx` — aiFirstUtterance 전달
+- `result/page.tsx` — dialogue_mission 결과 안내 메시지 업데이트
+- `tests/smoke/auth-routes.spec.ts` — Phase 10-E-5-A 신규 테스트 추가, Phase 10-E-4 테스트 갱신
+- `tests/smoke/api-smoke.spec.ts` — /api/dialogue/respond 테스트 9개 추가
+
+### 핵심 구조
+
+**dialogue turn 상태 머신:**
+```
+idle → ready → recording → recorded → processing → ready (반복)
+ready → completed → submitting
+```
+
+**short-audio/no-speech guard (dialogue에서도 동일 정책 유지):**
+- duration < 2초 또는 blob < 3000 bytes → STT 호출 금지, AI 응답 금지
+- no-speech (STT 결과 빈값) → AI 응답 금지, turn 추가 금지
+
+**MockDialogueConversationProvider (mission-aware):**
+- beginner-q4: 음료/온도/포장 목표 달성 여부를 all student turns에서 감지 → 빠진 목표 유도
+- intermediate-q4: latest student turn에서 수업시간/결석자료/상담 키워드 감지 → 해당 정보 응답
+- advanced-q4: latest student turn에서 일정/주제/회의 키워드 감지 → 해당 응답
+
+**DB 저장 전략:**
+- dialogueTurns는 aggregated transcript로 변환하여 sttResult.transcript에 저장
+- missionGoals 달성률 기반으로 task_completion_score 조정
+- 기존 speaking_submissions / ai_evaluations 구조와 호환 (schema 변경 없음)
+- dialogueTurns DB 영구 저장은 10-E-6 Known Issue로 유지
+
+### provider_events 기록
+- feature: 'conversation', provider: 'mock', status: 'success' | 'fallback'
+- metadata: { providerType: 'conversation' }
+
+### 검증 결과
+- npm run lint: 에러 0
+- npx tsc --noEmit: 에러 0
+- npm run build: 성공 (/api/dialogue/respond route 포함)
+- npm run test:smoke: 100 passed (기존 89 → 100, +11개)
+
+### 남은 Known Issues (10-E-5-B 이후)
+- 실제 OpenAI/Claude conversation provider 연결
+- dialogueTurns DB 영구 저장 구조 확정 (별도 테이블 또는 JSONB 컬럼)
+- turn별 audioUrl 저장 고도화
+- 교수자 화면에서 대화 로그/미션 달성 결과 검토 UI (10-E-5-B)
+- missionGoals 판정 품질 개선 (LLM 기반)
+- attempt 단위 1~4번 전체 응시 흐름
+- ETRI 발음평가 연동
+- 모바일 Safari q4 대화형 수동 검증

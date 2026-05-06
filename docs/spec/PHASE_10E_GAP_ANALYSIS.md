@@ -29,11 +29,17 @@
 - ✅ smoke 89 passed (기존 81 + 신규 8)
 - 🔜 남은 항목: 실제 식당 사진 교체, 음원 mp3 등록, dialogue_mission AI 대화 UI (10-E-5)
 
-**4번 dialogue_mission Known Issues (10-E-5 예정):**
-- 실제 AI 대화 UI 구현 (WebSocket 또는 API 기반 턴-by-턴 대화)
-- 대화 로그 저장 (`dialogueTurns` → DB)
-- missionGoals 달성 여부 평가 로직
-- 교수자 최종확정 rubric 강화 (대화 미션 35점 체계)
+**4번 dialogue_mission (10-E-5-A 처리 완료, 2026-05-06):**
+- ✅ DialogueMissionPanel 실제 AI 쌍방 대화 UI 구현 (idle→ready→recording→recorded→processing→ready 상태 머신)
+- ✅ /api/dialogue/respond POST route 구현 (server-side aiInformation 처리)
+- ✅ MockDialogueConversationProvider — mission-aware 응답 (beginner/intermediate/advanced 각각)
+- ✅ missionGoals 달성 감지 (detectMissionProgress, useMemo derived state)
+- ✅ short-audio/no-speech guard dialogue turn에서도 동일 정책 유지
+- ✅ submitDialogue 서버 액션 — aggregated transcript 기반 평가 + 기존 store 호환
+- ✅ dialogueTurns DB 저장: aggregated transcript로 기존 구조 호환 (schema 변경 없음)
+- ✅ smoke 100 passed
+- 🔜 10-E-5-B: 교수자 최종확정 화면 대화 로그/미션 결과 검토 UI
+- 🔜 10-E-6+: 실제 OpenAI/Claude provider, dialogueTurns DB 영구 저장, turn별 audioUrl
 
 **4번 dialogue_mission 구현 방향**: 단발 녹음형으로 최종 운영하지 않음. 생성형 AI 쌍방 대화형 평가로 구현 예정. 실제 AI 대화 UI·대화 로그 저장·missionGoals 달성 평가는 **10-E-5**에서 구현. 현재는 단발 녹음 UI를 숨기고 "준비 중" 상태로 표시하며 `evaluationMode: "interactive_dialogue"` 필드로 명시.
 

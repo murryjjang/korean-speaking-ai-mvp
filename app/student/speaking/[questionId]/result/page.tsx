@@ -431,11 +431,14 @@ export default async function SpeakingResultPage({
               </div>
             ) : null}
 
-            {/* dialogue_mission 임시 평가 안내 */}
+            {/* dialogue_mission 대화 요약 안내 */}
             {question?.typeId === 'qt-dialogue-mission' && (
               <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
+                <p className="text-xs font-semibold text-purple-800 mb-1">
+                  대화형 미션 평가
+                </p>
                 <p className="text-xs text-purple-700 leading-relaxed">
-                  대화형 평가 UI는 다음 단계에서 활성화됩니다. 현재 결과는 단발 녹음 기반 임시 평가입니다.
+                  AI와의 대화 전체 내용을 기반으로 평가되었습니다. 아래 &ldquo;음성 인식 결과&rdquo; 항목에서 전체 대화 내용을 확인하세요.
                 </p>
               </div>
             )}
