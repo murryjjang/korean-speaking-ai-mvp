@@ -472,3 +472,250 @@ test.describe('Phase 10-E-5-A: dialogue_mission 실제 AI 쌍방 대화 UI', () 
     await expect(page.locator('[data-testid="ai-turn"]').first()).toBeVisible()
   })
 })
+
+test.describe('Phase 10-E-5-B: 교수자 최종확정 화면 — official rubric 강화', () => {
+  test('teacher submissions 목록 페이지 정상 렌더링', async ({ page }) => {
+    await page.goto('/teacher/submissions')
+    if (!page.url().includes('/teacher')) return
+
+    await expect(page.getByRole('heading', { name: '제출 내역' })).toBeVisible()
+    // 제출 통계 카드 확인 — 여러 요소에 같은 텍스트가 있을 수 있으므로 first() 사용
+    await expect(page.getByText('전체 제출').first()).toBeVisible()
+    await expect(page.getByText('채점 대기').first()).toBeVisible()
+    await expect(page.getByText('확정 완료').first()).toBeVisible()
+  })
+
+  test('teacher submissions 목록에 대화 미션 배지가 표시됨', async ({ page }) => {
+    await page.goto('/teacher/submissions')
+    if (!page.url().includes('/teacher')) return
+
+    // sub-022 (beginner-q4-dialogue-mission)이 "AI대화" 배지로 목록에 표시되어야 함
+    await expect(page.getByText('AI대화').first()).toBeVisible()
+  })
+
+  test('reading 루브릭 (15점) 채점 화면 렌더링 — sub-019', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-019')
+    if (!page.url().includes('/teacher')) return
+
+    // 채점 화면 헤더
+    await expect(page.getByRole('heading', { name: /채점:/ })).toBeVisible()
+    // 문항 배점 표시 확인 (15점)
+    await expect(page.getByText('15점').first()).toBeVisible()
+  })
+
+  test('reading 루브릭 채점 화면에서 루브릭 항목 4개가 표시됨 (2단계)', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-019')
+    if (!page.url().includes('/teacher')) return
+
+    // 2단계(루브릭 조정)로 이동
+    await page.getByRole('button', { name: '루브릭 채점' }).click()
+
+    // official rubric 항목 4개 표시 확인
+    await expect(page.getByText('발음 정확성')).toBeVisible()
+    await expect(page.getByText('억양·리듬')).toBeVisible()
+    await expect(page.getByText('끊어 읽기·속도')).toBeVisible()
+    await expect(page.getByText('의미 전달력')).toBeVisible()
+  })
+
+  test('reading 루브릭 합계가 100이 아닌 15점 배점으로 표시됨', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-019')
+    if (!page.url().includes('/teacher')) return
+
+    await page.getByRole('button', { name: '루브릭 채점' }).click()
+
+    // 합계 행에 /15 표시 확인
+    await expect(page.getByText(/\/ 15/).first()).toBeVisible()
+    // AI 환산 점수 표시 확인
+    await expect(page.getByText(/환산.*\/100/).first()).toBeVisible()
+  })
+
+  test('material_description 루브릭 (25점) 채점 화면 — sub-020', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-020')
+    if (!page.url().includes('/teacher')) return
+
+    await expect(page.getByText('25점').first()).toBeVisible()
+
+    await page.getByRole('button', { name: '루브릭 채점' }).click()
+
+    // official rubric 5개 항목
+    await expect(page.getByText('자료 이해 정확성')).toBeVisible()
+    await expect(page.getByText('필수 요소 포함').first()).toBeVisible()
+    await expect(page.getByText('구조와 조직')).toBeVisible()
+    await expect(page.getByText('어휘·문장 표현')).toBeVisible()
+    await expect(page.getByText('전달 명확성')).toBeVisible()
+  })
+
+  test('listening_response 루브릭 (25점) 채점 화면 — sub-021', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-021')
+    if (!page.url().includes('/teacher')) return
+
+    await expect(page.getByText('25점').first()).toBeVisible()
+
+    await page.getByRole('button', { name: '루브릭 채점' }).click()
+
+    // official rubric 4개 항목
+    await expect(page.getByText('핵심 정보 파악')).toBeVisible()
+    await expect(page.getByText('정보 정확성')).toBeVisible()
+    await expect(page.getByText('간결성·명확성')).toBeVisible()
+  })
+
+  test('listening_response 화면에서 listeningScriptForTeacherOnly가 교수자 전용 박스에 표시됨', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-021')
+    if (!page.url().includes('/teacher')) return
+
+    // 교수자 전용 듣기 스크립트 박스 확인
+    await expect(page.getByText('교수자 전용 — 듣기 스크립트')).toBeVisible()
+    // 실제 스크립트 텍스트 포함 확인
+    await expect(page.getByText(/내일 한국어 수업/).first()).toBeVisible()
+  })
+
+  test('dialogue_mission 루브릭 (35점) 채점 화면 — sub-022', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-022')
+    if (!page.url().includes('/teacher')) return
+
+    await expect(page.getByText('35점').first()).toBeVisible()
+    // 대화형 배지 — teacherNotes 텍스트와 구별하기 위해 exact 사용
+    await expect(page.getByText('대화형', { exact: true })).toBeVisible()
+  })
+
+  test('dialogue_mission 채점 화면에서 대화 로그(AI/학생 turn)가 표시됨', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-022')
+    if (!page.url().includes('/teacher')) return
+
+    // 대화 로그 섹션 확인 — teacherNotes 텍스트에도 "대화 로그"가 포함되므로 heading 선택자 사용
+    await expect(page.getByRole('heading', { name: '대화 로그' })).toBeVisible()
+    // AI 첫 발화 확인
+    await expect(page.getByText('어서 오세요. 무엇을 드릴까요?')).toBeVisible()
+    // 학생 발화 확인
+    await expect(page.getByText('아이스 아메리카노 하나 주세요.').first()).toBeVisible()
+    // AI/학생 role 레이블 확인
+    await expect(page.getByText('AI').first()).toBeVisible()
+    await expect(page.getByText('학생').first()).toBeVisible()
+  })
+
+  test('dialogue_mission 채점 화면에서 aiInformation이 교수자 전용 박스에 표시됨', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-022')
+    if (!page.url().includes('/teacher')) return
+
+    await expect(page.getByText('교수자 전용 — AI 역할 정보')).toBeVisible()
+    await expect(page.getByText(/점원은 아메리카노/).first()).toBeVisible()
+  })
+
+  test('dialogue_mission 채점 2단계에서 missionGoals 달성 현황 표시', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-022')
+    if (!page.url().includes('/teacher')) return
+
+    await page.getByRole('button', { name: '루브릭 채점' }).click()
+
+    // 미션 달성 현황 패널 확인
+    await expect(page.getByText('미션 목표 달성 현황')).toBeVisible()
+    await expect(page.getByText('음료 주문').first()).toBeVisible()
+    // AI 판정 안내 메시지 확인
+    await expect(page.getByText(/AI 미션 달성 판정은 1차 참고용/).first()).toBeVisible()
+  })
+
+  test('dialogue_mission 루브릭 35점 5개 항목이 표시됨', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-022')
+    if (!page.url().includes('/teacher')) return
+
+    await page.getByRole('button', { name: '루브릭 채점' }).click()
+
+    await expect(page.getByText('미션 달성도')).toBeVisible()
+    await expect(page.getByText('상호작용 능력')).toBeVisible()
+    await expect(page.getByText('질문·확인 전략')).toBeVisible()
+    await expect(page.getByText('정확성·적절성')).toBeVisible()
+    await expect(page.getByText('유창성').first()).toBeVisible()
+  })
+
+  test('최종 확정 3단계에서 교수자 점수가 배점(15점) 기준으로 표시됨', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-019')
+    if (!page.url().includes('/teacher')) return
+
+    await page.getByRole('button', { name: '루브릭 채점' }).click()
+    await page.getByRole('button', { name: '최종 피드백' }).click()
+
+    // 교수자 확정 점수 배점 기준 표시 확인
+    await expect(page.getByText(/교수자 확정 점수.*배점/).first()).toBeVisible()
+    // 최종 확정 버튼 표시 확인
+    await expect(page.getByRole('button', { name: '최종 확정' })).toBeVisible()
+  })
+
+  test('AI 점수와 교수자 최종 점수 영역이 구분됨 — 환산/원점수 레이블', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-019')
+    if (!page.url().includes('/teacher')) return
+
+    await page.getByRole('button', { name: '루브릭 채점' }).click()
+    await page.getByRole('button', { name: '최종 피드백' }).click()
+
+    // AI 환산 점수 레이블
+    await expect(page.getByText('AI 1차 환산 점수').first()).toBeVisible()
+    // 교수자 배점 기준 레이블
+    await expect(page.getByText(/교수자 확정 점수/).first()).toBeVisible()
+  })
+
+  test('teacher comment 입력 UI가 최종 확정 화면에 있음', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-019')
+    if (!page.url().includes('/teacher')) return
+
+    await page.getByRole('button', { name: '루브릭 채점' }).click()
+    await page.getByRole('button', { name: '최종 피드백' }).click()
+
+    await expect(page.getByPlaceholder(/전반적인 평가와 격려/).first()).toBeVisible()
+  })
+
+  test('aiInformation은 학생 화면에서 비노출 유지 — beginner q4', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    const bodyText = await page.locator('body').innerText()
+    expect(bodyText).not.toContain('점원은 아메리카노, 라떼, 주스를 주문받을 수 있다')
+  })
+
+  test('teacher 화면에서는 aiInformation이 검토용으로 표시됨 — sub-022', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-022')
+    if (!page.url().includes('/teacher')) return
+
+    const bodyText = await page.locator('body').innerText()
+    expect(bodyText).toContain('점원은 아메리카노')
+  })
+
+  test('listeningScriptForTeacherOnly가 학생 화면에는 비노출 유지 — beginner q3', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
+    const bodyText = await page.locator('body').innerText()
+    // 스크립트 원문이 학생 화면에 노출되면 안 됨
+    expect(bodyText).not.toContain('여러분, 내일 한국어 수업은 오전 10시에 시작합니다')
+  })
+
+  test('교수자 화면에서는 listeningScriptForTeacherOnly가 표시됨 — sub-021', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-021')
+    if (!page.url().includes('/teacher')) return
+
+    const bodyText = await page.locator('body').innerText()
+    expect(bodyText).toContain('오전 10시에 시작합니다')
+  })
+
+  test('q1/q2/q3 학생 흐름 유지 — 준비 시작 버튼', async ({ page }) => {
+    for (const qId of ['beginner-q1-reading', 'beginner-q2-material-description', 'beginner-q3-listening-response']) {
+      await page.goto(`/student/speaking/${qId}?setId=beginner-set-1`)
+      await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    }
+  })
+
+  test('q4 dialogue_mission 학생 흐름 유지 — 대화 시작 버튼', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    await expect(page.locator('[data-testid="start-dialogue-button"]')).toBeVisible()
+  })
+
+  test('legacy q-003 route 유지', async ({ page }) => {
+    await page.goto('/student/speaking/q-003')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+
+  test('role guard — student가 teacher route 접근 시 redirect 또는 차단', async ({ page }) => {
+    // smoke 환경에서 Supabase 미설정이면 proxy.ts가 role guard를 skip하므로
+    // teacher가 접근 가능하거나 login으로 redirect — 404는 아니어야 함
+    await page.goto('/teacher/submissions')
+    const url = page.url()
+    expect(url).not.toContain('/not-found')
+    const isExpected = url.includes('/teacher') || url.includes('/login') || url.includes('/role-missing')
+    expect(isExpected).toBe(true)
+  })
+})

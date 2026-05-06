@@ -37,9 +37,25 @@
 - ✅ short-audio/no-speech guard dialogue turn에서도 동일 정책 유지
 - ✅ submitDialogue 서버 액션 — aggregated transcript 기반 평가 + 기존 store 호환
 - ✅ dialogueTurns DB 저장: aggregated transcript로 기존 구조 호환 (schema 변경 없음)
-- ✅ smoke 100 passed
-- 🔜 10-E-5-B: 교수자 최종확정 화면 대화 로그/미션 결과 검토 UI
+- ✅ smoke 102 passed
 - 🔜 10-E-6+: 실제 OpenAI/Claude provider, dialogueTurns DB 영구 저장, turn별 audioUrl
+
+**교수자 최종확정 화면 강화 (10-E-5-B 처리 완료, 2026-05-06):**
+- ✅ official rubric 동적 로드 (`question.rubricId` → rubrics.json 조회)
+- ✅ reading(15점)/material_description(25점)/listening_response(25점)/dialogue_mission(35점) 각각의 rubric item·배점 반영
+- ✅ AI 1차 환산 점수(0-100) vs 교수자 원점수(배점 기준) 명확 구분 표시
+- ✅ `listeningScriptForTeacherOnly` 교수자 전용 박스 표시 (학생 비공개 유지)
+- ✅ `aiInformation` 교수자 전용 박스 표시 (학생 비공개 유지)
+- ✅ q4 대화 로그: AI/학생 turn 구분 말풍선 형태로 교수자 화면에 표시
+- ✅ q4 missionGoals 달성 현황 패널 (루브릭 조정 2단계에서 표시)
+- ✅ `requiredElements`, `modelAnswer`, `teacherNotes` 교수자 검토용 표시
+- ✅ 음성 파일 `<audio controls>` player
+- ✅ mock 공식 문항 제출 4개 + AI 평가 4개 추가 (official rubric ID 기반)
+- ✅ 제출 목록에 "대화 미션" 레이블 + "AI대화" 배지 표시
+- ✅ smoke 126 passed (기존 102 + 신규 24)
+- 🔜 teacher_reviews RLS 전면 적용
+- 🔜 finalized 결과 학생 공개 화면
+- 🔜 dialogueTurns DB 영구 저장 구조 (현재 mock)
 
 **4번 dialogue_mission 구현 방향**: 단발 녹음형으로 최종 운영하지 않음. 생성형 AI 쌍방 대화형 평가로 구현 예정. 실제 AI 대화 UI·대화 로그 저장·missionGoals 달성 평가는 **10-E-5**에서 구현. 현재는 단발 녹음 UI를 숨기고 "준비 중" 상태로 표시하며 `evaluationMode: "interactive_dialogue"` 필드로 명시.
 

@@ -20,10 +20,12 @@ export function StepFinalFeedback({
   isPending,
   isFinalized,
 }: StepFinalFeedbackProps) {
-  const { aiEval } = data
-  const aiTotal = aiEval?.totalScore ?? 0
+  const { aiEval, officialRubric } = data
+  const maxScore = officialRubric.totalMaxScore
+  const aiRawScore = aiEval?.totalScore ?? 0          // official raw (e.g. 10/15)
+  const aiNormalized = aiEval?.normalizedScore ?? 0   // 0-100 normalized
   const teacherTotal = Object.values(draft.scores).reduce((a, b) => a + b, 0)
-  const totalDelta = teacherTotal - aiTotal
+  const totalDelta = teacherTotal - aiRawScore
   const readonly = isFinalized
 
   return (
@@ -35,28 +37,41 @@ export function StepFinalFeedback({
         </div>
       )}
 
+      {/* 점수 비교 */}
       <Card>
-        <CardHeader title="최종 점수 비교" />
+        <CardHeader title="최종 점수 비교" description={`루브릭: ${officialRubric.name} · 배점 ${maxScore}점`} />
         <CardBody>
           <div className="space-y-3">
             <div>
-              <div className="flex justify-between text-xs text-text-secondary mb-1">
-                <span>AI 총점</span>
-                <span className="tabular-nums">{aiTotal} / 100</span>
+              <div className="flex justify-between text-xs text-text-secondary mb-0.5">
+                <span>AI 1차 환산 점수</span>
+                <span className="tabular-nums">{aiNormalized} / 100</span>
               </div>
-              <ScoreBar score={aiTotal} maxScore={100} />
+              <div className="flex justify-between text-xs text-text-muted mb-1">
+                <span>AI 원점수 (배점 기준)</span>
+                <span className="tabular-nums">{aiRawScore} / {maxScore}</span>
+              </div>
+              <ScoreBar score={aiNormalized} maxScore={100} />
             </div>
+
             <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-text-secondary font-medium">교수자 확정 점수</span>
+              <div className="flex justify-between text-xs mb-0.5">
+                <span className="text-text-secondary font-medium">교수자 확정 점수 (배점 기준)</span>
                 <span className="font-bold tabular-nums text-text-primary">
-                  {teacherTotal} / 100
+                  {teacherTotal} / {maxScore}
                 </span>
               </div>
-              <ScoreBar score={teacherTotal} maxScore={100} />
+              <div className="flex justify-between text-xs text-text-muted mb-1">
+                <span>환산 점수 (참고)</span>
+                <span className="tabular-nums">
+                  {maxScore > 0 ? Math.round((teacherTotal / maxScore) * 100) : 0} / 100
+                </span>
+              </div>
+              <ScoreBar score={teacherTotal} maxScore={maxScore} />
             </div>
-            <div className="flex items-center justify-end gap-2 pt-1 border-t border-border">
-              <span className="text-xs text-text-secondary">AI 대비 조정 폭:</span>
+
+            <div className="flex items-center justify-between pt-1 border-t border-border">
+              <span className="text-xs text-text-secondary">AI 원점수 대비 조정 폭:</span>
               <span
                 className={[
                   'text-sm font-bold tabular-nums',
@@ -143,10 +158,13 @@ export function StepFinalFeedback({
         </CardBody>
       </Card>
 
+      {/* TODO: 학생 결과 화면에 교수자 확정 결과를 공개하는 기능은 후속 단계 구현 예정.
+          파일럿에서는 교수자가 확정 후 수동으로 학생에게 안내. */}
+
       {!isFinalized && (
         <div className="bg-warning-50 border border-warning-100 rounded-lg p-3">
           <p className="text-xs text-warning-700">
-            확정 후에는 수정이 불가합니다. 점수와 피드백을 최종 확인하세요.
+            확정 후에는 재확정이 가능하지만 &ldquo;재확정&rdquo; 표시가 남습니다. 점수와 피드백을 최종 확인하세요.
           </p>
         </div>
       )}
@@ -162,7 +180,10 @@ export function StepFinalFeedback({
             </Button>
           </>
         ) : (
-          <div className="flex justify-end w-full">
+          <div className="flex justify-between w-full items-center">
+            <Button variant="secondary" onClick={onBack}>
+              ← 루브릭 재검토
+            </Button>
             <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md bg-success-500 text-white">
               ✓ 채점 확정 완료
             </span>

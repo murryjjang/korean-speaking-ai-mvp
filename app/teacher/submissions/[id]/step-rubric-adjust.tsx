@@ -8,6 +8,8 @@ const ADJUSTMENT_REASONS = [
   { id: 'grammar', label: '문법' },
   { id: 'task', label: '과제 수행' },
   { id: 'context', label: '문맥 판단' },
+  { id: 'mission', label: '미션 달성' },
+  { id: 'interaction', label: '상호작용' },
 ]
 
 interface StepRubricAdjustProps {
@@ -27,7 +29,7 @@ export function StepRubricAdjust({
   onNext,
   isFinalized = false,
 }: StepRubricAdjustProps) {
-  const { aiEval, riskFlag, rubricItems } = data
+  const { aiEval, riskFlag, rubricItems, officialRubric, questionExtras, isDialogueMission } = data
 
   const rubricScores: RubricItemScore[] = rubricItems.map((item) => ({
     rubricItemId: item.id,
@@ -39,12 +41,14 @@ export function StepRubricAdjust({
   }))
 
   const teacherTotal = rubricScores.reduce((sum, r) => sum + r.teacherScore, 0)
-  const aiTotal = aiEval?.totalScore ?? 0
+  const aiTotal = aiEval?.totalScore ?? 0   // official raw score (e.g. 10/15)
+  const aiNormalized = aiEval?.normalizedScore ?? 0  // 0-100 normalized
+  const maxScore = officialRubric.totalMaxScore
   const totalDelta = teacherTotal - aiTotal
 
-  function handleScoreChange(rubricItemId: string, raw: string, maxScore: number) {
+  function handleScoreChange(rubricItemId: string, raw: string, itemMax: number) {
     const parsed = parseInt(raw, 10)
-    const clamped = isNaN(parsed) ? 0 : Math.max(0, Math.min(maxScore, parsed))
+    const clamped = isNaN(parsed) ? 0 : Math.max(0, Math.min(itemMax, parsed))
     onDraftChange({ ...draft, scores: { ...draft.scores, [rubricItemId]: clamped } })
   }
 
@@ -76,10 +80,46 @@ export function StepRubricAdjust({
         </div>
       )}
 
+      {/* AI 1차 평가 안내 */}
+      <div className="p-3 bg-info-50 border border-info-100 rounded-lg text-xs text-info-700 space-y-0.5">
+        <p className="font-semibold">AI 1차 평가 참고 정보</p>
+        <p>
+          루브릭: <span className="font-medium">{officialRubric.name}</span>
+          &nbsp;·&nbsp;문항 배점: <span className="font-medium">{maxScore}점</span>
+          &nbsp;·&nbsp;AI 환산 점수: <span className="font-medium">{aiNormalized}/100</span>
+          &nbsp;·&nbsp;AI 원점수: <span className="font-medium">{aiTotal}/{maxScore}</span>
+        </p>
+        <p>AI 점수를 초기값으로 참고하세요. 교수자 판단에 따라 조정 후 최종 확정합니다.</p>
+      </div>
+
+      {/* 대화 미션 — 미션 목표 달성 현황 */}
+      {isDialogueMission && questionExtras?.missionGoals && questionExtras.missionGoals.length > 0 && (
+        <Card>
+          <CardHeader
+            title="미션 목표 달성 현황 (AI 판정)"
+            description="AI 미션 달성 판정은 1차 참고용입니다. 최종 확정은 교수자가 수행합니다."
+          />
+          <CardBody>
+            <ul className="space-y-2">
+              {questionExtras.missionGoals.map((goal, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
+                  <span className="text-success-700 font-bold shrink-0">✓</span>
+                  <span className="text-text-primary">{goal}</span>
+                  <span className="ml-auto text-xs text-success-700 font-medium">달성</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-text-muted mt-3">
+              * AI 판정 기준으로 표시됩니다. 대화 로그를 직접 확인하여 교수자가 최종 판단하세요.
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
       <Card>
         <CardHeader
           title="루브릭별 점수 조정"
-          description="AI 점수를 기준으로 교수자 판단에 따라 조정하세요."
+          description={`AI 점수를 초기값으로 참고하세요. 배점 기준: ${maxScore}점`}
         />
         <CardBody noPadding>
           <div className="overflow-x-auto">
@@ -131,11 +171,12 @@ export function StepRubricAdjust({
                 ))}
                 <tr className="bg-surface border-t-2 border-border-strong">
                   <td className="px-4 py-3 font-bold text-text-primary">합계</td>
-                  <td className="px-4 py-3 text-center font-semibold text-text-secondary tabular-nums">
-                    {aiTotal} / 100
+                  <td className="px-4 py-3 text-center tabular-nums">
+                    <span className="font-semibold text-text-secondary">{aiTotal} / {maxScore}</span>
+                    <span className="block text-xs text-text-muted">환산 {aiNormalized}/100</span>
                   </td>
                   <td className="px-4 py-3 text-center font-bold text-text-primary tabular-nums">
-                    {teacherTotal} / 100
+                    {teacherTotal} / {maxScore}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <DeltaLabel delta={totalDelta} bold />
@@ -198,7 +239,7 @@ export function StepRubricAdjust({
         <Button variant="secondary" onClick={onBack}>
           ← 이전
         </Button>
-        <Button onClick={onNext}>다음 단계 →</Button>
+        <Button onClick={onNext}>최종 피드백 →</Button>
       </div>
     </div>
   )

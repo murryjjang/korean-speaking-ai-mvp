@@ -11,10 +11,15 @@ function formatDateTime(isoString: string): string {
   return `${y}년 ${mo}월 ${day}일 ${h}:${min}`
 }
 
-const MODULE_TYPE_LABEL: Record<string, string> = {
-  assessment: '말하기 평가',
-  mission: '미션 대화',
-  contest: '말하기 대회',
+const QUESTION_TYPE_LABELS: Record<string, string> = {
+  'qt-reading': '낭독',
+  'qt-material-desc': '자료 설명',
+  'qt-listening-resp': '듣고 답하기',
+  'qt-dialogue-mission': '생성형 AI 대화 미션',
+  'qt-self-intro': '자기소개',
+  'qt-picture': '그림 묘사',
+  'qt-situation': '상황 말하기',
+  'qt-opinion': '의견 말하기',
 }
 
 const STATUS_CONFIG: Record<
@@ -42,14 +47,31 @@ interface StepSubmissionViewProps {
 }
 
 export function StepSubmissionView({ data, onNext }: StepSubmissionViewProps) {
-  const { submission, student, cls, aiEval, riskFlag, question, rubricItems } = data
+  const {
+    submission,
+    student,
+    cls,
+    aiEval,
+    riskFlag,
+    question,
+    questionExtras,
+    officialRubric,
+    dialogueTurns,
+    isDialogueMission,
+    rubricItems,
+  } = data
   const statusCfg = STATUS_CONFIG[submission.status] ?? {
     label: submission.status,
     variant: 'default' as const,
   }
 
+  const questionTypeLabel = questionExtras?.typeId
+    ? (QUESTION_TYPE_LABELS[questionExtras.typeId] ?? questionExtras.typeId)
+    : '말하기 평가'
+
   return (
     <div className="space-y-4">
+      {/* 학생/제출 기본 정보 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader title="학생 정보" />
@@ -84,9 +106,22 @@ export function StepSubmissionView({ data, onNext }: StepSubmissionViewProps) {
                 value={question ? question.title : (submission.scenarioId ?? '—')}
                 valueClassName="text-right max-w-44 truncate"
               />
+              <div className="flex justify-between items-center">
+                <dt className="text-text-secondary">문항 유형</dt>
+                <dd className="font-medium text-text-primary">
+                  {isDialogueMission ? (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-primary-700">{questionTypeLabel}</span>
+                      <Badge variant="info">대화형</Badge>
+                    </span>
+                  ) : (
+                    questionTypeLabel
+                  )}
+                </dd>
+              </div>
               <InfoRow
-                label="유형"
-                value={MODULE_TYPE_LABEL[submission.moduleType] ?? submission.moduleType}
+                label="문항 배점"
+                value={`${questionExtras?.maxScore ?? officialRubric.totalMaxScore}점`}
               />
               <InfoRow
                 label="제출 시간"
@@ -104,15 +139,128 @@ export function StepSubmissionView({ data, onNext }: StepSubmissionViewProps) {
         </Card>
       </div>
 
-      {question && (
+      {/* 음성 파일 */}
+      {submission.audioUrl && (
         <Card>
-          <CardHeader title="문항 내용" />
+          <CardHeader title="제출 음성" description="학생 녹음 파일" />
           <CardBody>
-            <p className="text-sm text-text-primary leading-relaxed">{question.prompt}</p>
+            <audio
+              controls
+              src={submission.audioUrl}
+              className="w-full"
+              aria-label="학생 녹음 재생"
+            />
           </CardBody>
         </Card>
       )}
 
+      {/* 문항 내용 */}
+      {question && (
+        <Card>
+          <CardHeader
+            title="문항 내용"
+            description={officialRubric.name + ` · 배점 ${officialRubric.totalMaxScore}점`}
+          />
+          <CardBody>
+            <div className="space-y-3">
+              <p className="text-sm text-text-primary leading-relaxed whitespace-pre-line">
+                {question.prompt}
+              </p>
+              {questionExtras?.guide && (
+                <div className="p-2.5 bg-surface rounded-md border border-border">
+                  <p className="text-xs font-semibold text-text-secondary mb-1">안내</p>
+                  <p className="text-xs text-text-primary">{questionExtras.guide}</p>
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* 교수자 전용 — 듣기 스크립트 */}
+      {questionExtras?.listeningScriptForTeacherOnly && (
+        <div className="p-3 bg-warning-50 border border-warning-100 rounded-lg">
+          <p className="text-xs font-semibold text-warning-700 mb-1">
+            교수자 전용 — 듣기 스크립트 (학생 비공개)
+          </p>
+          <p className="text-sm text-warning-700 leading-relaxed">
+            {questionExtras.listeningScriptForTeacherOnly}
+          </p>
+        </div>
+      )}
+
+      {/* 교수자 전용 — AI 역할 정보 (대화 미션) */}
+      {isDialogueMission && questionExtras?.aiInformation && (
+        <div className="p-3 bg-primary-50 border border-primary-100 rounded-lg">
+          <p className="text-xs font-semibold text-primary-700 mb-1">
+            교수자 전용 — AI 역할 정보 (학생 비공개)
+          </p>
+          <p className="text-sm text-primary-700 leading-relaxed">{questionExtras.aiInformation}</p>
+        </div>
+      )}
+
+      {/* 필수 요소 */}
+      {questionExtras?.requiredElements && questionExtras.requiredElements.length > 0 && (
+        <Card>
+          <CardHeader title="필수 포함 요소" description="루브릭 채점 기준" />
+          <CardBody>
+            <ul className="space-y-1">
+              {questionExtras.requiredElements.map((el, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm">
+                  <span className="text-text-muted shrink-0 mt-0.5">•</span>
+                  <span className="text-text-primary">{el}</span>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* 대화 로그 — 대화 미션 전용 */}
+      {isDialogueMission && dialogueTurns.length > 0 && (
+        <Card>
+          <CardHeader
+            title="대화 로그"
+            description="AI 턴과 학생 턴이 교대로 표시됩니다. 단발 답변형이 아닌 생성형 AI 쌍방 대화 평가입니다."
+          />
+          <CardBody>
+            <div className="space-y-2">
+              {dialogueTurns.map((turn, i) => (
+                <div
+                  key={i}
+                  className={[
+                    'flex gap-2',
+                    turn.role === 'student' ? 'justify-end' : 'justify-start',
+                  ].join(' ')}
+                >
+                  {turn.role === 'ai' && (
+                    <span className="text-xs font-semibold text-primary-700 shrink-0 mt-1.5">
+                      AI
+                    </span>
+                  )}
+                  <div
+                    className={[
+                      'max-w-xs sm:max-w-sm px-3 py-2 rounded-lg text-sm leading-relaxed',
+                      turn.role === 'ai'
+                        ? 'bg-primary-50 border border-primary-100 text-primary-900'
+                        : 'bg-surface border border-border text-text-primary',
+                    ].join(' ')}
+                  >
+                    {turn.text}
+                  </div>
+                  {turn.role === 'student' && (
+                    <span className="text-xs font-semibold text-text-secondary shrink-0 mt-1.5">
+                      학생
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* STT 전사문 */}
       <Card>
         <CardHeader title="STT 전사문" />
         <CardBody>
@@ -128,19 +276,29 @@ export function StepSubmissionView({ data, onNext }: StepSubmissionViewProps) {
         </CardBody>
       </Card>
 
+      {/* AI 1차 평가 요약 */}
       {aiEval && (
         <Card>
-          <CardHeader title="AI 자동 평가 요약" description={`총점 ${aiEval.totalScore} / 100`} />
+          <CardHeader
+            title="AI 1차 평가 요약"
+            description={`환산 ${aiEval.normalizedScore}/100 · 원점수 ${aiEval.totalScore}/${officialRubric.totalMaxScore}점`}
+          />
           <CardBody>
             <div className="space-y-3">
+              <div className="p-2 bg-info-50 border border-info-100 rounded-md text-xs text-info-700">
+                AI 평가는 1차 참고 자료입니다. 교수자가 최종 점수를 확정합니다.
+              </div>
+
               <div>
                 <div className="flex justify-between text-xs text-text-secondary mb-1">
-                  <span className="font-medium">총점</span>
-                  <span>{aiEval.totalScore} / 100</span>
+                  <span className="font-medium">AI 환산 점수</span>
+                  <span>{aiEval.normalizedScore} / 100</span>
                 </div>
-                <ScoreBar score={aiEval.totalScore} maxScore={100} />
+                <ScoreBar score={aiEval.normalizedScore} maxScore={100} />
               </div>
+
               <div className="border-t border-border pt-3 space-y-2">
+                <p className="text-xs font-semibold text-text-secondary">루브릭 항목별 AI 점수</p>
                 {rubricItems.map((item) => {
                   const score = aiEval.scores[item.id] ?? 0
                   return (
@@ -153,6 +311,10 @@ export function StepSubmissionView({ data, onNext }: StepSubmissionViewProps) {
                     </div>
                   )
                 })}
+                <div className="flex justify-between text-xs font-bold text-text-primary border-t border-border pt-1">
+                  <span>합계</span>
+                  <span>{aiEval.totalScore} / {officialRubric.totalMaxScore}점</span>
+                </div>
               </div>
 
               {aiEval.errorTags.length > 0 && (
@@ -180,6 +342,26 @@ export function StepSubmissionView({ data, onNext }: StepSubmissionViewProps) {
         </Card>
       )}
 
+      {/* 교수자 참고 — 모범 답안 */}
+      {questionExtras?.modelAnswer && (
+        <Card>
+          <CardHeader title="모범 답안 (교수자 참고)" description="채점 기준 예시 답변입니다." />
+          <CardBody>
+            <p className="text-sm text-text-primary leading-relaxed bg-surface p-3 rounded-md border border-border italic">
+              {questionExtras.modelAnswer}
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* 교수자 전용 메모 */}
+      {questionExtras?.teacherNotes && (
+        <div className="p-3 bg-warning-50 border border-warning-100 rounded-lg">
+          <p className="text-xs font-semibold text-warning-700 mb-1">교수자 채점 메모</p>
+          <p className="text-sm text-warning-700 leading-relaxed">{questionExtras.teacherNotes}</p>
+        </div>
+      )}
+
       {riskFlag && (
         <div className="p-3 bg-danger-50 border border-danger-100 rounded-lg">
           <p className="text-xs font-semibold text-danger-700 mb-1">위험 학생 분류 사유</p>
@@ -200,7 +382,7 @@ export function StepSubmissionView({ data, onNext }: StepSubmissionViewProps) {
           </p>
         )}
         <Button onClick={onNext} disabled={!aiEval}>
-          다음 단계 →
+          루브릭 채점 →
         </Button>
       </div>
     </div>

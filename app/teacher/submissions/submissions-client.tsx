@@ -16,6 +16,7 @@ const LANGUAGE_GROUP_OPTIONS = [
 const CONTENT_TYPE_OPTIONS = [
   { value: 'all', label: '전체 유형' },
   { value: '말하기 평가', label: '말하기 평가' },
+  { value: '대화 미션', label: '대화 미션 (AI 쌍방)' },
   { value: '미션 대화', label: '미션 대화' },
   { value: '말하기 대회', label: '말하기 대회' },
 ]

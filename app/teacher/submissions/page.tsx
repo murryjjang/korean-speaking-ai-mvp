@@ -9,6 +9,7 @@ import {
   mockRiskFlags,
 } from '@/src/lib/mock/data'
 import { getStatusOverride } from '@/src/lib/mock/teacher-grading-store'
+import questionsJson from '@/src/content/questions.json'
 import type { RiskLevel } from '@/src/types/data'
 import type { TeacherSubmissionRow } from '../submissions-table'
 import { SubmissionsClient } from './submissions-client'
@@ -34,6 +35,10 @@ function calcRisk(score: number | undefined): RiskLevel {
   return 'high'
 }
 
+const questionTypeMap = new Map(
+  (questionsJson as Array<Record<string, unknown>>).map((q) => [q.id as string, q.typeId as string]),
+)
+
 export default function TeacherSubmissionsListPage() {
   const evalMap = new Map(mockAIEvaluations.map((e) => [e.submissionId, e.normalizedScore]))
   const studentMap = new Map(mockStudents.map((s) => [s.id, s]))
@@ -53,6 +58,17 @@ export default function TeacherSubmissionsListPage() {
 
     const effectiveStatus = getStatusOverride(s.id) ?? s.status
 
+    // Determine display type — dialogue_mission gets special label
+    const qTypeId = s.questionId ? questionTypeMap.get(s.questionId) : undefined
+    const isDialogueMission = qTypeId === 'qt-dialogue-mission'
+    const moduleTypeLabel = isDialogueMission
+      ? '대화 미션'
+      : s.moduleType === 'assessment'
+        ? '말하기 평가'
+        : s.moduleType === 'mission'
+          ? '미션 대화'
+          : '말하기 대회'
+
     return {
       id: s.id,
       studentName: student?.name ?? s.studentId,
@@ -64,12 +80,8 @@ export default function TeacherSubmissionsListPage() {
       languageGroupRaw: student?.languageGroup ?? '',
       nativeLanguage: student?.nativeLanguage ?? '—',
       submittedAt: new Date(s.submittedAt).toLocaleDateString('ko-KR'),
-      moduleType:
-        s.moduleType === 'assessment'
-          ? '말하기 평가'
-          : s.moduleType === 'mission'
-            ? '미션 대화'
-            : '말하기 대회',
+      moduleType: moduleTypeLabel,
+      isDialogueMission,
       aiScore,
       status: effectiveStatus,
       risk,

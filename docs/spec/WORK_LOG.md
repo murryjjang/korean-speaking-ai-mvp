@@ -4,6 +4,83 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-5-B — 교수자 최종확정 화면 official rubric 기반 강화
+
+**날짜**: 2026-05-06  
+**목표**: teacher dashboard 제출 검토 화면을 official assessment rubric 기준으로 강화. AI가 1차 평가자, 교수자가 최종 확정자라는 구조를 명확히.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/types/grading.ts` | `OfficialRubric`, `QuestionExtras`, `DialogueTurnPreview` 타입 추가; `GradingWizardData` 확장 (`officialRubric`, `questionExtras`, `dialogueTurns`, `isDialogueMission`) |
+| `src/lib/mock/data.ts` | 공식 문항 mock submission 4개 추가 (sub-019~022), AI evaluation 4개 추가 (공식 rubric ID 기반) |
+| `app/teacher/submissions/[id]/page.tsx` | 올바른 rubric 동적 로드 (`question.rubricId`), `questionExtras` 빌드, `dialogueTurns` mock 데이터, `isDialogueMission` 판별 |
+| `app/teacher/submissions/[id]/step-submission-view.tsx` | 문항 guide/requiredElements/modelAnswer 표시; 교수자 전용: listeningScriptForTeacherOnly, aiInformation; q4 대화 로그(AI/학생 turn 구분); 음성 파일 audio player; AI 1차 평가 점수 배점 기준 표시 |
+| `app/teacher/submissions/[id]/step-rubric-adjust.tsx` | officialRubric.totalMaxScore 기반 합계 표시; AI 환산/원점수 구분 안내; 대화 미션 missionGoals 달성 현황; "미션" "상호작용" 조정 이유 추가 |
+| `app/teacher/submissions/[id]/step-final-feedback.tsx` | AI 1차 환산 점수 vs 교수자 확정 점수(배점 기준) 구분 표시; officialRubric.totalMaxScore 적용 |
+| `app/teacher/submissions/page.tsx` | questionsJson import, dialogue_mission 문항 유형 레이블 "대화 미션"으로 분기 |
+| `app/teacher/submissions-table.tsx` | `isDialogueMission` 필드 추가; dialogue_mission 행에 "AI대화" 배지 표시 |
+| `app/teacher/submissions/submissions-client.tsx` | 필터 옵션에 "대화 미션 (AI 쌍방)" 추가 |
+| `tests/smoke/auth-routes.spec.ts` | Phase 10-E-5-B teacher review 테스트 27개 추가 |
+| `docs/spec/WORK_LOG.md` | 이 항목 |
+| `docs/spec/PHASE_10E_GAP_ANALYSIS.md` | 10-E-5-B 처리 결과 반영 |
+
+### 핵심 구현 내용
+
+**Official Rubric 연동**:
+- `page.tsx`에서 `question.rubricId`로 rubrics.json에서 정확한 루브릭을 로드
+- reading(15점), material_description(25점), listening_response(25점), dialogue_mission(35점) 각각의 항목·배점 사용
+- legacy `rubric-speaking-01`(100점)은 기존 제출에 그대로 유지
+
+**점수 표시 구분**:
+- AI 1차 환산 점수: `aiEval.normalizedScore`(0~100)
+- AI 원점수(배점 기준): `aiEval.totalScore / officialRubric.totalMaxScore`
+- 교수자 최종 점수: sum of adjusted rubric item scores / officialRubric.totalMaxScore
+
+**Step 1 (제출 검토) 강화**:
+- `requiredElements`: 루브릭 채점 기준 목록 표시
+- `listeningScriptForTeacherOnly`: 교수자 전용 박스로 표시 (학생 비공개)
+- `aiInformation`: 교수자 전용 박스로 표시 (학생 비공개)
+- q4 대화 로그: AI/학생 turn 구분 말풍선 형태로 표시
+- `modelAnswer`: 교수자 참고 모범 답안 표시
+- `teacherNotes`: 교수자 채점 메모 표시
+- audio player: `submission.audioUrl`이 있으면 `<audio controls>` 표시
+
+**Step 2 (루브릭 조정) 강화**:
+- q4 missionGoals 달성 현황 패널 추가
+- AI 환산/원점수 안내 배너
+- 합계 행에 AI 원점수 표시 + 환산 참고 표시
+- "미션", "상호작용" 조정 이유 추가
+
+**Step 3 (최종 피드백) 강화**:
+- "AI 1차 환산 점수 / 100" vs "교수자 확정 점수 / 배점" 구분
+
+**mock 데이터 추가**:
+- `sub-019`: beginner-q1-reading / rubric-reading-01 / AI 원점수 10/15 (환산 67)
+- `sub-020`: beginner-q2-material-description / rubric-material-desc-01 / AI 17/25 (환산 68)
+- `sub-021`: beginner-q3-listening-response / rubric-listening-resp-01 / AI 17/25 (환산 68)
+- `sub-022`: beginner-q4-dialogue-mission / rubric-dialogue-mission-01 / AI 23/35 (환산 66)
+
+### 남은 Known Issues
+
+- teacher_reviews RLS 전면 적용 (Supabase 기반 전환 시)
+- finalized 결과 학생 공개 화면 (TODO 주석으로 표시)
+- dialogueTurns DB 영구 저장 구조 (현재 mock)
+- actual Azure TTS 연결
+- actual OpenAI/Claude conversation provider 연결
+- ETRI/Azure 발음평가 연동
+- 모바일 Safari teacher/student 수동 QA
+
+### lint / tsc / build / smoke
+
+- `npm run lint` → 에러 0
+- `npx tsc --noEmit` → 에러 0
+- `npm run build` → 성공
+- `npm run test:smoke` → **126 passed** (기존 102 + 신규 24)
+
+---
+
 ## Phase 10-E-4 추가 수정 — dialogue_mission 단발 녹음→제출 UI 비표시
 
 **날짜**: 2026-05-06  

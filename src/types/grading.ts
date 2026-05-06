@@ -1,6 +1,30 @@
 import type { Submission, Student, Class, AIEvaluation, TeacherEvaluation, RiskFlag } from './data'
 import type { RubricItem, Question } from './content'
 
+export type OfficialRubric = {
+  id: string
+  name: string
+  totalMaxScore: number
+  items: RubricItem[]
+}
+
+export type QuestionExtras = {
+  typeId: string
+  guide: string
+  requiredElements: string[]
+  modelAnswer: string
+  teacherNotes: string
+  listeningScriptForTeacherOnly?: string
+  aiInformation?: string
+  missionGoals?: string[]
+  maxScore: number
+}
+
+export type DialogueTurnPreview = {
+  role: 'ai' | 'student'
+  text: string
+}
+
 export type GradingWizardData = {
   submission: Submission
   student: Student
@@ -9,7 +33,11 @@ export type GradingWizardData = {
   existingTeacherEval: TeacherEvaluation | null
   riskFlag: RiskFlag | null
   rubricItems: RubricItem[]
+  officialRubric: OfficialRubric
   question: Question | null
+  questionExtras: QuestionExtras | null
+  dialogueTurns: DialogueTurnPreview[]
+  isDialogueMission: boolean
   isAlreadyFinalized: boolean
 }
 

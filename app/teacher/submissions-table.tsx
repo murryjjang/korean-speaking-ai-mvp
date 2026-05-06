@@ -21,6 +21,7 @@ export type TeacherSubmissionRow = Record<string, unknown> & {
   languageGroupRaw: string;
   submittedAt: string;
   moduleType: string;
+  isDialogueMission?: boolean;
   aiScore: number | null;
   status: string;
   risk: RiskLevel;
@@ -54,7 +55,20 @@ const columns: Column<TeacherSubmissionRow>[] = [
   { key: "className", label: "반", className: "whitespace-nowrap" },
   { key: "langGroup", label: "어권", className: "whitespace-nowrap" },
   { key: "submittedAt", label: "제출일", sortable: true, className: "whitespace-nowrap" },
-  { key: "moduleType", label: "유형", className: "whitespace-nowrap" },
+  {
+    key: "moduleType",
+    label: "유형",
+    className: "whitespace-nowrap",
+    render: (v, row) =>
+      row.isDialogueMission ? (
+        <span className="inline-flex items-center gap-1">
+          <span className="text-primary-700 font-medium text-xs">{v as string}</span>
+          <Badge variant="info">AI대화</Badge>
+        </span>
+      ) : (
+        <span className="text-xs text-text-primary">{v as string}</span>
+      ),
+  },
   {
     key: "aiScore",
     label: "AI 점수",
