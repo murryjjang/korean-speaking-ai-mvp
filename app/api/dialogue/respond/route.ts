@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   }
 
   const b = body as Record<string, unknown>
-  const { questionId, turns, latestStudentText, level } = b
+  const { questionId, turns, latestStudentText, level, mode, personaId } = b
 
   if (typeof questionId !== 'string' || !questionId) {
     return Response.json({ error: 'missing_question_id' }, { status: 400 })
@@ -50,6 +50,10 @@ export async function POST(request: Request) {
   const provider = getDialogueConversationProvider()
 
   try {
+    const safeMode =
+      mode === 'practice' ? 'practice' : 'assessment'
+    const safePersonaId = typeof personaId === 'string' ? personaId : undefined
+
     const result = await provider.getDialogueResponse({
       questionId,
       level: typeof level === 'string' ? level : (question.difficulty ?? 'beginner'),
@@ -58,6 +62,8 @@ export async function POST(request: Request) {
       missionGoals,
       turns: safeTurns,
       latestStudentText,
+      mode: safeMode,
+      personaId: safePersonaId,
     })
 
     try {

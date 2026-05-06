@@ -6,10 +6,11 @@ import { Button, Card, CardBody } from '@/src/components/ui'
 import { useAudioRecorder } from '@/src/hooks/use-audio-recorder'
 import { useTTS } from '@/src/hooks/use-tts'
 import { submitDialogue } from '@/app/student/speaking/dialogue-actions'
-import type { DialogueTurn, MissionGoalResult, DialogueMissionPanelStatus } from '@/src/types/dialogue'
+import type { DialogueTurn, MissionGoalResult, DialogueMissionPanelStatus, DialogueMode } from '@/src/types/dialogue'
 import { detectMissionProgress } from '@/src/lib/dialogue-mission'
+import { validateRecordedAudio, getAudioValidationMessage } from '@/src/lib/audio-validation'
+import { shouldAnswerLanguageQuestion } from '@/src/lib/dialogue-policy'
 
-const MIN_VALID_DURATION_SEC = 2
 const MIN_VALID_BLOB_SIZE = 3000
 
 function formatTime(sec: number): string {
@@ -25,6 +26,9 @@ export type DialogueMissionPanelProps = {
   aiFirstUtterance: string
   missionGoals: string[]
   maxDialogueDurationSec: number
+  // Dialogue mode: 'assessment' (default, q4 evaluation) or 'practice' (free conversation)
+  mode?: DialogueMode
+  personaId?: string
 }
 
 export function DialogueMissionPanel({
@@ -34,6 +38,8 @@ export function DialogueMissionPanel({
   aiFirstUtterance,
   missionGoals,
   maxDialogueDurationSec,
+  mode = 'assessment',
+  personaId,
 }: DialogueMissionPanelProps) {
   const router = useRouter()
   const recorder = useAudioRecorder()
@@ -110,10 +116,15 @@ export function DialogueMissionPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelStatus])
 
-  const isInvalidAudio =
-    recorder.state === 'stopped' &&
-    (recorder.durationSec < MIN_VALID_DURATION_SEC ||
-      (blobSize !== null && blobSize < MIN_VALID_BLOB_SIZE))
+  const audioValidation =
+    recorder.state === 'stopped'
+      ? validateRecordedAudio({ durationSec: recorder.durationSec, blobSize, audioStats: recorder.audioStats })
+      : { valid: true as const }
+  const isInvalidAudio = !audioValidation.valid
+  const invalidAudioMessage =
+    !audioValidation.valid
+      ? getAudioValidationMessage(audioValidation.reason)
+      : '녹음을 확인해 주세요.'
 
   const hasValidStudentTurns = turns.some(
     (t) => t.role === 'student' && t.status === 'completed',
@@ -165,12 +176,14 @@ export function DialogueMissionPanel({
   const handleSendTurn = useCallback(async () => {
     if (recorder.state !== 'stopped' || !recorder.blobUrl) return
 
-    // Defense-in-depth: guard matches button disabled condition
-    if (
-      recorder.durationSec < MIN_VALID_DURATION_SEC ||
-      (blobSize !== null && blobSize < MIN_VALID_BLOB_SIZE)
-    ) {
-      setTurnError('녹음이 너무 짧습니다. 2초 이상 말해 주세요.')
+    // Defense-in-depth: matches the disabled-button condition
+    const guardCheck = validateRecordedAudio({
+      durationSec: recorder.durationSec,
+      blobSize,
+      audioStats: recorder.audioStats,
+    })
+    if (!guardCheck.valid) {
+      setTurnError(getAudioValidationMessage(guardCheck.reason))
       return
     }
 
@@ -198,6 +211,7 @@ export function DialogueMissionPanel({
     // STT call
     let transcript = ''
     let sttProviderName = ''
+    let sttWarning = ''
     try {
       const fd = new FormData()
       fd.append('audio', audioBlob, 'recording.webm')
@@ -207,17 +221,25 @@ export function DialogueMissionPanel({
         const data = await res.json()
         if (typeof data?.transcript === 'string') transcript = data.transcript
         if (typeof data?.providerName === 'string') sttProviderName = data.providerName
+        if (typeof data?.warning === 'string') sttWarning = data.warning
       }
     } catch {
       // STT failure
     }
 
-    // No-speech guard — same policy as single-recording flow
-    if (sttProviderName === 'no-speech' || !transcript.trim()) {
+    // No-speech / hallucination guard
+    if (
+      sttProviderName === 'no-speech' ||
+      sttWarning === 'stt_hallucination_filtered' ||
+      !transcript.trim()
+    ) {
       setTurnError('음성이 감지되지 않았습니다. 다시 말해 주세요.')
       setPanelStatus('recorded')
       return
     }
+
+    // Tag student turn intent — language questions are excluded from mission evidence
+    const isLanguageQuestion = shouldAnswerLanguageQuestion(transcript)
 
     // Add student turn
     const studentTurn: DialogueTurn = {
@@ -228,6 +250,7 @@ export function DialogueMissionPanel({
       createdAt: new Date().toISOString(),
       status: 'completed',
       providerName: sttProviderName || 'mock',
+      intent: isLanguageQuestion ? 'language_question' : 'mission_response',
     }
 
     const newTurns = [...turns, studentTurn]
@@ -245,6 +268,8 @@ export function DialogueMissionPanel({
           level: difficulty,
           turns: newTurns.map((t) => ({ role: t.role, text: t.text })),
           latestStudentText: transcript,
+          mode,
+          personaId,
         }),
       })
 
@@ -290,7 +315,7 @@ export function DialogueMissionPanel({
     setBlobSize(null)
     setTurnError(null)
     setPanelStatus('ready')
-  }, [recorder, blobSize, turns, questionId, difficulty, ttsPlay])
+  }, [recorder, blobSize, turns, questionId, difficulty, ttsPlay, mode, personaId])
 
   const handleEndDialogue = useCallback(() => {
     if (!canSubmit) return
@@ -496,7 +521,7 @@ export function DialogueMissionPanel({
                   data-testid="short-recording-warning"
                 >
                   <p className="text-xs text-amber-700">
-                    <strong>녹음이 너무 짧습니다.</strong> 2초 이상 말해 주세요.
+                    {invalidAudioMessage}
                   </p>
                 </div>
               )}

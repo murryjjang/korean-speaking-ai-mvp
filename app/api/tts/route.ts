@@ -20,8 +20,10 @@ export async function POST(request: Request) {
   const purposeStr = typeof purpose === 'string' ? purpose : null
   const configuredProvider = process.env.TTS_PROVIDER ?? 'mock'
 
-  // Fast path: not openai or no API key → return fallback immediately
-  if (configuredProvider !== 'openai' || !process.env.OPENAI_API_KEY) {
+  // Fast path: not a real provider or missing credentials → return fallback immediately
+  const isOpenAI = configuredProvider === 'openai' && !!process.env.OPENAI_API_KEY
+  const isAzure = configuredProvider === 'azure' && !!process.env.AZURE_SPEECH_KEY && !!process.env.AZURE_SPEECH_REGION
+  if (!isOpenAI && !isAzure) {
     await logProviderEvent({
       provider: 'mock',
       feature: 'tts',
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
     })
   }
 
-  // OpenAI TTS path
+  // OpenAI or Azure TTS path
   const startMs = Date.now()
 
   try {

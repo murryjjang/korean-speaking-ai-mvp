@@ -4,6 +4,134 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-5-C/D 통합 보정 — language question 우선순위, 무음 차단, q2 이미지 구조
+
+**날짜**: 2026-05-06  
+**목표**: assessment/practice mode 분리 후 추가 보정. q4 표현 질문 오인 수정, 무음 STT 환각 차단, q2 실제 사진 asset 연결 구조 정리.
+
+### 수정/신규 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/lib/audio-validation.ts` | **신규** — `AudioStats`, `validateRecordedAudio()`, `isLikelySilentAudio()`, `getAudioValidationMessage()` |
+| `src/lib/stt-sanity.ts` | **신규** — `isLikelySttHallucination()`, `isGenericYouTubeOutro()`, `normalizeTranscript()` (YouTube outro 환각 필터) |
+| `src/lib/dialogue-policy.ts` | language question 패턴 확장 (17→27개), "어떻게 얘기", "이 표현", "자연스러", "문법", "발음" 등 추가; `answerLanguageQuestionForAssessment()`에 "여기서/매장 어떻게 얘기" 전용 응답 추가 |
+| `src/lib/dialogue-mission.ts` | `missionStudentText()` — language question turn을 mission evidence에서 제외; `shouldAnswerLanguageQuestion()` import로 재감지 |
+| `src/types/dialogue.ts` | `DialogueTurnIntent` 타입 추가 (`language_question`, `mission_response`, `other`); `DialogueTurn.intent` 선택 필드 추가 |
+| `src/hooks/use-audio-recorder.ts` | AudioContext/AnalyserNode 기반 에너지 분석 추가; `audioStats: AudioStats \| null` 반환; `finalizeAudioAnalysis()` helper |
+| `app/api/stt/route.ts` | STT 결과 post-filter — `isLikelySttHallucination()` 통과하면 `transcript: ''`, `warning: 'stt_hallucination_filtered'` 반환; provider_events 기록 |
+| `src/providers/conversation/index.ts` | `allStudentText()` — language question turns 제외 (mission evidence 오염 방지) |
+| `src/content/assessment-assets.ts` | beginner q2 `src` 경로 설정 (`/images/official/beginner-restaurant-scene.jpg`), `alt` 개선 |
+| `src/components/question-asset-renderer.tsx` | `ImageAssetCard`에 `onError` fallback 추가 — 파일 없어도 placeholder로 graceful 전환 |
+| `src/components/dialogue-mission-panel.tsx` | `validateRecordedAudio()` 사용; `getAudioValidationMessage()` 메시지 동적화; STT hallucination warning 차단; student turn에 `intent` 태깅 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | `validateRecordedAudio()` 사용; `sttHallucinationError` 상태 추가; hallucination 감지 시 재녹음 안내 표시 |
+| `public/images/official/.gitkeep` | 이미지 대상 디렉토리 생성 |
+| `tests/smoke/auth-routes.spec.ts` | Phase 10-E-5-C/D 통합 보정 전용 테스트 14개 추가 (총 156개) |
+
+### 핵심 구현 내용
+
+**q4 language question 우선순위 보정**:
+- 처리 순서 고정: ① no-speech/invalid audio guard → ② language question 감지 → ③ mission completion → ④ normal roleplay
+- "여기서 먹고 가려면 어떻게 얘기해야 하죠?" → language question 처리, "'여기서 먹고 갈게요' 또는 '매장에서 먹고 갈게요'라고 말하면 자연스럽습니다. 그럼 매장에서 드시고 가실 건가요?"
+- "포장해 주세요가 맞아요?" → language question 처리, 포장 missionGoal evidence로 사용 안 함
+- `detectMissionProgress()`: language question turn을 text evidence에서 제외 (`missionStudentText()`)
+- `DialogueTurn.intent`: `language_question` | `mission_response` | `other` (client-only, DB schema 변경 없음)
+
+**무음 녹음 / STT 환각 차단**:
+- 클라이언트: `validateRecordedAudio({ durationSec, blobSize, audioStats })` — duration < 2s, blobSize < 3000B, maxRms < 0.003, voicedMs < 400ms 시 invalid
+- AudioContext/AnalyserNode로 RMS 샘플링 (100ms 간격), `audioStats` 반환
+- 서버: `/api/stt` 결과에 `isLikelySttHallucination()` 적용 — "시청해주셔서 감사합니다.", YouTube outro 등 차단
+- q4 dialogue panel: STT warning `stt_hallucination_filtered` 시 turn 추가/AI 응답 생성 금지
+
+**q2 실제 사진 asset 연결 구조**:
+- `assessment-assets.ts`: beginner q2 `src: '/images/official/beginner-restaurant-scene.jpg'` 설정
+- `ImageAssetCard`: `onError` → `setImgFailed(true)` → placeholder 전환 (파일 없어도 crash 없음)
+- `public/images/official/` 디렉토리 생성 (실제 사진 파일은 파일럿 전 직접 촬영/허가 이미지로 교체 필요)
+- intermediate/advanced q2 chart/table 렌더링 유지
+
+**Known Issues (남은 항목)**:
+- Azure 실제 키 기반 수동 검증 미완
+- practice mode 전체 대화 UI (페르소나 카드 클릭 → 대화 시작) 미구현
+- dialogueTurns DB 영구 저장 미완
+- attempt 단위 전체 응시 흐름(1~4번) 미구현
+- beginner q2 실제 사진 파일 없음 (파일럿 전 직접 촬영 또는 사용 허가 이미지 교체 필요)
+- 모바일/브라우저별 무음 threshold 수동 조정 필요
+
+### 검증 결과
+
+| 명령 | 결과 |
+|---|---|
+| `npm run lint` | ✅ 0 errors |
+| `npx tsc --noEmit` | ✅ 0 errors |
+| `npm run build` | ✅ 성공 (20 routes) |
+| `npm run test:smoke` | ✅ 156 passed (14개 Phase 10-E-5-C/D 통합 보정 테스트 포함) |
+
+---
+
+## Phase 10-E-5-C/D — 대화 정책 분리, 페르소나 구조 확장, Azure TTS provider
+
+**날짜**: 2026-05-06  
+**목표**: assessment mode(q4 평가)와 practice mode(생성형 대화연습)의 대화 규칙을 분리. 5개 페르소나 구조 정의. Azure TTS provider 연결 가능 구조 구현 + Azure 키 미설정 시 browser speechSynthesis fallback 안전 동작.
+
+### 수정/신규 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/lib/dialogue-policy.ts` | **신규** — `DialogueMode`, `DialoguePolicyConfig`, `shouldAnswerLanguageQuestion()`, `answerLanguageQuestionForAssessment()`, `answerLanguageQuestionForPractice()`, `buildReturnToRoleplayMessage()`, `getDialoguePolicy()` |
+| `src/lib/personas.ts` | **신규** — 5개 페르소나 registry: cafe_staff_friendly, admin_staff_clear, event_partner_professional, korean_teacher_coach, friend_casual; `dialectHint` 필드 포함 |
+| `src/providers/tts/azure.ts` | **신규** — `AzureTTSProvider` (SSML 기반, ko-KR-SunHiNeural 기본값, AZURE_SPEECH_KEY/REGION 없으면 `azure_tts_no_credentials` 예외 발생) |
+| `src/providers/tts/index.ts` | Azure provider 분기 추가 (`TTS_PROVIDER=azure`) |
+| `app/api/tts/route.ts` | Azure credentials 체크 로직 추가 — `isAzure` 조건으로 fast-path 분기 |
+| `src/types/dialogue.ts` | `DialogueMode`, `DialoguePanelConfig` 타입 추가 |
+| `src/providers/conversation/index.ts` | `DialogueConversationInput`에 `mode`, `personaId`, `allowLanguageHelp`, `maxTurns`, `autonomyLevel` 추가; `MockDialogueConversationProvider`에서 policy 기반 언어 질문 처리, practice mode 개방적 응답 |
+| `app/api/dialogue/respond/route.ts` | `mode`, `personaId` 수신 후 provider에 전달 |
+| `src/components/dialogue-mission-panel.tsx` | `mode`, `personaId` props 추가; API 호출 시 전달; `handleSendTurn` 의존성 배열 업데이트 |
+| `app/student/conversation-practice/page.tsx` | **신규** — 생성형 대화연습 placeholder 페이지 (페르소나 카드 5개, 준비 중 상태 표시) |
+| `app/student/layout.tsx` | "대화연습 (생성형)" nav item 추가 |
+| `app/teacher/submissions/[id]/grading-wizard.tsx` | `data-testid="grading-wizard"` 추가 (smoke test 대응) |
+| `.env.local.example` | Azure TTS 설명 업데이트, `AZURE_TTS_VOICE` 변수 추가 |
+| `tests/smoke/auth-routes.spec.ts` | Phase 10-E-5-C/D 전용 테스트 16개 추가 (총 142개) |
+
+### 핵심 구현 내용
+
+**Assessment vs Practice 정책 분리**:
+- `assessment` mode: `allowLanguageHelp: 'limited'`, `maxTurns: 8~10`, `autonomyLevel: 'guided'` — 미션 달성 중심, 문법 질문에 짧게 답하고 역할극 복귀
+- `practice` mode: `allowLanguageHelp: 'full'`, `maxTurns: 14~20`, `autonomyLevel: 'open'` — 문법/표현 자세한 설명, 예문 제공, 코치 모드
+- q4 official dialogue_mission은 반드시 `assessment` mode (기본값)
+
+**문법/표현 질문 대응**:
+- `shouldAnswerLanguageQuestion()`: 정규식 패턴 17개로 언어 질문 감지
+- assessment: 짧은 확인 후 즉시 역할극 복귀 (예: "네, 자연스러운 표현입니다. 포장으로 해드릴까요?")
+- practice: 자세한 설명 + 예문 (예: "'포장해 주세요'와 '가져갈게요' 차이 설명 + 연습 유도")
+
+**Azure TTS**:
+- `AZURE_SPEECH_KEY` + `AZURE_SPEECH_REGION` 있으면 Azure Cognitive Services TTS 호출
+- SSML 기반 (ko-KR, SunHiNeural 기본값), `rateForLevel()`로 수준별 속도 조정
+- 키 없으면 `azure_tts_no_credentials` 예외 → API route에서 catch → fallback JSON 반환
+- 클라이언트(`use-tts.ts`)는 `audioBase64` 없으면 자동으로 browser speechSynthesis 사용
+
+**페르소나 구조**:
+- 5개 페르소나, `dialectHint` 필드 포함 (standard/seoul/busan/jeolla/gyeongnam)
+- 사투리 억양 TTS는 Azure voice 지원 확인 후 후속 구현 예정 (LLM 표현은 가능, TTS 억양은 미지원)
+- `modeSupport` 필드로 assessment/practice 지원 여부 관리
+
+**Known Issues (남은 항목)**:
+- Azure 실제 키 기반 수동 검증 미완
+- practice mode 전체 대화 UI (페르소나 카드 클릭 → 대화 시작) 미구현
+- dialogueTurns DB 영구 저장 미완
+- attempt 단위 전체 응시 흐름(1~4번) 미구현
+
+### 검증 결과
+
+| 명령 | 결과 |
+|---|---|
+| `npm run lint` | ✅ 0 errors |
+| `npx tsc --noEmit` | ✅ 0 errors |
+| `npm run build` | ✅ 성공 (20 routes) |
+| `npm run test:smoke` | ✅ 142 passed (16개 Phase 10-E-5-C/D 전용 테스트 포함) |
+
+---
+
 ## Phase 10-E-5-B — 교수자 최종확정 화면 official rubric 기반 강화
 
 **날짜**: 2026-05-06  

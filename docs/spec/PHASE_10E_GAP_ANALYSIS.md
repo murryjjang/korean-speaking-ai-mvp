@@ -57,6 +57,45 @@
 - 🔜 finalized 결과 학생 공개 화면
 - 🔜 dialogueTurns DB 영구 저장 구조 (현재 mock)
 
+**대화 정책 분리 및 페르소나 확장 (10-E-5-C/D 처리 완료, 2026-05-06):**
+- ✅ `src/lib/dialogue-policy.ts` — assessment/practice mode 정책 분리
+- ✅ assessment mode: `allowLanguageHelp: 'limited'`, `maxTurns: 8~10`, `autonomyLevel: 'guided'`
+- ✅ practice mode: `allowLanguageHelp: 'full'`, `maxTurns: 14~20`, `autonomyLevel: 'open'`
+- ✅ `shouldAnswerLanguageQuestion()` — 언어 질문 패턴 감지 (정규식 17개)
+- ✅ assessment mode 문법 질문 → 짧은 확인 + 역할극 복귀
+- ✅ practice mode 문법 질문 → 자세한 설명 + 예문
+- ✅ `src/lib/personas.ts` — 5개 페르소나 registry (cafe_staff_friendly, admin_staff_clear, event_partner_professional, korean_teacher_coach, friend_casual)
+- ✅ `dialectHint` 필드 포함 (standard/seoul/busan/jeolla/gyeongnam) — TTS 억양은 Azure voice 확인 후 후속 구현
+- ✅ `src/providers/tts/azure.ts` — `AzureTTSProvider` (SSML ko-KR, SunHiNeural 기본값, level별 rate)
+- ✅ Azure key 없으면 예외 → route catch → fallback JSON 반환 (crash 없음)
+- ✅ `app/student/conversation-practice/page.tsx` — 생성형 대화연습 placeholder 페이지
+- ✅ student nav에 "대화연습 (생성형)" 추가
+- ✅ `DialogueConversationInput`에 `mode`, `personaId` 등 추가
+- ✅ smoke 142 passed (기존 126 + 신규 16)
+
+**10-E-5-C/D 통합 보정 (2026-05-06):**
+- ✅ language question 패턴 27개로 확장 ("어떻게 얘기", "이 표현", "자연스러", "문법", "발음" 등)
+- ✅ "여기서 먹고 가려면 어떻게 얘기해야 하죠?" → language question 처리, mission completion 오인 방지
+- ✅ `detectMissionProgress()`: language question turn text를 evidence에서 제외 (`missionStudentText()`)
+- ✅ `DialogueTurn.intent`: `language_question` | `mission_response` | `other` (client-only, DB schema 변경 없음)
+- ✅ `src/lib/audio-validation.ts` — `AudioStats`, `validateRecordedAudio()`, `isLikelySilentAudio()`, `getAudioValidationMessage()`
+- ✅ `src/hooks/use-audio-recorder.ts` — AudioContext/AnalyserNode 기반 에너지 분석 (100ms 간격 RMS 샘플링)
+- ✅ `src/lib/stt-sanity.ts` — `isLikelySttHallucination()` ("시청해주셔서 감사합니다." 등 YouTube outro 필터)
+- ✅ `/api/stt` post-filter — hallucination 감지 시 `transcript: ''`, `warning: 'stt_hallucination_filtered'`
+- ✅ q1/q2/q3 speaking-client에 STT hallucination guard 추가 (재녹음 안내)
+- ✅ q4 dialogue panel에 hallucination guard 추가 (turn/AI 응답 생성 금지)
+- ✅ beginner q2 `src: '/images/official/beginner-restaurant-scene.jpg'` 경로 설정
+- ✅ `ImageAssetCard` onError fallback — 파일 없어도 placeholder graceful 전환
+- ✅ `public/images/official/` 디렉토리 생성
+- ✅ smoke 156 passed (기존 142 + 신규 14)
+- 🔜 Azure 실제 키 기반 수동 검증 미완
+- 🔜 practice mode 전체 대화 UI (페르소나 카드 클릭 → 대화 시작) 미구현
+- 🔜 dialogueTurns DB 영구 저장 미완
+- 🔜 attempt 단위 1~4번 전체 응시 흐름 미구현
+- 🔜 beginner q2 실제 사진 교체 필요 (파일럿 전, 직접 촬영 또는 사용 허가 이미지)
+- 🔜 모바일/브라우저별 무음 threshold 수동 조정 필요
+- 🔜 ETRI/Azure 발음평가 비교 미완
+
 **4번 dialogue_mission 구현 방향**: 단발 녹음형으로 최종 운영하지 않음. 생성형 AI 쌍방 대화형 평가로 구현 예정. 실제 AI 대화 UI·대화 로그 저장·missionGoals 달성 평가는 **10-E-5**에서 구현. 현재는 단발 녹음 UI를 숨기고 "준비 중" 상태로 표시하며 `evaluationMode: "interactive_dialogue"` 필드로 명시.
 
 ---

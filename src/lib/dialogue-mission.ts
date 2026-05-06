@@ -1,8 +1,19 @@
 import type { DialogueTurn, MissionGoalResult } from '@/src/types/dialogue'
+import { shouldAnswerLanguageQuestion } from '@/src/lib/dialogue-policy'
 
-function allStudentText(turns: DialogueTurn[]): string {
+// Only count turns where the student was actually performing the mission,
+// not asking meta-questions about language/grammar/expression.
+// A turn is excluded if it has intent='language_question' OR if the text triggers
+// the language question detector (handles turns created before intent tagging).
+function missionStudentText(turns: DialogueTurn[]): string {
   return turns
-    .filter((t) => t.role === 'student' && t.status === 'completed')
+    .filter(
+      (t) =>
+        t.role === 'student' &&
+        t.status === 'completed' &&
+        t.intent !== 'language_question' &&
+        !shouldAnswerLanguageQuestion(t.text),
+    )
     .map((t) => t.text.toLowerCase())
     .join(' ')
 }
@@ -12,7 +23,7 @@ function hasAny(text: string, keywords: string[]): boolean {
 }
 
 function detectBeginnerCafe(missionGoals: string[], turns: DialogueTurn[]): MissionGoalResult[] {
-  const all = allStudentText(turns)
+  const all = missionStudentText(turns)
   return [
     {
       goalIndex: 0,
@@ -33,7 +44,7 @@ function detectBeginnerCafe(missionGoals: string[], turns: DialogueTurn[]): Miss
 }
 
 function detectIntermediateAdmin(missionGoals: string[], turns: DialogueTurn[]): MissionGoalResult[] {
-  const all = allStudentText(turns)
+  const all = missionStudentText(turns)
   return [
     {
       goalIndex: 0,
@@ -54,7 +65,7 @@ function detectIntermediateAdmin(missionGoals: string[], turns: DialogueTurn[]):
 }
 
 function detectAdvancedEvent(missionGoals: string[], turns: DialogueTurn[]): MissionGoalResult[] {
-  const all = allStudentText(turns)
+  const all = missionStudentText(turns)
   return [
     {
       goalIndex: 0,

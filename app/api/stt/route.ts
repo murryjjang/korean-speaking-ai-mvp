@@ -1,5 +1,6 @@
 import { getSTTProvider } from '@/src/providers/stt'
 import { logProviderEvent } from '@/src/lib/supabase/provider-events'
+import { isLikelySttHallucination } from '@/src/lib/stt-sanity'
 
 // Whisper hallucinates with near-silent audio (< ~1s). Block before calling the provider.
 const MIN_AUDIO_SIZE_BYTES = 3000
@@ -74,6 +75,35 @@ export async function POST(request: Request) {
       result.providerName,
       result.latencyMs,
     )
+
+    // Post-filter: reject known Whisper hallucination phrases (YouTube outros, etc.)
+    if (result.transcript && isLikelySttHallucination(result.transcript)) {
+      await logProviderEvent({
+        provider: 'stt-filter',
+        feature: 'stt',
+        status: 'error',
+        latencyMs: result.latencyMs,
+        questionId,
+        errorCode: 'stt_hallucination_filtered',
+        errorMessage: `Hallucination detected: "${result.transcript.slice(0, 60)}"`,
+      }).catch(() => {})
+
+      console.info(
+        '[provider_events] stt.hallucination_filtered provider=%s questionId=%s transcript="%s"',
+        result.providerName,
+        questionId,
+        result.transcript.slice(0, 60),
+      )
+
+      return Response.json({
+        transcript: '',
+        confidence: 0,
+        providerName: 'stt-filter',
+        latencyMs: result.latencyMs,
+        source: 'stt-filter',
+        warning: 'stt_hallucination_filtered',
+      })
+    }
 
     return Response.json({
       transcript: result.transcript,

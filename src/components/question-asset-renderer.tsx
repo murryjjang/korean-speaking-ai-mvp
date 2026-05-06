@@ -31,7 +31,11 @@ const BAR_COLORS = ['#3b82f6', '#10b981', '#f59e0b']
 // --- Sub-renderers ---
 
 function ImageAssetCard({ asset }: { asset: StudentVisibleAsset }) {
-  if (asset.src) {
+  // imgFailed tracks whether the image file returned a load error (e.g. 404).
+  // When true, fall through to placeholder even when asset.src is non-empty.
+  const [imgFailed, setImgFailed] = useState(false)
+
+  if (asset.src && !imgFailed) {
     return (
       <div
         className="mt-4 rounded-md border border-border overflow-hidden"
@@ -43,6 +47,7 @@ function ImageAssetCard({ asset }: { asset: StudentVisibleAsset }) {
           alt={asset.alt ?? asset.displayTitle}
           className="w-full object-cover"
           style={{ maxHeight: '280px' }}
+          onError={() => setImgFailed(true)}
         />
         <p className="px-3 py-1.5 text-xs text-text-secondary text-center border-t border-border bg-surface">
           {asset.displayTitle}

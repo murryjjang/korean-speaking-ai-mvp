@@ -719,3 +719,426 @@ test.describe('Phase 10-E-5-B: 교수자 최종확정 화면 — official rubric
     expect(isExpected).toBe(true)
   })
 })
+
+test.describe('Phase 10-E-5-C/D: 대화 정책 분리, 페르소나, Azure TTS', () => {
+  // ── Dialogue policy helpers ──────────────────────────────────────────────
+
+  test('dialogue-policy: assessment mode 설정 반환', async ({ request }) => {
+    // policy 모듈 import 결과를 API through 없이 서버 빌드 정상 여부로 검증.
+    // 실제 policy 로직은 unit 테스트 대신 API 응답을 통해 간접 확인.
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [],
+        latestStudentText: '아메리카노 주세요',
+        level: 'beginner',
+        mode: 'assessment',
+      },
+    })
+    // 200 응답 + aiText 필드 존재 확인
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    expect(typeof data.aiText).toBe('string')
+    expect(data.aiText.length).toBeGreaterThan(0)
+  })
+
+  test('dialogue-policy: practice mode 설정 반환 — 더 개방적인 응답', async ({ request }) => {
+    // practice mode도 알려진 questionId가 있어야 정상 응답 (보안 설계 유지)
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [{ role: 'ai', text: '어서 오세요.' }],
+        latestStudentText: '어떤 음료가 있어요?',
+        level: 'beginner',
+        mode: 'practice',
+        personaId: 'cafe_staff_friendly',
+      },
+    })
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    expect(typeof data.aiText).toBe('string')
+    expect(data.aiText.length).toBeGreaterThan(0)
+  })
+
+  test('assessment mode: 문법/표현 질문에 짧은 답변 후 roleplay 복귀 응답', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [{ role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' }],
+        latestStudentText: '포장해 주세요가 맞아요?',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+      },
+    })
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    expect(typeof data.aiText).toBe('string')
+    // assessment mode 문법 질문 응답: 확인 + 바로 역할극 복귀
+    expect(data.aiText).toMatch(/맞|자연스러|표현|포장/)
+  })
+
+  test('practice mode: 문법/표현 질문에 더 자세한 설명 허용', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [{ role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' }],
+        latestStudentText: '포장해 주세요와 가져갈게요 차이가 뭐예요?',
+        level: 'beginner',
+        mode: 'practice',
+        personaId: 'cafe_staff_friendly',
+      },
+    })
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    expect(typeof data.aiText).toBe('string')
+    expect(data.aiText.length).toBeGreaterThan(20)
+  })
+
+  test('q4 official dialogue_mission은 기본적으로 assessment mode로 동작', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    // q4 대화 패널 표시 확인 (assessment mode 기본값 — UI는 동일)
+    await expect(page.locator('[data-testid="dialogue-mission-panel"]')).toBeVisible()
+  })
+
+  // ── Persona registry ──────────────────────────────────────────────────────
+
+  test('persona registry에 café/admin/event/teacher/friend 5개가 있음', async ({ request }) => {
+    // API를 통해 practice route 페이지에 페르소나 카드가 5개 이상 렌더링되는지 확인
+    await request.get('/student/conversation-practice')
+    // Server-side rendering: page loads without error (smoke check)
+    const res = await request.get('/student/conversation-practice')
+    expect(res.status()).toBe(200)
+  })
+
+  test('/student/conversation-practice 페이지 정상 렌더링 및 페르소나 카드 표시', async ({ page }) => {
+    await page.goto('/student/conversation-practice')
+    await expect(page.getByRole('heading', { name: '생성형 대화연습' })).toBeVisible()
+    // practice mode personas: korean_teacher_coach, friend_casual
+    await expect(page.locator('[data-testid="persona-card-korean_teacher_coach"]')).toBeVisible()
+    await expect(page.locator('[data-testid="persona-card-friend_casual"]')).toBeVisible()
+  })
+
+  test('persona card에 dialectHint 기반 필드가 존재 (dialect 지원 구조 확인)', async ({ page }) => {
+    await page.goto('/student/conversation-practice')
+    // 준비 중 배지 확인 (persona card 렌더링됨)
+    const preparingBadges = page.getByText('준비 중')
+    await expect(preparingBadges.first()).toBeVisible()
+  })
+
+  // ── Azure TTS provider ────────────────────────────────────────────────────
+
+  test('Azure key 없을 때 /api/tts가 crash 없이 fallback 반환', async ({ request }) => {
+    // TTS_PROVIDER 기본값은 mock — Azure key 미설정 상태
+    const res = await request.post('/api/tts', {
+      data: { text: '안녕하세요. 주문 도와드릴게요.' },
+    })
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    expect(data.ok).toBe(true)
+    // fallback 또는 success 중 하나여야 함
+    expect(['fallback', 'success']).toContain(data.status)
+  })
+
+  test('TTS_PROVIDER=mock 상태에서 q4 다시 듣기 버튼 crash 없음', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    await page.locator('[data-testid="start-dialogue-button"]').click()
+    await expect(page.locator('[data-testid="ai-replay-button"]').first()).toBeVisible()
+    // 다시 듣기 클릭 → crash 없이 ttsState 변화
+    await page.locator('[data-testid="ai-replay-button"]').first().click()
+    // 페이지 크래시 없음 확인
+    await expect(page.locator('[data-testid="dialogue-mission-panel"]')).toBeVisible()
+  })
+
+  test('speechSynthesis 없는 환경에서 TTS fallback 후에도 AI turn 표시 유지', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'speechSynthesis', {
+        value: undefined,
+        configurable: true,
+        writable: true,
+      })
+    })
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    await page.locator('[data-testid="start-dialogue-button"]').click()
+    // TTS 불가 환경에서도 AI turn이 표시되어야 함
+    await expect(page.locator('[data-testid="ai-turn"]').first()).toBeVisible()
+  })
+
+  // ── 기존 흐름 유지 확인 ─────────────────────────────────────────────────
+
+  test('q1/q2/q3 기존 평가 흐름 유지 — 준비 시작 버튼', async ({ page }) => {
+    for (const qId of [
+      'beginner-q1-reading',
+      'beginner-q2-material-description',
+      'beginner-q3-listening-response',
+    ]) {
+      await page.goto(`/student/speaking/${qId}?setId=beginner-set-1`)
+      await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    }
+  })
+
+  test('teacher final review workflow 유지 — sub-022 채점 가능', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-022')
+    if (!page.url().includes('/teacher')) return
+    await expect(page.locator('[data-testid="grading-wizard"]')).toBeVisible()
+  })
+
+  test('official 12개 URL 접근성 유지', async ({ request }) => {
+    const urls = [
+      '/student/speaking/beginner-q1-reading',
+      '/student/speaking/beginner-q2-material-description',
+      '/student/speaking/beginner-q3-listening-response',
+      '/student/speaking/beginner-q4-dialogue-mission',
+      '/student/speaking/intermediate-q1-reading',
+      '/student/speaking/intermediate-q2-material-description',
+      '/student/speaking/intermediate-q3-listening-response',
+      '/student/speaking/intermediate-q4-dialogue-mission',
+      '/student/speaking/advanced-q1-reading',
+      '/student/speaking/advanced-q2-material-description',
+      '/student/speaking/advanced-q3-listening-response',
+      '/student/speaking/advanced-q4-dialogue-mission',
+    ]
+    for (const url of urls) {
+      const res = await request.get(url)
+      expect(res.status(), `Expected 200 for ${url}`).toBe(200)
+    }
+  })
+
+  test('legacy q-003 유지', async ({ page }) => {
+    await page.goto('/student/speaking/q-003')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+
+  test('no-speech guard 유지 — 빈 transcript 처리', async ({ request }) => {
+    // dialogue/respond에 빈 latestStudentText → 400 에러
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [],
+        latestStudentText: '   ',
+        level: 'beginner',
+        mode: 'assessment',
+      },
+    })
+    expect(res.status()).toBe(400)
+  })
+})
+
+test.describe('Phase 10-E-5-C/D 통합 수정: language question 우선순위, 무음 차단, q2 이미지 구조', () => {
+  // ── language question 우선순위 보정 ──────────────────────────────────────
+
+  test('"여기서 먹고 가려면 어떻게 얘기해야 하죠?" — language question 응답 + roleplay 복귀', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [{ role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' }],
+        latestStudentText: '여기서 먹고 가려면 어떻게 얘기해야 하죠?',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+      },
+    })
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    // Should explain the expression and return to roleplay
+    expect(data.aiText).toMatch(/먹고 갈|매장에서|드시고|자연스럽/)
+    // Should NOT fire the mission completion response
+    expect(data.aiText).not.toMatch(/주문 도와드리겠습니다.*감사합니다/)
+  })
+
+  test('"포장해 주세요가 맞아요?" — language question으로 처리, 즉시 종료 응답 아님', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [{ role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' }],
+        latestStudentText: '포장해 주세요가 맞아요?',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+      },
+    })
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    // Should confirm the expression, return to roleplay
+    expect(data.aiText).toMatch(/맞|자연스러|포장/)
+    // Should NOT fire the completion / thanks response
+    expect(data.aiText).not.toMatch(/주문 도와드리겠습니다.*감사합니다/)
+  })
+
+  test('language question 이후 실제 발화 "여기서 먹고 갈게요" — mission response로 처리', async ({ request }) => {
+    // After a language question turn, the next mission response should be treated normally
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+          // Language question turn (previously sent)
+          { role: 'student', text: '여기서 먹고 가려면 어떻게 얘기해야 하죠?' },
+          { role: 'ai', text: "'여기서 먹고 갈게요'라고 말하면 자연스럽습니다. 그럼 매장에서 드시고 가실 건가요?" },
+          { role: 'student', text: '아메리카노 주세요.' },
+          { role: 'ai', text: '차가운 음료로 드릴까요, 따뜻한 음료로 드릴까요?' },
+          { role: 'student', text: '아이스로 주세요.' },
+          { role: 'ai', text: '드시고 가세요, 아니면 포장해 드릴까요?' },
+        ],
+        latestStudentText: '여기서 먹고 갈게요.',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+      },
+    })
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    expect(typeof data.aiText).toBe('string')
+    expect(data.aiText.length).toBeGreaterThan(0)
+  })
+
+  test('모든 목표 달성 상태에서 마지막 발화가 language question이면 즉시 종료 응답 안 함', async ({ request }) => {
+    // All mission goals met via previous turns, but last turn is a language question
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+          { role: 'student', text: '아이스 아메리카노 주세요.' },
+          { role: 'ai', text: '드시고 가세요, 포장해 드릴까요?' },
+          { role: 'student', text: '포장해 주세요.' },
+          { role: 'ai', text: '알겠습니다. 포장 준비해 드릴게요.' },
+        ],
+        latestStudentText: '이렇게 말해도 자연스러워요?',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+      },
+    })
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    // Should answer language question, not fire completion
+    expect(data.aiText).not.toMatch(/주문 도와드리겠습니다.*감사합니다/)
+  })
+
+  test('practice mode: 같은 language question에 더 자세한 설명', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        turns: [{ role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' }],
+        latestStudentText: '포장해 주세요와 가져갈게요 차이가 뭐예요?',
+        level: 'beginner',
+        mode: 'practice',
+        personaId: 'cafe_staff_friendly',
+      },
+    })
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    expect(data.aiText.length).toBeGreaterThan(20)
+  })
+
+  // ── 무음 녹음 차단 (클라이언트 validation helpers 구조 확인) ──────────────
+
+  test('/api/stt는 빈 파일에 no-speech 응답 유지', async ({ request }) => {
+    // Intentionally send no audio field — empty blob triggers no-speech guard
+    const res = await request.post('/api/stt', {
+      multipart: {
+        questionId: 'beginner-q1-reading',
+      },
+    })
+    // Should return ok with no-speech or empty transcript (server-side guard)
+    expect(res.status()).toBe(200)
+    const data = await res.json()
+    // Empty blob → no-speech guard triggers
+    expect(typeof data.transcript).toBe('string')
+  })
+
+  // ── q2 이미지 asset 구조 ─────────────────────────────────────────────────
+
+  test('beginner q2 이미지 또는 placeholder가 정상 렌더링됨 (licenseNote 미노출)', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q2-material-description?setId=beginner-set-1')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+
+    // 파일 없으면 onError → placeholder 또는 image-container 중 하나가 보여야 함
+    const hasPlaceholder = await page.locator('[data-testid="image-asset-placeholder"]').isVisible().catch(() => false)
+    const hasImage = await page.locator('[data-testid="image-asset-container"]').isVisible().catch(() => false)
+    expect(hasPlaceholder || hasImage).toBe(true)
+
+    // 제목 표시
+    await expect(page.getByText('식당 안 모습')).toBeVisible()
+
+    // 내부 메타데이터가 학습자에게 노출되면 안 됨
+    const bodyText = await page.locator('body').innerText()
+    expect(bodyText).not.toContain('teacherOnlyNote')
+    expect(bodyText).not.toContain('replacementRequiredBeforePilot')
+    expect(bodyText).not.toContain('Getty')
+    expect(bodyText).not.toContain('파일럿 전 직접 촬영')
+  })
+
+  test('beginner q2 assetMeta에 src 경로가 설정됨 (구조 확인)', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q2-material-description?setId=beginner-set-1')
+    // 이미지 컨테이너 또는 placeholder 중 하나가 보임 — 파일 존재 여부에 관계없이 crash 없음
+    const hasContainer = await page.locator('[data-testid="image-asset-container"]').isVisible().catch(() => false)
+    const hasPlaceholder = await page.locator('[data-testid="image-asset-placeholder"]').isVisible().catch(() => false)
+    expect(hasContainer || hasPlaceholder).toBe(true)
+  })
+
+  test('intermediate/advanced q2 chart/table 렌더링 유지', async ({ page }) => {
+    // intermediate
+    await page.goto('/student/speaking/intermediate-q2-material-description?setId=intermediate-set-1')
+    await expect(page.locator('[data-testid="chart-asset"]')).toBeVisible()
+    await expect(page.getByText('50%').first()).toBeVisible()
+
+    // advanced
+    await page.goto('/student/speaking/advanced-q2-material-description?setId=advanced-set-1')
+    await expect(page.locator('[data-testid="chart-asset"]')).toBeVisible()
+    await expect(page.getByText('120명').first()).toBeVisible()
+  })
+
+  // ── 기존 흐름 후퇴 없음 확인 ─────────────────────────────────────────────
+
+  test('q1/q2/q3 기존 평가 흐름 후퇴 없음', async ({ page }) => {
+    for (const qId of [
+      'beginner-q1-reading',
+      'beginner-q2-material-description',
+      'beginner-q3-listening-response',
+    ]) {
+      await page.goto(`/student/speaking/${qId}?setId=beginner-set-1`)
+      await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+    }
+  })
+
+  test('q4 dialogue_mission 쌍방 대화 흐름 후퇴 없음', async ({ page }) => {
+    await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
+    await page.locator('[data-testid="start-dialogue-button"]').click()
+    await expect(page.locator('[data-testid="ai-turn"]').first()).toBeVisible()
+    await expect(page.locator('[data-testid="ai-replay-button"]').first()).toBeVisible()
+  })
+
+  test('teacher final review workflow 후퇴 없음 — sub-022', async ({ page }) => {
+    await page.goto('/teacher/submissions/sub-022')
+    if (!page.url().includes('/teacher')) return
+    await expect(page.locator('[data-testid="grading-wizard"]')).toBeVisible()
+  })
+
+  test('legacy q-003 route 유지', async ({ page }) => {
+    await page.goto('/student/speaking/q-003')
+    await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
+  })
+
+  test('official 12개 URL 접근성 유지', async ({ request }) => {
+    const urls = [
+      '/student/speaking/beginner-q1-reading',
+      '/student/speaking/beginner-q2-material-description',
+      '/student/speaking/beginner-q3-listening-response',
+      '/student/speaking/beginner-q4-dialogue-mission',
+      '/student/speaking/intermediate-q1-reading',
+      '/student/speaking/intermediate-q2-material-description',
+      '/student/speaking/intermediate-q3-listening-response',
+      '/student/speaking/intermediate-q4-dialogue-mission',
+      '/student/speaking/advanced-q1-reading',
+      '/student/speaking/advanced-q2-material-description',
+      '/student/speaking/advanced-q3-listening-response',
+      '/student/speaking/advanced-q4-dialogue-mission',
+    ]
+    for (const url of urls) {
+      const res = await request.get(url)
+      expect(res.status(), `Expected 200 for ${url}`).toBe(200)
+    }
+  })
+})

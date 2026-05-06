@@ -2,6 +2,7 @@
 //
 // 기존 MockConversationProvider(scripted, turn-number-based)는 유지.
 // Phase 10-E-5에서 DialogueConversationProvider(mission-aware)를 추가.
+// Phase 10-E-5-C에서 assessment/practice mode 분리 정책 추가.
 // Phase 9+에서 ClaudeConversationProvider / OpenAIConversationProvider 추가 예정.
 
 export type ConversationTurnResult = {
@@ -33,6 +34,13 @@ export type DialogueConversationInput = {
   missionGoals: string[]
   turns: DialogueTurnInput[]
   latestStudentText: string
+  // Mode determines policy: 'assessment' (mission-first, limited lang help)
+  // vs 'practice' (coaching-first, full lang help). Defaults to 'assessment'.
+  mode?: 'assessment' | 'practice'
+  personaId?: string
+  allowLanguageHelp?: 'limited' | 'full'
+  maxTurns?: number
+  autonomyLevel?: 'guided' | 'open'
 }
 
 export type DialogueConversationOutput = {
@@ -95,16 +103,26 @@ class MockConversationProvider implements ConversationProvider {
   }
 }
 
-// ── Mission-aware mock provider (Phase 10-E-5) ──────────────────
+// ── Mission-aware mock provider (Phase 10-E-5 / 10-E-5-C) ──────────────────
+
+import {
+  shouldAnswerLanguageQuestion,
+  answerLanguageQuestionForAssessment,
+  answerLanguageQuestionForPractice,
+  getDialoguePolicy,
+} from '@/src/lib/dialogue-policy'
 
 function hasAny(text: string, keywords: string[]): boolean {
   const lower = text.toLowerCase()
   return keywords.some((kw) => lower.includes(kw))
 }
 
+// Only count student turns where the student was performing the mission.
+// Language question turns (asking how to say something) are excluded from
+// mission evidence so they cannot accidentally trigger goal completion.
 function allStudentText(turns: DialogueTurnInput[]): string {
   return turns
-    .filter((t) => t.role === 'student')
+    .filter((t) => t.role === 'student' && !shouldAnswerLanguageQuestion(t.text))
     .map((t) => t.text.toLowerCase())
     .join(' ')
 }
@@ -197,6 +215,19 @@ class MockDialogueConversationProvider implements DialogueConversationProvider {
     const start = Date.now()
     await new Promise<void>((resolve) => setTimeout(resolve, MOCK_LATENCY_MS))
 
+    const mode = input.mode ?? 'assessment'
+    const policy = getDialoguePolicy(mode, input.level, input.personaId)
+
+    // Language question detection — apply policy-based response
+    if (shouldAnswerLanguageQuestion(input.latestStudentText)) {
+      const personaId = input.personaId ?? this.#inferPersonaId(input.questionId)
+      const text =
+        policy.allowLanguageHelp === 'full'
+          ? answerLanguageQuestionForPractice(input.latestStudentText, input.level, personaId)
+          : answerLanguageQuestionForAssessment(input.latestStudentText, input.level, personaId)
+      return { text, providerName: 'mock', latencyMs: Date.now() - start, status: 'success' }
+    }
+
     let text: string
 
     switch (input.questionId) {
@@ -210,7 +241,10 @@ class MockDialogueConversationProvider implements DialogueConversationProvider {
         text = advancedEventResponse(input)
         break
       default:
-        text = FALLBACK_RESPONSE
+        // For practice mode with unknown questionId, give a more open response
+        text = policy.autonomyLevel === 'open'
+          ? '좋아요! 계속 말해 보세요. 어떤 내용이든 괜찮습니다.'
+          : FALLBACK_RESPONSE
     }
 
     return {
@@ -219,6 +253,13 @@ class MockDialogueConversationProvider implements DialogueConversationProvider {
       latencyMs: Date.now() - start,
       status: 'success',
     }
+  }
+
+  #inferPersonaId(questionId: string): string {
+    if (questionId.includes('beginner')) return 'cafe_staff_friendly'
+    if (questionId.includes('intermediate')) return 'admin_staff_clear'
+    if (questionId.includes('advanced')) return 'event_partner_professional'
+    return 'cafe_staff_friendly'
   }
 }
 

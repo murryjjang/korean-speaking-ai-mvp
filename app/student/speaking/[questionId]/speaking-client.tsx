@@ -8,6 +8,7 @@ import type { LangHintItem } from '@/src/components/ui'
 import { submitSpeaking } from '../actions'
 import type { ClientPronunciationResult } from '../actions'
 import { useAudioRecorder } from '@/src/hooks/use-audio-recorder'
+import { validateRecordedAudio, getAudioValidationMessage } from '@/src/lib/audio-validation'
 import { useTTS } from '@/src/hooks/use-tts'
 import { QuestionAssetRenderer } from '@/src/components/question-asset-renderer'
 import type { StudentVisibleAsset } from '@/src/content/assessment-assets'
@@ -41,8 +42,7 @@ export type QuestionData = {
   aiFirstUtterance?: string
 }
 
-const MIN_VALID_DURATION_SEC = 2
-const MIN_VALID_BLOB_SIZE = 3000
+
 
 const difficultyLabel: Record<string, string> = {
   beginner: '초급',
@@ -124,6 +124,7 @@ export function SpeakingClient({
   const [prepRemaining, setPrepRemaining] = useState(question.prepTimeSec)
   const [prepStarted, setPrepStarted] = useState(false)
   const [submitError, setSubmitError] = useState(false)
+  const [sttHallucinationError, setSttHallucinationError] = useState(false)
   // Detected once at mount; server always returns false (no navigator).
   const [isIOSSafari] = useState<boolean>(() => {
     if (typeof navigator === 'undefined') return false
@@ -225,26 +226,30 @@ export function SpeakingClient({
     // Phase transition happens via the effect above when recorder.state becomes 'stopped'
   }, [recorder])
 
-  // True when stopped recording is too short or too small to contain real speech
-  const isInvalidAudio =
-    recorder.state === 'stopped' &&
-    (recorder.durationSec < MIN_VALID_DURATION_SEC ||
-      (blobSize !== null && blobSize < MIN_VALID_BLOB_SIZE))
+  const audioValidation =
+    recorder.state === 'stopped'
+      ? validateRecordedAudio({ durationSec: recorder.durationSec, blobSize, audioStats: recorder.audioStats })
+      : { valid: true as const }
+  const isInvalidAudio = !audioValidation.valid
+  const invalidAudioMessage =
+    !audioValidation.valid
+      ? getAudioValidationMessage(audioValidation.reason)
+      : '녹음을 확인해 주세요.'
 
   const handleSubmit = useCallback(async () => {
-    // Defense-in-depth: guard matches the disabled-button condition
-    if (recorder.state === 'stopped' && (
-      recorder.durationSec < MIN_VALID_DURATION_SEC ||
-      (blobSize !== null && blobSize < MIN_VALID_BLOB_SIZE)
-    )) {
-      return
+    // Defense-in-depth: matches the disabled-button condition
+    if (recorder.state === 'stopped') {
+      const guard = validateRecordedAudio({ durationSec: recorder.durationSec, blobSize, audioStats: recorder.audioStats })
+      if (!guard.valid) return
     }
 
     setPhase('submitting')
     setSubmitError(false)
+    setSttHallucinationError(false)
 
     let sttTranscript: string | undefined
     let sttProviderName: string | undefined
+    let sttHallucinationDetected = false
     let audioUrl: string | undefined
     let pronunciationResult: ClientPronunciationResult | undefined
 
@@ -271,10 +276,10 @@ export function SpeakingClient({
               fd.append('questionId', question.id)
               const res = await fetch('/api/stt', { method: 'POST', body: fd })
               if (res.ok) {
-                // Response.json() returns any; safe to access known fields directly.
                 const data = await res.json()
                 if (typeof data?.transcript === 'string') sttTranscript = data.transcript
                 if (typeof data?.providerName === 'string') sttProviderName = data.providerName
+                if (data?.warning === 'stt_hallucination_filtered') sttHallucinationDetected = true
               }
             } catch {
               // STT failure is non-blocking — submitSpeaking uses mock fallback
@@ -325,6 +330,13 @@ export function SpeakingClient({
       }
     }
 
+    // Block submission if STT detected a hallucination transcript — re-record instead.
+    if (sttHallucinationDetected) {
+      setSttHallucinationError(true)
+      setPhase('review')
+      return
+    }
+
     try {
       const { submissionId } = await submitSpeaking(question.id, questionSetId, {
         hasRecording: recorder.state === 'stopped' && recorder.blobUrl !== null,
@@ -339,7 +351,7 @@ export function SpeakingClient({
       setSubmitError(true)
       setPhase('review')
     }
-  }, [question.id, question.prompt, questionSetId, router, recorder.state, recorder.blobUrl, recorder.durationSec, blobSize])
+  }, [question.id, question.prompt, questionSetId, router, recorder.state, recorder.blobUrl, recorder.durationSec, recorder.audioStats, blobSize])
 
   const handleRetake = useCallback(() => {
     recorder.reset()
@@ -614,6 +626,19 @@ export function SpeakingClient({
                 </p>
               )}
 
+              {/* STT hallucination detected — re-record */}
+              {sttHallucinationError && (
+                <div
+                  className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-left"
+                  data-testid="stt-hallucination-warning"
+                >
+                  <p className="text-xs text-amber-700 leading-relaxed">
+                    <strong>음성이 감지되지 않았습니다.</strong>{' '}
+                    마이크에 가까이 대고 다시 말해 주세요.
+                  </p>
+                </div>
+              )}
+
               {/* Short/silent recording — blocks submission */}
               {isInvalidAudio && (
                 <div
@@ -621,8 +646,7 @@ export function SpeakingClient({
                   data-testid="short-recording-warning"
                 >
                   <p className="text-xs text-amber-700 leading-relaxed">
-                    <strong>녹음 시간이 너무 짧습니다.</strong>{' '}
-                    다시 녹음해 주세요.
+                    {invalidAudioMessage}
                   </p>
                 </div>
               )}

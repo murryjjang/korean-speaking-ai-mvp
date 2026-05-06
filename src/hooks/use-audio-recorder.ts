@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import type { AudioStats } from '@/src/lib/audio-validation'
 
 export type RecorderState = 'idle' | 'requesting' | 'recording' | 'stopped' | 'error'
 
@@ -15,21 +16,34 @@ export interface UseAudioRecorderReturn {
   errorType: RecorderErrorType | null
   blobUrl: string | null
   durationSec: number
+  audioStats: AudioStats | null
   startRecording: () => Promise<void>
   stopRecording: () => void
   reset: () => void
 }
+
+// Sampling interval for RMS energy analysis (ms)
+const ANALYSIS_INTERVAL_MS = 100
+// RMS threshold above which a frame is considered "voiced"
+const VOICED_RMS_THRESHOLD = 0.01
 
 export function useAudioRecorder(): UseAudioRecorderReturn {
   const [state, setState] = useState<RecorderState>('idle')
   const [errorType, setErrorType] = useState<RecorderErrorType | null>(null)
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [durationSec, setDurationSec] = useState(0)
+  const [audioStats, setAudioStats] = useState<AudioStats | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Audio energy analysis refs
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const rmsDataRef = useRef<number[]>([])
+  const analysisTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -52,6 +66,37 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     }
   }, [])
 
+  // Finalize audio energy stats from collected samples, then tear down AudioContext.
+  const finalizeAudioAnalysis = useCallback(() => {
+    if (analysisTimerRef.current !== null) {
+      clearInterval(analysisTimerRef.current)
+      analysisTimerRef.current = null
+    }
+
+    const samples = rmsDataRef.current
+    if (samples.length > 0) {
+      const avgRms = samples.reduce((s, v) => s + v, 0) / samples.length
+      const maxRms = Math.max(...samples)
+      const voicedFrames = samples.filter((rms) => rms > VOICED_RMS_THRESHOLD).length
+      const voicedMs = voicedFrames * ANALYSIS_INTERVAL_MS
+      const speechRatio = voicedFrames / samples.length
+      setAudioStats({
+        avgRms,
+        maxRms,
+        voicedMs,
+        speechRatio,
+        sampledFrames: samples.length,
+      })
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {})
+      audioContextRef.current = null
+    }
+    analyserRef.current = null
+    rmsDataRef.current = []
+  }, [])
+
   const startRecording = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setState('error')
@@ -69,6 +114,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     revokeBlobUrl()
     chunksRef.current = []
     setDurationSec(0)
+    setAudioStats(null)
 
     let stream: MediaStream
     try {
@@ -89,6 +135,40 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     }
 
     streamRef.current = stream
+
+    // Start audio energy analysis (best-effort — gracefully skipped if AudioContext unavailable)
+    try {
+      const AudioContextClass =
+        window.AudioContext ??
+        (
+          window as unknown as Record<string, typeof AudioContext | undefined>
+        ).webkitAudioContext
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass()
+        audioContextRef.current = ctx
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 2048
+        analyserRef.current = analyser
+        const source = ctx.createMediaStreamSource(stream)
+        source.connect(analyser)
+        rmsDataRef.current = []
+
+        const bufLen = analyser.frequencyBinCount
+        const dataArr = new Float32Array(bufLen)
+        analysisTimerRef.current = setInterval(() => {
+          const a = analyserRef.current
+          if (!a) return
+          a.getFloatTimeDomainData(dataArr)
+          let sum = 0
+          for (let i = 0; i < bufLen; i++) {
+            sum += dataArr[i] * dataArr[i]
+          }
+          rmsDataRef.current.push(Math.sqrt(sum / bufLen))
+        }, ANALYSIS_INTERVAL_MS)
+      }
+    } catch {
+      // AudioContext unavailable — energy analysis skipped, duration/size guards still apply
+    }
 
     // Pick a supported MIME type — Safari does not support audio/webm
     const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -114,6 +194,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     recorder.onstop = () => {
       clearTimer()
       stopStream()
+      finalizeAudioAnalysis()
       const blob = new Blob(chunksRef.current, {
         type: recorder.mimeType || 'audio/webm',
       })
@@ -130,6 +211,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     recorder.onerror = () => {
       clearTimer()
       stopStream()
+      finalizeAudioAnalysis()
       setState('error')
       setErrorType('unknown')
     }
@@ -140,7 +222,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     timerRef.current = setInterval(() => {
       setDurationSec((prev) => prev + 1)
     }, 1000)
-  }, [clearTimer, revokeBlobUrl, stopStream])
+  }, [clearTimer, revokeBlobUrl, stopStream, finalizeAudioAnalysis])
 
   const stopRecording = useCallback(() => {
     clearTimer()
@@ -150,10 +232,11 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     ) {
       mediaRecorderRef.current.stop()
     } else {
+      finalizeAudioAnalysis()
       stopStream()
       setState('stopped')
     }
-  }, [clearTimer, stopStream])
+  }, [clearTimer, finalizeAudioAnalysis, stopStream])
 
   const reset = useCallback(() => {
     clearTimer()
@@ -163,15 +246,17 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     ) {
       mediaRecorderRef.current.stop()
     }
+    finalizeAudioAnalysis()
     stopStream()
     revokeBlobUrl()
     chunksRef.current = []
     setDurationSec(0)
+    setAudioStats(null)
     setState('idle')
     setErrorType(null)
-  }, [clearTimer, revokeBlobUrl, stopStream])
+  }, [clearTimer, revokeBlobUrl, stopStream, finalizeAudioAnalysis])
 
-  // Cleanup on unmount
+  // Cleanup on unmount — avoid calling setAudioStats after unmount by cleaning refs directly
   useEffect(() => {
     return () => {
       clearTimer()
@@ -181,6 +266,17 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       ) {
         mediaRecorderRef.current.stop()
       }
+      // Clean analysis timers/context without updating state
+      if (analysisTimerRef.current !== null) {
+        clearInterval(analysisTimerRef.current)
+        analysisTimerRef.current = null
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {})
+        audioContextRef.current = null
+      }
+      analyserRef.current = null
+      rmsDataRef.current = []
       stopStream()
       // Revoke blob URL directly here to avoid stale closure issues
       setBlobUrl((prev) => {
@@ -196,6 +292,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     errorType,
     blobUrl,
     durationSec,
+    audioStats,
     startRecording,
     stopRecording,
     reset,

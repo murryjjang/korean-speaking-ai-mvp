@@ -18,18 +18,20 @@ type OfficialAsset = StudentVisibleAsset & {
 }
 
 const OFFICIAL_ASSETS: OfficialAsset[] = [
-  // beginner q2: 식당 사진 (placeholder — 파일럿 전 실제 사진 교체 필요)
+  // beginner q2: 식당 사진
+  // 파일럿 전 직접 촬영 또는 사용 허가 이미지로 교체 필요.
+  // 파일이 없으면 렌더러가 placeholder를 표시한다.
   {
     assetId: 'beginner-restaurant-image',
     questionId: 'beginner-q2-material-description',
     assetType: 'image',
     displayTitle: '식당 안 모습',
     studentVisibleDescription: '식당에서 손님이 음식을 주문하는 장면을 보고 설명하세요.',
-    src: '',
-    alt: '식당 안 모습 — 손님이 주문하는 장면',
+    src: '/images/official/beginner-restaurant-scene.jpg',
+    alt: '식당에서 손님이 음식을 주문하는 장면',
     status: 'placeholder',
     teacherOnlyNote:
-      '파일럿 전 실제 사진 교체 필요. 권장 파일명: /public/images/official/beginner-restaurant-scene.jpg. 직접 촬영 또는 CC0 라이선스 이미지 사용.',
+      '파일럿 전 직접 촬영 또는 사용 허가 이미지로 교체 필요. 대상 경로: public/images/official/beginner-restaurant-scene.jpg. Getty·Google 검색 이미지 사용 금지. 직접 촬영·CC0·AI 생성 이미지만 사용 가능.',
     replacementRequiredBeforePilot: true,
   },
   // intermediate q2: 수업 방식 선호도 차트 (앱 내부 렌더링)

@@ -6,6 +6,7 @@ const navItems: NavItem[] = [
   { label: "내 학습 현황", href: "/student" },
   { label: "말하기 평가", href: "/student/speaking" },
   { label: "미션 대화", href: "/student/mission" },
+  { label: "대화연습 (생성형)", href: "/student/conversation-practice" },
   { label: "말하기 대회 준비", href: "/student/contest", disabled: true },
 ];
 

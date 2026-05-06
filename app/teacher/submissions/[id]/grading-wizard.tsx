@@ -77,7 +77,7 @@ export function GradingWizard({ data }: GradingWizardProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="grading-wizard">
       {isFinalized && (
         <div className="p-3 bg-warning-50 border border-warning-100 rounded-lg flex items-center gap-2">
           <span className="text-warning-700 font-bold shrink-0">🔒</span>

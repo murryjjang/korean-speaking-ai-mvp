@@ -1,4 +1,5 @@
 import type { TTSProvider, TTSResult } from '@/src/types/providers'
+import { AzureTTSProvider } from './azure'
 
 // Server stub — synthesis happens client-side via Web Speech API.
 class BrowserTTSProvider implements TTSProvider {
@@ -66,7 +67,11 @@ export function getTTSProvider(): TTSProvider {
   if (providerName === 'openai' && process.env.OPENAI_API_KEY) {
     return new OpenAITTSProvider()
   }
-  // TODO: TTS_PROVIDER=azure일 때 Azure Speech TTS 연결 (ko-KR-SunHiNeural 등)
+  if (providerName === 'azure') {
+    // AzureTTSProvider throws 'azure_tts_no_credentials' if keys are absent.
+    // The caller (api/tts/route.ts) catches this and returns fallback to the client.
+    return new AzureTTSProvider()
+  }
   if (providerName === 'mock') {
     return new MockTTSProvider()
   }

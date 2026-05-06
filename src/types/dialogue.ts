@@ -1,5 +1,9 @@
+export type DialogueMode = 'assessment' | 'practice'
+
 export type DialogueTurnRole = 'ai' | 'student' | 'system'
 export type DialogueTurnStatus = 'completed' | 'error'
+
+export type DialogueTurnIntent = 'language_question' | 'mission_response' | 'other'
 
 export type DialogueTurn = {
   id: string
@@ -11,6 +15,10 @@ export type DialogueTurn = {
   status: DialogueTurnStatus
   providerName?: string
   confidence?: number | null
+  // Client-only intent tag — set when adding student turns.
+  // language_question turns are excluded from mission evidence.
+  // Not persisted to DB (no schema change).
+  intent?: DialogueTurnIntent
   // TTS playback tracking — client-state only, not persisted to DB
   // TODO: TTS_PROVIDER=azure일 때 Azure Speech TTS 연결
   // TODO: AI dialogue turn별 generated audio URL 저장
@@ -34,3 +42,10 @@ export type DialogueMissionPanelStatus =
   | 'processing'
   | 'completed'
   | 'submitting'
+
+// Panel config — passed from parent to control dialogue behavior
+export type DialoguePanelConfig = {
+  mode: DialogueMode
+  personaId?: string
+  maxTurns?: number
+}

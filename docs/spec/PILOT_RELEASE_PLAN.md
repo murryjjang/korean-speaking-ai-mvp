@@ -25,7 +25,7 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 | **D+3** — 최소기능 시연판 | 2026-05-07 | Supabase 연결 + 핵심 경로 저장 확인 | ✅ 완료 (Phase 6-B1~B2) |
 | **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 | ✅ 완료 (Phase 6-B2~B5) |
 | **D+10** — 로그인/역할 분기 | 2026-05-14 | Supabase Auth 기반 로그인 + 역할별 route 보호 | ✅ 완료 (Phase 9-A) |
-| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | **P0 처리 완료 (10-E-1), P1-1~P1-4 처리 완료 (10-E-2), 정식 문항 콘텐츠 입력 완료 (10-E-3), reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정), asset 구조·listenLimit·student-safe rendering 완료 (10-E-4), dialogue_mission 단발 녹음 UI 비표시·준비 중 상태 표시 완료 (10-E-4 추가 수정), dialogue_mission 실제 AI 대화 UI + TTS 재생 완료 (10-E-5-A), 교수자 채점 official rubric 강화 완료 (10-E-5-B), 실제 식당 사진·음원 mp3 교체 대기 (파일럿 전 필수)** |
+| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | **P0 처리 완료 (10-E-1), P1-1~P1-4 처리 완료 (10-E-2), 정식 문항 콘텐츠 입력 완료 (10-E-3), reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정), asset 구조·listenLimit·student-safe rendering 완료 (10-E-4), dialogue_mission 단발 녹음 UI 비표시·준비 중 상태 표시 완료 (10-E-4 추가 수정), dialogue_mission 실제 AI 대화 UI + TTS 재생 완료 (10-E-5-A), 교수자 채점 official rubric 강화 완료 (10-E-5-B), assessment/practice 정책 분리·페르소나 구조·Azure TTS provider 준비 완료 (10-E-5-C/D), 실제 식당 사진·음원 mp3 교체 대기 (파일럿 전 필수)** |
 
 ---
 
@@ -51,10 +51,28 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 5. 빌드/테스트 후 배포
 
 **이미지 등록 절차 (식당 사진 준비 후):**
-1. `public/images/official/` 디렉토리 생성
-2. `beginner-restaurant-scene.jpg` 배치 (저작권 확인 필수)
+1. `public/images/official/` 디렉토리 생성 ✅ (10-E-5-C/D 통합 보정에서 완료)
+2. `beginner-restaurant-scene.jpg` 배치 (저작권 확인 필수 — 직접 촬영·CC0·AI 생성만 허용, Getty/Google 금지)
 3. `src/content/questions.json`의 `beginner-q2-material-description` `imageUrl` 필드 업데이트
-4. `src/content/assessment-assets.ts`의 `beginner-restaurant-image` `src` 필드 업데이트 + `status: 'ready'` 변경
+4. `src/content/assessment-assets.ts`의 `beginner-restaurant-image` `status: 'ready'` 변경 (src 경로는 이미 설정됨)
+
+---
+
+## 파일럿 전 수동 확인 항목 (Phase 10-E-5-C/D 통합 보정 이후)
+
+파일럿 출시 전 반드시 수동으로 확인해야 할 항목들.
+
+| 항목 | 확인 방법 | 기대 결과 |
+|---|---|---|
+| q4 표현 질문 처리 | beginner q4 대화에서 "여기서 먹고 가려면 어떻게 얘기해야 하죠?" 발화 | AI가 표현 안내 후 역할극 복귀. "주문 도와드리겠습니다. 감사합니다!" 즉시 종료 없음 |
+| language question → mission 오인 없음 | "포장해 주세요가 맞아요?" 발화 후 미션 목표 상태 확인 | 포장 missionGoal이 achieved로 바뀌지 않아야 함 |
+| 실제 발화 후 mission 달성 | 이후 "포장해 주세요" 실제 발화 | 그때 missionGoal achieved 처리 |
+| 무음 녹음 차단 | 마이크에 말 없이 녹음 시작/종료 | "음성이 감지되지 않았습니다. 다시 녹음해 주세요." 메시지, 제출 버튼 disabled |
+| 정상 발화는 차단되지 않음 | 실제 한국어 발화 녹음 후 제출 | 정상 평가 진행 |
+| STT hallucination 차단 | (Whisper 실제 키 연결 시) 무음 녹음 제출 | "시청해주셔서 감사합니다." 환각 transcript가 평가 결과로 나타나지 않음 |
+| beginner q2 실제 사진 교체 | `public/images/official/beginner-restaurant-scene.jpg` 파일 배치 후 확인 | 식당 사진이 정상 표시됨 (현재는 placeholder) |
+| intermediate/advanced q2 차트 | 해당 문항 접근 | 50%/30%/20% 및 120명/180명/260명 수치 정상 표시 |
+| Azure TTS 수동 검증 | `TTS_PROVIDER=azure` + 실제 키 설정 후 AI 발화 재생 | Azure 음성으로 재생. 키 없으면 browser fallback |
 
 ---
 
@@ -1167,3 +1185,94 @@ Redirect URLs:
 - [ ] 교수자 전용 `listeningScriptForTeacherOnly`가 `/student/speaking/*/result` 화면에 없음 확인
 - [ ] 교수자 전용 `aiInformation`이 `/student/speaking/*/result` 화면에 없음 확인
 - [ ] 교수자 채점 화면(`/teacher/submissions/[id]`)이 미인증 상태에서 `/login`으로 redirect 확인
+
+---
+
+## Phase 10-E-5-C/D — 평가 모드와 연습 모드 정책 분리 / Azure TTS (2026-05-06)
+
+> **Phase 10-E-5-C/D 기록 (2026-05-06)**: assessment mode(q4 평가)와 practice mode(생성형 대화연습)의 대화 규칙 분리. 5개 페르소나 구조 정의. Azure TTS provider 연결 구조 구현.
+
+### 평가 q4 (assessment mode) vs 생성형 대화연습 (practice mode) 규칙 차이
+
+| 항목 | assessment mode (q4) | practice mode (대화연습) |
+|---|---|---|
+| 목적 | 미션 달성·평가 공정성 | 언어 학습·피드백 |
+| 언어 질문 대응 | 짧게 확인 후 역할극 복귀 | 자세한 설명 + 예문 |
+| 최대 턴 수 | 8~10 (초급/중급), 10 (고급) | 14~20 |
+| 자율도 | guided (미션 목표 우선) | open (자유 대화) |
+| 교수자 확정 | 대상 (finalized 상태) | 미대상 (학습 피드백 전용) |
+| 페르소나 | cafe_staff/admin/event (assessment 지원) | teacher_coach/friend (practice 전용) |
+
+**assessment mode 문법 질문 응답 예:**
+> 학생: "포장해 주세요가 맞아요?"  
+> AI: "네, 자연스러운 표현입니다. 그럼 포장으로 해드릴까요?"
+
+**practice mode 문법 질문 응답 예:**
+> 학생: "포장해 주세요와 가져갈게요 차이가 뭐예요?"  
+> AI: "둘 다 사용할 수 있습니다. '포장해 주세요'는 주문할 때 정중하게 요청하는 표현이고, '가져갈게요'는 매장에서 먹지 않고 가지고 간다는 뜻입니다. 예를 들면 '아메리카노 하나 포장해 주세요'라고 말할 수 있습니다."
+
+### Azure TTS 적용 절차
+
+Azure TTS는 `TTS_PROVIDER=azure` + `AZURE_SPEECH_KEY` + `AZURE_SPEECH_REGION` 설정 시 활성화된다.
+
+**환경변수 설정 (`.env.local` 또는 Vercel 환경변수):**
+```
+TTS_PROVIDER=azure
+AZURE_SPEECH_KEY=(Azure Portal > Speech Services > Keys and Endpoint > KEY 1)
+AZURE_SPEECH_REGION=(예: koreacentral, eastasia)
+AZURE_TTS_VOICE=ko-KR-SunHiNeural
+```
+
+**Azure Speech 리소스 생성 절차:**
+1. Azure Portal > Create resource > "Speech" 검색 > 생성
+2. Pricing tier: Free (F0) — 월 500,000자 무료 (파일럿 규모 충분)
+3. 생성 완료 후 Keys and Endpoint에서 Key1 복사
+4. Region 확인 (예: Korea Central = koreacentral)
+5. 위 환경변수에 설정 후 재배포
+
+**TTS provider fallback 정책:**
+
+| 상황 | 동작 |
+|---|---|
+| `TTS_PROVIDER=azure` + 키 있음 | Azure Speech TTS → `audioBase64` 반환 → Audio 객체 재생 |
+| `TTS_PROVIDER=azure` + 키 없음 | 예외 catch → fallback JSON → browser speechSynthesis |
+| `TTS_PROVIDER=openai` + 키 있음 | OpenAI TTS → `audioBase64` 반환 → Audio 객체 재생 |
+| `TTS_PROVIDER=mock` (기본값) | fallback JSON → browser speechSynthesis |
+| speechSynthesis 미지원 브라우저 | error 상태 반환 → 대화 진행 불중단 |
+
+**한국어 Azure Neural 음성 목록 (권장):**
+
+| 음성 | 성별 | 특징 | 권장 용도 |
+|---|---|---|---|
+| ko-KR-SunHiNeural | 여성 | 자연스럽고 친절한 톤 | 카페 점원, 코치 |
+| ko-KR-InJoonNeural | 남성 | 차분하고 전문적 | 행정실, 협력기관 |
+| ko-KR-BongJinNeural | 남성 | 뉴스 톤, 명확한 발음 | 고급 비즈니스 |
+
+### 페르소나 / 사투리 파일럿 유의사항
+
+**페르소나 현황:**
+
+| personaId | 이름 | 레벨 | mode 지원 |
+|---|---|---|---|
+| cafe_staff_friendly | 친절한 카페 점원 | 초급 | assessment + practice |
+| admin_staff_clear | 행정실 직원 | 중급 | assessment + practice |
+| event_partner_professional | 외부 협력기관 직원 | 고급 | assessment + practice |
+| korean_teacher_coach | 한국어 선생님 | 전체 | practice 전용 |
+| friend_casual | 친구 | 전체 | practice 전용 |
+
+**사투리 관련 파일럿 주의사항:**
+- `dialectHint` 필드는 구현 구조만 준비됨 — 실제 사투리 억양 TTS는 미구현
+- LLM 기반 사투리 어휘/표현 변환은 기술적으로 가능하나, 파일럿에서는 표준어(standard) 기본 사용
+- Azure Neural voice는 표준 한국어 기준 — 사투리 억양 TTS 품질은 Azure voice 지원 확인 필요
+- assessment mode에서는 반드시 표준 한국어 사용 (평가 공정성)
+- 사투리 실험은 practice mode + 후속 단계로 연기
+
+### 파일럿 전 Azure TTS 수동 검증 체크리스트
+
+- [ ] `TTS_PROVIDER=azure`, `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` 환경변수 설정
+- [ ] `AZURE_TTS_VOICE=ko-KR-SunHiNeural` 확인
+- [ ] `/api/tts`에 `{"text":"어서 오세요. 주문 도와드릴게요."}` POST → `audioBase64` 반환 확인
+- [ ] q4 대화 시작 → AI 첫 발화 자동 재생 (Azure TTS 음성) 확인
+- [ ] q4 AI turn 다시 듣기 버튼 클릭 → Azure TTS 재생 확인
+- [ ] q1 "문제 듣기" 버튼 → Azure TTS 재생 확인 (q1/q2/q3 흐름 영향 없음)
+- [ ] Azure 키 제거 후 fallback → browser speechSynthesis 정상 동작 확인
