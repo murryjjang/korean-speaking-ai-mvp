@@ -515,6 +515,28 @@ D. corrected_answer 섹션:
 | difficultyLabel/Variant | `speaking-client.tsx` | 수준 표시 UI 기반 |
 | questionSetId 전달 경로 | `speaking-client.tsx` → `actions.ts` | attempt 묶음 확장 기반 |
 
+| language question turn → mission evidence 제외 | `dialogue-mission.ts`, `providers/conversation/index.ts` | 표현 확인 질문이 goal 달성 증거로 오인식되지 않도록 |
+| 비정상 표현 교정 (assessment mode) | `lib/dialogue-policy.ts` | STT 오인식·비자연스러운 표현을 "맞다"고 긍정하는 버그 방지 |
+
 ---
 
-*분석 완료: 2026-05-05 — 코드 수정 없음, 문서 작성만 수행*
+## Phase 10-E-5-C/D 추가 보정 (2026-05-06)
+
+### 발견된 Gap
+
+| Gap | 위치 | 심각도 |
+|---|---|---|
+| `answerLanguageQuestionForAssessment` fallback이 잘못된 표현을 "맞다"고 긍정 | `dialogue-policy.ts` | 높음 — 학습자 오류 강화 |
+| "이게 맞나요?" 패턴이 `?` 없으면 미감지 | `dialogue-policy.ts` | 중간 |
+| "똑바로 알려주세요" 등 새 패턴 미감지 | `dialogue-policy.ts` | 낮음 |
+
+### 수정 결과
+
+- `UNNATURAL_CAFE_PATTERNS` 도입: STT 오인식("나이스 아메리칸", "던지세요" 등) 감지 → 바른 표현 교정 후 역할극 복귀
+- `LANGUAGE_QUESTION_PATTERNS` 보강: `/이게 맞/`, `/맞나요/`, `/정확한 표현/`, `/맞는 표현/`, `/똑바로 알/`, `/제대로 알/` 추가
+- assessment mode fallback 메타 문구("계속 진행해 볼까요?") → 역할극 문구("어떤 음료로 주문하시겠어요?") 교체
+- 테스트 +6개 추가 (164 passed)
+
+---
+
+*분석 완료: 2026-05-05 / 추가 보정: 2026-05-06*

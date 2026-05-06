@@ -63,7 +63,7 @@ export interface STTProvider {
 }
 
 export interface TTSProvider {
-  synthesize(text: string): Promise<TTSResult>
+  synthesize(text: string, options?: { voice?: string; rate?: number; lang?: string }): Promise<TTSResult>
 }
 
 export interface PronunciationProvider {

@@ -133,8 +133,8 @@ export function DialogueMissionPanel({
 
   const handlePlayAITurn = useCallback((turn: DialogueTurn) => {
     setPlayingTurnId(turn.id)
-    ttsPlay(turn.text, questionId, 'ai-dialogue')
-  }, [ttsPlay, questionId])
+    ttsPlay(turn.text, questionId, 'ai-dialogue', personaId)
+  }, [ttsPlay, questionId, personaId])
 
   const handleStart = useCallback(() => {
     const firstTurn: DialogueTurn = {
@@ -151,8 +151,8 @@ export function DialogueMissionPanel({
     setTurnError(null)
     // Auto-play first utterance (best-effort — browser autoplay policy may block)
     setPlayingTurnId(firstTurn.id)
-    ttsPlay(aiFirstUtterance, questionId, 'ai-dialogue')
-  }, [aiFirstUtterance, ttsPlay, questionId])
+    ttsPlay(aiFirstUtterance, questionId, 'ai-dialogue', personaId)
+  }, [aiFirstUtterance, ttsPlay, questionId, personaId])
 
   const handleStartRecording = useCallback(() => {
     recorder.reset()
@@ -292,7 +292,7 @@ export function DialogueMissionPanel({
       setTurns((prev) => [...prev, aiTurn])
       // Auto-play AI response (fire-and-forget)
       setPlayingTurnId(aiTurn.id)
-      ttsPlay(aiText, questionId, 'ai-dialogue')
+      ttsPlay(aiText, questionId, 'ai-dialogue', personaId)
     } catch {
       const fallbackId = `turn-ai-fallback-${Date.now()}`
       const fallbackText = '네, 알겠습니다.'
@@ -308,7 +308,7 @@ export function DialogueMissionPanel({
         },
       ])
       setPlayingTurnId(fallbackId)
-      ttsPlay(fallbackText, questionId, 'ai-dialogue')
+      ttsPlay(fallbackText, questionId, 'ai-dialogue', personaId)
     }
 
     recorder.reset()

@@ -18,7 +18,13 @@ const LANGUAGE_QUESTION_PATTERNS: RegExp[] = [
   /가 맞(아요|나요|죠|지요)/,
   /은 맞(나요|죠|지요)/,
   /는 맞(나요|죠|지요)/,
+  /이게 맞(아요|나요|죠|지요)?/,  // "이게 맞나요?" — ?없이도 감지
+  /그게 맞(아요|나요|죠|지요)/,
+  /맞나요/,                          // "? 없는" STT 출력도 감지
+  /맞아요\?/,                        // "맞아요?"
   /맞(아요|나요|죠|지요)\?/,
+  /맞는 표현/,
+  /정확한 표현/,
   /차이가 뭐/,
   /차이는 뭐/,
   /어떻게 (말|얘기)(해|하면|해야)/,
@@ -39,15 +45,34 @@ const LANGUAGE_QUESTION_PATTERNS: RegExp[] = [
   /좋은 표현/,
   /한국어(로|에서)/,
   /영어로 (뭐|어떻게)/,
+  /똑바로 알/,
+  /제대로 알/,
 ]
 
 export function shouldAnswerLanguageQuestion(text: string): boolean {
   return LANGUAGE_QUESTION_PATTERNS.some((p) => p.test(text))
 }
 
+// Cafe ordering: STT misrecognition patterns and clearly unnatural expressions.
+// Each entry maps a bad pattern to the correction to suggest.
+const UNNATURAL_CAFE_PATTERNS: Array<{ pattern: RegExp; correction: string }> = [
+  { pattern: /던지세요/, correction: '아이스 아메리카노 주세요' },
+  { pattern: /나이스\s*아메리카/, correction: '아이스 아메리카노 주세요' },
+  { pattern: /나이스\s*아메리칸/, correction: '아이스 아메리카노 주세요' },
+  { pattern: /아메리칸\s*(던|주)/, correction: '아이스 아메리카노 주세요' },
+]
+
+function unnaturalCafeCorrection(text: string): string | null {
+  for (const { pattern, correction } of UNNATURAL_CAFE_PATTERNS) {
+    if (pattern.test(text)) return correction
+  }
+  return null
+}
+
 /**
  * Assessment mode: short confirmation, immediately return to roleplay.
  * AI should not over-explain — just enough to unblock the student and continue the mission.
+ * Never confirm an unnatural or STT-misrecognised expression as correct.
  */
 export function answerLanguageQuestionForAssessment(
   text: string,
@@ -55,6 +80,23 @@ export function answerLanguageQuestionForAssessment(
   personaId: string,
 ): string {
   const lower = text.toLowerCase()
+
+  // Cafe context: detect obviously unnatural or STT-misrecognised expressions first.
+  // Must run before any correctness confirmation to avoid false affirmatives.
+  if (personaId === 'cafe_staff_friendly') {
+    const correction = unnaturalCafeCorrection(lower)
+    if (correction !== null) {
+      return `그 표현은 자연스럽지 않습니다. '${correction}'라고 말하면 자연스럽습니다. 그럼 다시 주문해 보시겠어요?`
+    }
+  }
+
+  // Confirm known-correct cafe expressions
+  if (lower.includes('아이스 아메리카노') || lower.includes('아이스아메리카노')) {
+    return '네, 자연스러운 표현입니다. 그럼 아이스 아메리카노로 해드릴까요?'
+  }
+  if (lower.includes('따뜻한 아메리카노') || lower.includes('핫 아메리카노')) {
+    return '네, 자연스러운 표현입니다. 따뜻한 아메리카노로 해드릴까요?'
+  }
 
   // "여기서 먹고 가려면 어떻게 얘기해야 하죠?" or similar dine-in expression questions
   if (
@@ -85,7 +127,10 @@ export function answerLanguageQuestionForAssessment(
   if (personaId === 'event_partner_professional') {
     return '네, 그 표현을 사용하셔도 좋습니다. 다시 본론으로 돌아가겠습니다.'
   }
-  return '네, 맞는 표현입니다. 계속 진행해 볼까요?'
+  if (personaId === 'cafe_staff_friendly') {
+    return '어떤 음료로 주문하시겠어요?'
+  }
+  return '다시 말씀해 보시겠어요?'
 }
 
 /**

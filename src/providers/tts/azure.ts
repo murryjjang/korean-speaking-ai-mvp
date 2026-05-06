@@ -9,6 +9,11 @@ function escapeXml(text: string): string {
     .replace(/'/g, '&apos;')
 }
 
+/** Clamp TTS rate to safe learner range [0.75, 1.35]. */
+export function clampRate(rate: number): number {
+  return Math.min(1.35, Math.max(0.75, rate))
+}
+
 export function rateForLevel(level: string): number {
   switch (level) {
     case 'beginner': return 0.85
@@ -30,9 +35,10 @@ export class AzureTTSProvider implements TTSProvider {
       throw new Error('azure_tts_no_credentials')
     }
 
-    const voice = options?.voice ?? process.env.AZURE_TTS_VOICE ?? 'ko-KR-SunHiNeural'
+    const voice = options?.voice ?? process.env.AZURE_TTS_VOICE ?? 'ko-KR-InJoonNeural'
     const lang = options?.lang ?? 'ko-KR'
-    const rate = options?.rate ?? 1.0
+    const envRate = process.env.AZURE_TTS_RATE ? parseFloat(process.env.AZURE_TTS_RATE) : 1.0
+    const rate = clampRate(options?.rate ?? envRate)
 
     const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${lang}"><voice name="${voice}"><prosody rate="${rate}">${escapeXml(text)}</prosody></voice></speak>`
 

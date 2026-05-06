@@ -7,7 +7,7 @@ export type TTSState = 'idle' | 'loading' | 'playing' | 'error'
 export interface UseTTSReturn {
   state: TTSState
   errorMessage: string | null
-  play: (text: string, questionId?: string, purpose?: string) => Promise<void>
+  play: (text: string, questionId?: string, purpose?: string, personaId?: string) => Promise<void>
   stop: () => void
 }
 
@@ -18,6 +18,7 @@ type TTSAPIResponse = {
   audioBase64?: string
   mimeType?: string
   fallbackText?: string
+  fallbackRate?: number
   message?: string
 }
 
@@ -44,7 +45,7 @@ export function useTTS(): UseTTSReturn {
   }, [])
 
   const play = useCallback(
-    async (text: string, questionId?: string, purpose?: string) => {
+    async (text: string, questionId?: string, purpose?: string, personaId?: string) => {
       stop()
       const seq = ++seqRef.current
       setState('loading')
@@ -54,7 +55,7 @@ export function useTTS(): UseTTSReturn {
         const res = await fetch('/api/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, questionId, purpose }),
+          body: JSON.stringify({ text, questionId, purpose, personaId }),
         })
 
         if (seq !== seqRef.current) return
@@ -89,7 +90,7 @@ export function useTTS(): UseTTSReturn {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
           const utter = new SpeechSynthesisUtterance(fallbackText)
           utter.lang = 'ko-KR'
-          utter.rate = 0.9
+          utter.rate = data.fallbackRate ?? 0.9
           utter.onend = () => {
             if (seq === seqRef.current) setState('idle')
           }

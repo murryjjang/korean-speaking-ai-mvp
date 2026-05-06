@@ -3,7 +3,7 @@ import { AzureTTSProvider } from './azure'
 
 // Server stub — synthesis happens client-side via Web Speech API.
 class BrowserTTSProvider implements TTSProvider {
-  async synthesize(text: string): Promise<TTSResult> {
+  async synthesize(text: string, _options?: { voice?: string; rate?: number; lang?: string }): Promise<TTSResult> {
     return {
       audioUrl: '',
       durationSec: Math.ceil(text.length / 10),
@@ -15,7 +15,7 @@ class BrowserTTSProvider implements TTSProvider {
 }
 
 class MockTTSProvider implements TTSProvider {
-  async synthesize(_: string): Promise<TTSResult> {
+  async synthesize(_text: string, _options?: { voice?: string; rate?: number; lang?: string }): Promise<TTSResult> {
     await new Promise((resolve) => setTimeout(resolve, 300))
     return {
       audioUrl: '/mock/audio/tts-sample.mp3',
@@ -28,7 +28,7 @@ class MockTTSProvider implements TTSProvider {
 }
 
 class OpenAITTSProvider implements TTSProvider {
-  async synthesize(text: string): Promise<TTSResult> {
+  async synthesize(text: string, _options?: { voice?: string; rate?: number; lang?: string }): Promise<TTSResult> {
     const startMs = Date.now()
     const model = process.env.TTS_MODEL ?? 'tts-1'
     const voice = process.env.TTS_VOICE ?? 'nova'

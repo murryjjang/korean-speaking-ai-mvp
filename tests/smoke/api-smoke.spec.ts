@@ -299,6 +299,44 @@ test.describe('/api/tts smoke', () => {
     }
   })
 
+  test('fallbackRate 필드가 숫자로 반환되어야 함', async ({ request }) => {
+    const res = await request.post('/api/tts', {
+      data: {
+        text: '안녕하세요.',
+        questionId: 'beginner-q4-dialogue-mission',
+        purpose: 'ai-dialogue',
+      },
+    })
+
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // 항상 숫자형 fallbackRate가 포함되어야 함 (browser speechSynthesis fallback 용)
+    expect(typeof body.fallbackRate).toBe('number')
+    // 허용 범위 0.75~1.35 내에 있어야 함
+    expect(body.fallbackRate).toBeGreaterThanOrEqual(0.75)
+    expect(body.fallbackRate).toBeLessThanOrEqual(1.35)
+  })
+
+  test('personaId 전달 시 fallbackRate가 persona defaultRate에 따라 달라짐', async ({ request }) => {
+    // cafe_staff_friendly → defaultRate 1.10
+    const resCafe = await request.post('/api/tts', {
+      data: { text: '어서오세요.', personaId: 'cafe_staff_friendly' },
+    })
+    const bodyCafe = await resCafe.json()
+    expect(typeof bodyCafe.fallbackRate).toBe('number')
+    expect(bodyCafe.fallbackRate).toBeCloseTo(1.10, 2)
+
+    // personaId 없음 → env 기본값 사용 (테스트 환경에서는 1.0)
+    const resNoPersona = await request.post('/api/tts', {
+      data: { text: '안녕하세요.' },
+    })
+    const bodyNoPersona = await resNoPersona.json()
+    expect(typeof bodyNoPersona.fallbackRate).toBe('number')
+    // 범위 내
+    expect(bodyNoPersona.fallbackRate).toBeGreaterThanOrEqual(0.75)
+    expect(bodyNoPersona.fallbackRate).toBeLessThanOrEqual(1.35)
+  })
+
   test('text 없이 전송 → 400 반환', async ({ request }) => {
     const res = await request.post('/api/tts', { data: {} })
     expect(res.status()).toBe(400)
@@ -543,5 +581,139 @@ test.describe('Phase 10-E-5-A: /api/dialogue/respond smoke', () => {
     const body = await res.json()
     // 수업 시간 정보 응답 확인
     expect(body.aiText).toContain('월요일')
+  })
+})
+
+test.describe('Phase 10-E-5-C/D: 잘못된 표현 교정 및 assessment mode 응답 개선', () => {
+  test('"나이스 아메리칸 던지세요 이게 맞나요?" → language question 감지, 교정 응답 반환', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+        ],
+        latestStudentText: '나이스 아메리칸 던지세요 이게 맞나요?',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // 틀린 표현을 "맞는 표현"으로 확인해 주면 안 됨
+    expect(body.aiText).not.toContain('맞는 표현입니다')
+    expect(body.aiText).not.toContain('계속 진행해 볼까요')
+    // 교정이 포함되어야 함
+    expect(body.aiText).toMatch(/자연스럽지 않습니다|아이스 아메리카노/)
+    // 역할극 복귀 문구 포함
+    expect(body.aiText).toMatch(/주문|다시|음료/)
+  })
+
+  test('"아이스 아메리카노 주세요가 맞아요?" → 표현 확인 질문으로 처리, 긍정 확인 + 역할극 복귀', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+        ],
+        latestStudentText: '아이스 아메리카노 주세요가 맞아요?',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // 올바른 표현이므로 긍정 확인
+    expect(body.aiText).toMatch(/자연스러운 표현|아이스 아메리카노/)
+    // 역할극 복귀 문구 포함
+    expect(body.aiText).toMatch(/해드릴까요|주문|음료/)
+    // 임무 완료 응답이어서는 안 됨 (감사합니다는 3개 goal 충족 시 나오는 응답)
+    expect(body.aiText).not.toContain('감사합니다')
+  })
+
+  test('language question turn은 mission evidence에서 제외 — 이후 실제 주문 시 goal achieved', async ({ request }) => {
+    // 표현 질문 turn 포함 후 실제 음료+온도 주문
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+          { role: 'student', text: '나이스 아메리칸 던지세요 이게 맞나요?' },
+          { role: 'ai', text: "그 표현은 자연스럽지 않습니다. '아이스 아메리카노 주세요'라고 말하면 자연스럽습니다. 그럼 다시 주문해 보시겠어요?" },
+        ],
+        latestStudentText: '아이스 아메리카노 주세요.',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // 음료+온도 주문 → 포장 여부를 물어보거나 온도 확인 질문
+    expect(body.aiText).toMatch(/따뜻|포장|드시고|차가운/)
+  })
+
+  test('assessment mode: "똑바로 알려주세요" → language question 감지', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+        ],
+        latestStudentText: '어떻게 말해야 하는지 똑바로 알려주세요.',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // language question으로 처리 → 역할극 응답(온도/포장 질문)이 나오면 안 됨
+    expect(body.aiText).not.toContain('차가운 음료로 드릴까요')
+    expect(body.aiText).not.toContain('드시고 가세요, 아니면')
+    expect(typeof body.aiText).toBe('string')
+    expect(body.aiText.length).toBeGreaterThan(0)
+  })
+
+  test('practice mode: 어색한 표현 질문 → 더 자세한 설명 허용', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        mode: 'practice',
+        personaId: 'cafe_staff_friendly',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+        ],
+        latestStudentText: '어떻게 말해야 자연스러워요?',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // practice mode → 설명이 포함된 응답
+    expect(typeof body.aiText).toBe('string')
+    expect(body.aiText.length).toBeGreaterThan(0)
+    // practice mode에서는 "계속 진행해 볼까요?" 같은 짧은 메타 응답이 아닌 실질적 답변
+    expect(body.aiText.length).toBeGreaterThan(10)
+  })
+
+  test('assessment mode fallback: 알 수 없는 표현 질문 → 역할극 복귀 문구', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        mode: 'assessment',
+        personaId: 'cafe_staff_friendly',
+        turns: [],
+        latestStudentText: '이 표현이 맞나요?',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // fallback도 역할극 문구 ("계속 진행해 볼까요?"는 사용 안 함)
+    expect(body.aiText).not.toBe('네, 맞는 표현입니다. 계속 진행해 볼까요?')
+    expect(typeof body.aiText).toBe('string')
+    expect(body.aiText.length).toBeGreaterThan(0)
   })
 })

@@ -3079,3 +3079,48 @@ ready → completed → submitting
 - attempt 단위 1~4번 전체 응시 흐름
 - ETRI 발음평가 연동
 - 모바일 Safari q4 대화형 수동 검증
+
+---
+
+## Phase 10-E-5-C/D 추가 보정 — 잘못된 표현 무조건 긍정 방지
+
+**날짜**: 2026-05-06  
+**목표**: assessment mode에서 학습자의 명백히 비정상적인 표현(STT 오인식 포함)을 "맞다"고 긍정하는 버그 수정.
+
+### 문제 현상
+`beginner-q4-dialogue-mission`에서 학생이 "나이스 아메리칸 던지세요 이게 맞나요?" 입력 시
+AI가 "네, 맞는 표현입니다. 계속 진행해 볼까요?" 반환 — 교정 없음.
+
+### 수정 내용
+
+**수정 파일 1: src/lib/dialogue-policy.ts**
+- `LANGUAGE_QUESTION_PATTERNS`에 패턴 추가: `/이게 맞/`, `/그게 맞/`, `/맞나요/`, `/맞아요\?/`, `/맞는 표현/`, `/정확한 표현/`, `/똑바로 알/`, `/제대로 알/`
+- `UNNATURAL_CAFE_PATTERNS` 배열 추가: `던지세요`, `나이스 아메리카`, `나이스 아메리칸`, `아메리칸 던/주` — 각각 교정 표현("아이스 아메리카노 주세요") 매핑
+- `unnaturalCafeCorrection(text)` helper 추가 — 비정상 표현 감지 → 교정 표현 반환
+- `answerLanguageQuestionForAssessment` 수정:
+  - cafe persona에서 비정상 표현 먼저 검사 → "그 표현은 자연스럽지 않습니다. 'X'라고 말하면 자연스럽습니다. 그럼 다시 주문해 보시겠어요?" 반환
+  - 정상 cafe 표현 확인 패턴 추가: 아이스 아메리카노, 따뜻한 아메리카노
+  - fallback: "네, 맞는 표현입니다. 계속 진행해 볼까요?" → cafe persona는 "어떤 음료로 주문하시겠어요?", 나머지는 "다시 말씀해 보시겠어요?"로 교체
+
+**수정 파일 2: tests/smoke/api-smoke.spec.ts**
+- 새 describe 블록 "Phase 10-E-5-C/D: 잘못된 표현 교정 및 assessment mode 응답 개선" 추가 (+6개 테스트):
+  - "나이스 아메리칸 던지세요 이게 맞나요?" → "맞는 표현입니다" 불포함, 교정 포함 확인
+  - "아이스 아메리카노 주세요가 맞아요?" → 긍정 확인 + 역할극 복귀 확인
+  - language question turn 제외 후 실제 주문 → goal achieved 확인
+  - "똑바로 알려주세요" → language question 감지 확인
+  - practice mode 언어 질문 → 상세 설명 허용 확인
+  - fallback 응답이 구 meta 문구("계속 진행해 볼까요?")가 아님 확인
+
+### 핵심 불변 원칙 유지
+- language question turn은 mission evidence에서 제외 (기존 로직 유지)
+- assessment mode: 짧은 교정 후 역할극 복귀 (meta 표현 사용 안 함)
+- practice mode: 더 자세한 설명 허용 (기존 `answerLanguageQuestionForPractice` 유지)
+- Azure TTS provider/fallback 유지
+- teacher final review workflow 유지
+- no-speech/short-audio guard 유지
+
+### 검증 결과
+- npm run lint: 에러 0
+- npx tsc --noEmit: 에러 0
+- npm run build: 성공
+- npm run test:smoke: 164 passed (기존 158 → 164, +6개)

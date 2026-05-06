@@ -1,8 +1,10 @@
 import { getTTSProvider } from '@/src/providers/tts'
+import { clampRate } from '@/src/providers/tts/azure'
+import { getPersona } from '@/src/lib/personas'
 import { logProviderEvent } from '@/src/lib/supabase/provider-events'
 
 export async function POST(request: Request) {
-  let body: { text?: unknown; questionId?: unknown; purpose?: unknown; voice?: unknown }
+  let body: { text?: unknown; questionId?: unknown; purpose?: unknown; personaId?: unknown }
 
   try {
     body = await request.json()
@@ -10,7 +12,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'invalid_json' }, { status: 400 })
   }
 
-  const { text, questionId, purpose } = body
+  const { text, questionId, purpose, personaId } = body
 
   if (!text || typeof text !== 'string' || !text.trim()) {
     return Response.json({ error: 'text_required' }, { status: 400 })
@@ -18,7 +20,14 @@ export async function POST(request: Request) {
 
   const qid = typeof questionId === 'string' ? questionId : null
   const purposeStr = typeof purpose === 'string' ? purpose : null
+  const personaIdStr = typeof personaId === 'string' ? personaId : null
   const configuredProvider = process.env.TTS_PROVIDER ?? 'mock'
+
+  // Resolve voice/rate: persona > env var > hard default
+  const persona = personaIdStr ? getPersona(personaIdStr) : undefined
+  const resolvedVoice = persona?.defaultVoice ?? process.env.AZURE_TTS_VOICE ?? 'ko-KR-InJoonNeural'
+  const envRate = process.env.AZURE_TTS_RATE ? parseFloat(process.env.AZURE_TTS_RATE) : 1.0
+  const resolvedRate = clampRate(persona?.defaultRate ?? envRate)
 
   // Fast path: not a real provider or missing credentials → return fallback immediately
   const isOpenAI = configuredProvider === 'openai' && !!process.env.OPENAI_API_KEY
@@ -38,6 +47,7 @@ export async function POST(request: Request) {
       providerName: 'mock',
       status: 'fallback',
       fallbackText: text,
+      fallbackRate: resolvedRate,
     })
   }
 
@@ -46,7 +56,7 @@ export async function POST(request: Request) {
 
   try {
     const provider = getTTSProvider()
-    const result = await provider.synthesize(text)
+    const result = await provider.synthesize(text, { voice: resolvedVoice, rate: resolvedRate })
 
     await logProviderEvent({
       provider: result.providerName,
@@ -72,6 +82,7 @@ export async function POST(request: Request) {
         status: 'success',
         audioBase64,
         mimeType: result.mimeType ?? 'audio/mpeg',
+        fallbackRate: resolvedRate,
       })
     }
 
@@ -81,6 +92,7 @@ export async function POST(request: Request) {
       providerName: result.providerName,
       status: 'fallback',
       fallbackText: text,
+      fallbackRate: resolvedRate,
     })
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
@@ -104,6 +116,7 @@ export async function POST(request: Request) {
       providerName: configuredProvider,
       status: 'error',
       fallbackText: text,
+      fallbackRate: resolvedRate,
       message: 'TTS synthesis failed',
     })
   }
