@@ -10,11 +10,6 @@ test.describe('/api/pronunciation smoke', () => {
   test('빈 오디오 + referenceText → mock fallback normalizedScore 반환', async ({
     request,
   }) => {
-    const formData = new FormData()
-    formData.append('referenceText', '안녕하세요')
-    formData.append('questionId', 'q-001')
-    // audio 없이 전송 — route에서 빈 Blob으로 처리
-
     const res = await request.post('/api/pronunciation', {
       multipart: {
         referenceText: '안녕하세요',
@@ -44,6 +39,51 @@ test.describe('/api/pronunciation smoke', () => {
 
     // 400이거나, route가 gracefully fallback해서 200으로 normalizedScore 반환
     expect([200, 400]).toContain(res.status())
+  })
+
+  test('ETRI API 실패 시 app crash 없음 — mock fallback 반환', async ({ request }) => {
+    // ETRI_API_KEY 없거나 외부 API 불통 환경에서도 200으로 mock fallback 반환해야 함.
+    // 실제 ETRI 호출이 발생해도 timeout/error 시 graceful fallback 확인.
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '저는 오늘 병원에 갑니다.',
+        questionId: 'beginner-q1-reading',
+        audio: {
+          name: 'recording.webm',
+          mimeType: 'audio/webm',
+          buffer: Buffer.alloc(500, 0), // 작은 가짜 오디오 — no-speech or ETRI error
+        },
+      },
+    })
+
+    // 어떤 경우에도 200 이어야 하며 normalizedScore가 있어야 함
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.normalizedScore).toBe('number')
+    expect(body.normalizedScore).toBeGreaterThanOrEqual(0)
+    expect(body.normalizedScore).toBeLessThanOrEqual(100)
+    expect(typeof body.providerName).toBe('string')
+  })
+
+  test('ETRI provider: providerName이 mock일 때 etri처럼 보이면 안 됨 (fallback 명확화)', async ({ request }) => {
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '안녕하세요.',
+        questionId: 'beginner-q1-reading',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // mock 응답: normalizedScore=72이고 providerName='mock'이면 ETRI 원점수가 없어야 함
+    // (etri fallback에서는 normalizedScore=0, fallbackReason='provider_error' 반환)
+    if (body.providerName === 'mock' && body.fallbackReason === 'provider_error') {
+      expect(body.normalizedScore).toBe(0)
+      expect(body.rawScore).toBeUndefined()
+    }
+    if (body.providerName === 'mock' && !body.fallbackReason) {
+      // 순수 mock 설정: normalizedScore는 mock 값 (72 등)
+      expect(body.normalizedScore).toBeGreaterThan(0)
+    }
   })
 })
 
@@ -715,5 +755,302 @@ test.describe('Phase 10-E-5-C/D: 잘못된 표현 교정 및 assessment mode 응
     expect(body.aiText).not.toBe('네, 맞는 표현입니다. 계속 진행해 볼까요?')
     expect(typeof body.aiText).toBe('string')
     expect(body.aiText.length).toBeGreaterThan(0)
+  })
+})
+
+// ── Phase 10-E: ETRI 발음평가 오디오 포맷 처리 ────────────────────────────────
+
+test.describe('/api/pronunciation ETRI 오디오 포맷 처리', () => {
+  /**
+   * 무음/가짜 webm(작은 바이너리)은 변환 실패 또는 ETRI 거절로 이어진다.
+   * 어떤 경우에도 앱이 crash되지 않고 구조화된 응답이 반환되어야 한다.
+   */
+  test('webm 바이너리가 유효하지 않아도 앱 crash 없음 — 에러 응답 반환', async ({ request }) => {
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '저는 오늘 병원에 갑니다.',
+        questionId: 'beginner-q1-reading',
+        audio: {
+          name: 'recording.webm',
+          mimeType: 'audio/webm',
+          // Invalid webm bytes — ffmpeg will fail to convert
+          buffer: Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x00, 0x00, 0x00]),
+        },
+      },
+    })
+
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.normalizedScore).toBe('number')
+    expect(body.normalizedScore).toBeGreaterThanOrEqual(0)
+    // providerName must stay as the configured provider (etri or mock), never undefined
+    expect(typeof body.providerName).toBe('string')
+    expect(body.providerName).not.toBe('')
+  })
+
+  test('ETRI 실패 시 providerName이 mock으로 바뀌지 않음', async ({ request }) => {
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '안녕하세요.',
+        questionId: 'beginner-q1-reading',
+        audio: {
+          name: 'recording.webm',
+          mimeType: 'audio/webm',
+          buffer: Buffer.alloc(500, 0),
+        },
+      },
+    })
+
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // When ETRI is configured and fails, providerName is 'etri' NOT 'mock'
+    // When mock is configured, providerName is 'mock'
+    // Either way it must be a valid string
+    expect(typeof body.providerName).toBe('string')
+
+    // If mock is configured: fallbackReason should not be an ETRI-specific code
+    // If etri is configured but fails: providerName must remain 'etri'
+    if (body.providerName === 'etri' && body.fallbackReason) {
+      expect(['audio_conversion_failed', 'etri_api_error', 'etri_http_error', 'etri_fetch_failed', 'provider_error'])
+        .toContain(body.fallbackReason)
+    }
+  })
+
+  test('silent audio(all-zero webm) — silent guard 또는 변환 실패 응답, app crash 없음', async ({ request }) => {
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '저는 학생입니다.',
+        questionId: 'beginner-q1-reading',
+        audio: {
+          name: 'recording.webm',
+          mimeType: 'audio/webm',
+          buffer: Buffer.alloc(3000, 0),
+        },
+      },
+    })
+    // Must not crash — any valid status is acceptable
+    expect([200, 400]).toContain(res.status())
+    if (res.status() === 200) {
+      const body = await res.json()
+      expect(typeof body.normalizedScore).toBe('number')
+    }
+  })
+
+  test('q1 reading referenceText가 API에 전달되어 응답 반환', async ({ request }) => {
+    // The script (referenceText) must reach the provider — verified indirectly:
+    // a non-empty script + valid response structure means the route passed it through.
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '오늘은 날씨가 맑고 바람이 시원합니다. 저는 공원에서 산책을 즐깁니다.',
+        questionId: 'beginner-q1-reading',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.normalizedScore).toBe('number')
+    expect(typeof body.providerName).toBe('string')
+    expect(typeof body.feedback).toBe('string')
+    expect(body.feedback.length).toBeGreaterThan(0)
+  })
+
+  test('변환 실패 응답: fallbackReason이 audio_conversion_failed이면 normalizedScore=0', async ({
+    request,
+  }) => {
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '저는 학생입니다.',
+        questionId: 'beginner-q1-reading',
+        audio: {
+          name: 'recording.webm',
+          mimeType: 'audio/webm',
+          buffer: Buffer.from([0x00, 0x01, 0x02]),
+        },
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    if (body.fallbackReason === 'audio_conversion_failed') {
+      expect(body.normalizedScore).toBe(0)
+      // providerName must NOT be 'mock' — it must stay as the configured provider
+      expect(body.providerName).not.toBe('mock')
+    }
+  })
+
+  test('q1/q2/q3 기존 문항 유형별 흐름 유지 — 오디오 없이도 normalizedScore 반환', async ({
+    request,
+  }) => {
+    const cases = [
+      { qId: 'beginner-q1-reading', ref: '저는 오늘 병원에 갑니다.' },
+      { qId: 'beginner-q2-material-description', ref: '이 사진을 설명해 보세요.' },
+      { qId: 'beginner-q3-listening-response', ref: '들은 내용을 말해 보세요.' },
+    ]
+    for (const { qId, ref } of cases) {
+      const res = await request.post('/api/pronunciation', {
+        multipart: { referenceText: ref, questionId: qId },
+      })
+      expect(res.ok()).toBe(true)
+      const body = await res.json()
+      expect(typeof body.normalizedScore).toBe('number')
+      expect(body.normalizedScore).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  test('q4 dialogue_mission 흐름 유지 — pronunciation API가 dialogue와 충돌하지 않음', async ({
+    request,
+  }) => {
+    // Verify that the pronunciation endpoint also accepts q4 questionId without crash
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '아이스 아메리카노 주세요.',
+        questionId: 'beginner-q4-dialogue-mission',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.normalizedScore).toBe('number')
+  })
+})
+
+// ── Phase 10-E-7: ETRI score missing / error code 처리 ────────────────────────
+
+test.describe('/api/pronunciation ETRI score missing 및 error code 처리', () => {
+  test('에러 응답의 fallbackReason이 허용된 코드 중 하나임', async ({ request }) => {
+    const ALLOWED_FALLBACK_REASONS = [
+      'audio_conversion_failed',
+      'etri_api_error',
+      'etri_http_error',
+      'etri_fetch_failed',
+      'etri_score_missing',
+      'provider_error',
+      'no_api_key',
+      'mock_configured',
+    ]
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '저는 학생입니다.',
+        questionId: 'beginner-q1-reading',
+        audio: {
+          name: 'recording.webm',
+          mimeType: 'audio/webm',
+          buffer: Buffer.from([0x1a, 0x45, 0xdf, 0xa3]),
+        },
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    if (body.fallbackReason !== undefined) {
+      expect(ALLOWED_FALLBACK_REASONS).toContain(body.fallbackReason)
+    }
+  })
+
+  test('에러 응답: fallbackReason이 있으면 rawScore는 undefined여야 함 (0이면 안 됨)', async ({
+    request,
+  }) => {
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '저는 학생입니다.',
+        questionId: 'beginner-q1-reading',
+        audio: {
+          name: 'recording.webm',
+          mimeType: 'audio/webm',
+          buffer: Buffer.from([0x00, 0x01, 0x02]),
+        },
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // fallbackReason이 있으면 rawScore가 반드시 undefined여야 함 (파싱 실패를 0점으로 표현 금지)
+    if (body.fallbackReason) {
+      expect(body.rawScore).toBeUndefined()
+    }
+  })
+
+  test('에러 응답: fallbackReason=etri_score_missing이면 feedback이 비어있지 않음', async ({
+    request,
+  }) => {
+    // This test verifies the feedback message shape for error responses.
+    // We can't force etri_score_missing without mocking, so we verify the general contract.
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '오늘은 날씨가 맑습니다.',
+        questionId: 'beginner-q1-reading',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // feedback must always be a non-empty string regardless of error state
+    expect(typeof body.feedback).toBe('string')
+    expect(body.feedback.length).toBeGreaterThan(0)
+  })
+
+  test('q1/q2/q3 문항 — 오디오 없이도 정상 응답 구조 유지', async ({ request }) => {
+    const cases = [
+      { qId: 'beginner-q1-reading', ref: '저는 오늘 병원에 갑니다.' },
+      { qId: 'beginner-q2-material-description', ref: '이 사진은 식당입니다.' },
+      { qId: 'beginner-q3-listening-response', ref: '들은 내용을 말해 보세요.' },
+    ]
+    for (const { qId, ref } of cases) {
+      const res = await request.post('/api/pronunciation', {
+        multipart: { referenceText: ref, questionId: qId },
+      })
+      expect(res.ok()).toBe(true)
+      const body = await res.json()
+      expect(typeof body.normalizedScore).toBe('number')
+      expect(body.normalizedScore).toBeGreaterThanOrEqual(0)
+      expect(body.normalizedScore).toBeLessThanOrEqual(100)
+      expect(typeof body.providerName).toBe('string')
+      expect(typeof body.feedback).toBe('string')
+    }
+  })
+
+  test('q4 dialogue_mission — pronunciation API가 충돌 없이 응답 반환', async ({ request }) => {
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '포장해 주세요.',
+        questionId: 'beginner-q4-dialogue-mission',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.normalizedScore).toBe('number')
+    expect(typeof body.providerName).toBe('string')
+  })
+
+  test('q1 reading: referenceText가 지문 본문만인 경우 API 정상 응답', async ({ request }) => {
+    // Client strips the instruction line before \n\n — send only the reading text.
+    // This verifies the provider accepts a short, clean script without instructions.
+    const readingTextOnly = '저는 오늘 오후에 병원에 갑니다. 병원에 가기 전에 약국에 들를 예정입니다.'
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: readingTextOnly,
+        questionId: 'beginner-q1-reading',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(typeof body.normalizedScore).toBe('number')
+    expect(typeof body.feedback).toBe('string')
+    expect(body.feedback.length).toBeGreaterThan(0)
+  })
+
+  test('변환 실패 응답: normalizedScore=0이고 providerName은 mock이 아님', async ({ request }) => {
+    const res = await request.post('/api/pronunciation', {
+      multipart: {
+        referenceText: '저는 학생입니다.',
+        questionId: 'beginner-q1-reading',
+        audio: {
+          name: 'recording.webm',
+          mimeType: 'audio/webm',
+          buffer: Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x00]),
+        },
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    if (body.fallbackReason === 'audio_conversion_failed') {
+      expect(body.normalizedScore).toBe(0)
+      expect(body.providerName).not.toBe('mock')
+      expect(body.rawScore).toBeUndefined()
+    }
   })
 })

@@ -36,6 +36,15 @@ export type PronunciationResult = ProviderMeta & {
   normalizedScore: number
   wordScores: PronunciationWordScore[]
   feedback: string
+  /** ETRI 원점수 (1~5). PRONUNCIATION_PROVIDER=etri 시만 설정됨. */
+  rawScore?: number
+  /** etri fallback일 때 사유 */
+  fallbackReason?: string
+  /** 파일럿 보정 참고점수. 최종점수 아님 — 교수자 검토 후 확정. */
+  calibratedScore?: number
+  calibrationVersion?: string
+  calibrationStatus?: 'uncalibrated' | 'provisional' | 'validated'
+  calibrationNote?: string
 }
 
 export type LLMEvalScore = {

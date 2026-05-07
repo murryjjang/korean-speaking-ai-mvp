@@ -94,7 +94,38 @@
 - 🔜 attempt 단위 1~4번 전체 응시 흐름 미구현
 - 🔜 beginner q2 실제 사진 교체 필요 (파일럿 전, 직접 촬영 또는 사용 허가 이미지)
 - 🔜 모바일/브라우저별 무음 threshold 수동 조정 필요
-- 🔜 ETRI/Azure 발음평가 비교 미완
+- ✅ **ETRI 발음평가 실제 연동 착수** (Phase 10-E-7): URL/Authorization/점수환산 수정, q1 reading script 추출, rawScore UI 표시, fallback 명확화
+- ✅ **ETRI 점수 표시 보정** (Phase 10-E-7 추가): 원점수/참고환산 구분, 세부 항목 막대 provider별 분리, calibration 안내 배너, WAV 진단 로그 강화
+- ✅ **AI 1차 평가·ETRI 카드 분리 표시 + 보정 참고점수 구조 추가** (Phase 10-E-7 통합 수정):
+  - 상단 종합점수 "발음" 라벨 → "AI 발음 추정" (provider=etri), ETRI 원점수와 명확 분리
+  - 발음 평가 카드 제목 → "ETRI 발음평가 API 결과"
+  - rawScore(원점수) / normalizedScore(단순환산) / calibratedScore(보정참고) 3단계 구분 표시
+  - `src/lib/pronunciation-calibration.ts` 신규 — piecewise linear calibration, calibrationStatus="provisional"
+  - calibratedScore 최종 종합점수 자동 반영 보류 (파일럿 교수자 검토 후 결정)
+- ✅ **ETRI 실제 API 실패 복구 + q1 낭독 문항 표시 정책** (Phase 10-E-7 통합 후속 수정):
+  - `ETRI_PRONUNCIATION_ENDPOINT` env override 추가 (기존 base-only에서 full URL 재정의 가능)
+  - ETRI 오류 메시지 세분화: etri_fetch_failed / etri_http_error / etri_api_error 별도 안내 문구
+  - q1 낭독 문항(qt-reading): 종합점수 카드 → "문항 AI 참고평가", rubric-speaking-01 breakdown 숨김, 낭독 기준 4개 + "공식 종합점수는 1~4번 전체 응시 후 산출됩니다." 안내
+  - 테스트 25개 추가 (오류 메시지 매핑, fallback 분기, reading 표시 정책, endpoint 정책)
+- ✅ **q1 문항 AI 참고평가에 ETRI calibratedScore 반영** (Phase 10-E-7 추가 수정):
+  - q1ReferenceScore 산식: `round(calibratedScore × 0.6 + aiScore × 0.4)` (임시 — 파일럿 calibration 후 비율 조정 예정)
+  - ETRI 성공 시 CardHeader 부제 → "AI 1차 평가 + ETRI 보정 참고값 · 교수자 확정 전 참고값"
+  - ETRI 실패 시 기존 AI 참고점수 유지 + "ETRI 발음평가가 반영되지 않은 AI 참고평가" 안내
+  - 낭독 기준 "기본 발음·억양 이해 가능" 항목에 ETRI 반영 시 "· ETRI 참고 반영" 마커 추가
+  - q1 legacy 5개 breakdown 미표시 유지
+  - calibratedScore는 teacher final score로 자동 확정하지 않음
+  - calibratedScore는 1~4번 전체 공식 종합점수에 자동 반영하지 않음
+  - 테스트 파일 신규: `tests/unit/q1-reference-score-policy.test.ts` (작업 8 전체 커버)
+- 🔜 **q1 reference score 산식은 임시** — `round(calibratedScore × 0.6 + aiScore × 0.4)` 비율은 파일럿 calibration 샘플 수집 후 재검토 필요
+- 🔜 **공식 1~4번 전체 세트 종합점수 산식 미확정** — 각 문항 배점(reading 15 / material_description 25 / listening 25 / dialogue 35)을 기준으로 한 교수자 확정 후 종합점수 계산 방식은 10-E-6~7에서 정리 예정
+- 🔜 **ETRI calibratedScore는 q1 문항 참고평가에만 일부 반영** — 공식 최종점수에는 자동 반영하지 않음. 교수자가 ETRI 보정 참고점수를 참고하여 최종 점수를 직접 입력하는 방식 유지
+- 🔜 ETRI 실제 음원 포맷(webm) 호환성 수동 검증 필요
+- 🔜 q2/q3/q4 ETRI script 기준 확정 필요 (현재 참고 점수로만 활용)
+- 🔜 Azure/ETRI 발음평가 비교 미완
+- 🔜 **교수자 최종점수 반영 비율 확정 필요** — ETRI calibratedScore가 최종 발음점수에 얼마나 반영되는지 미확정. 공식 세트(q1~q4) 전체 응시 흐름 완성 후 종합점수 산식 재정리 예정
+- 🔜 **ETRI calibration 후속 확정 필요** — calibrationStatus="provisional". 원어민/학습자/부정확 발화 샘플 수집 후 CALIBRATION_ANCHORS v0.1-pilot 재검토. calibration 완료 전까지 calibratedScore는 파일럿 보정용 참고값으로만 표시
+- 🔜 **q1 script 길이 및 오디오 포맷 영향 검토** — q1 전체 낭독 텍스트를 한 번에 ETRI에 전달 중. 긴 텍스트가 점수에 영향을 줄 수 있음. 후속 개선 후보: (1) 문장 단위 audio segmentation (어려움), (2) 짧은 q1 문항부터 ETRI 기준 검증, (3) 추후 문장 단위 낭독 문항에서 문장별 ETRI 평가 가능
+- 🔜 **ETRI recognized text와 script 일치율 확인** — ETRI가 인식한 텍스트가 기준 script와 얼마나 일치하는지 서버 로그로 확인 필요. 불일치 시 음성 품질 또는 발음 문제 가능성
 
 **4번 dialogue_mission 구현 방향**: 단발 녹음형으로 최종 운영하지 않음. 생성형 AI 쌍방 대화형 평가로 구현 예정. 실제 AI 대화 UI·대화 로그 저장·missionGoals 달성 평가는 **10-E-5**에서 구현. 현재는 단발 녹음 UI를 숨기고 "준비 중" 상태로 표시하며 `evaluationMode: "interactive_dialogue"` 필드로 명시.
 
@@ -539,4 +570,40 @@ D. corrected_answer 섹션:
 
 ---
 
-*분석 완료: 2026-05-05 / 추가 보정: 2026-05-06*
+---
+
+## Phase 10-E-7 추가 수정 2차 Known Issues (2026-05-07)
+
+### KI-1: result page rubric 혼재 (rubric-speaking-01 고정)
+
+| 항목 | 내용 |
+|---|---|
+| **증상** | result page (`app/student/speaking/[questionId]/result/page.tsx`)가 `rubric-speaking-01`(레거시 5개 항목 100점)을 hardcode 사용 |
+| **영향** | q1 reading의 실제 rubric(`rubric-reading-01`, 4개 항목 15점)과 다른 항목·배점 구조로 표시됨 |
+| **발원** | line 9: `const rubric = rubricsJson.find((r) => r.id === 'rubric-speaking-01')!` 고정 |
+| **관련 함수** | `detailToLLMEvalResult` — 항상 ri-pronunciation/ri-fluency/ri-vocabulary/ri-grammar/ri-task 5개 생성 |
+| **우선순위** | 중간 — 파일럿 기간에는 "AI 1차 평가 참고값" 라벨로 완화 중 |
+| **후속 작업** | result page가 `question.rubricId`를 기반으로 rubric을 동적 로드하도록 수정; `detailToLLMEvalResult`도 rubric-aware 변환으로 교체 |
+
+### KI-2: 발음 항목 14점 고정 (mock AI aggregate 파생값)
+
+| 항목 | 내용 |
+|---|---|
+| **증상** | 종합점수 카드의 "발음" 항목이 14/20으로 고정되어 보임 |
+| **원인** | `getMockDetail`에서 `pronunciation_reference_score: 72` 하드코딩 → `toRubricScore(72)` = 14 |
+| **ETRI 관계** | ETRI rawScore(예: 51/100)와 완전히 무관. 구조적으로 분리된 별개 값. |
+| **완화 조치** | 종합점수 CardHeader에 "AI 1차 평가" 라벨 추가; ETRI provider일 때 "발음 항목은 AI 추정값" 안내 표시 |
+| **후속 작업** | 실제 ETRI normalizedScore를 `pronunciation_reference_score`에 전달하여 AI 평가에 반영 (보정 완료 후) |
+
+### KI-3: ETRI 점수 calibration 미완료
+
+| 항목 | 내용 |
+|---|---|
+| **증상** | 원어민 낭독에서 ETRI rawScore 2.5~2.7/5 관찰 (예상 3.5+ 대비 낮음) |
+| **원인 후보** | 긴 지문 전체 평가 / script 불일치 / 마이크 음량 부족 / ETRI calibration 미적용 등 복수 |
+| **현재 상태** | ETRI 점수는 "보정 전 참고값"으로 표시; 최종 발음 점수는 교수자 수동 확정 |
+| **후속 작업** | PILOT_RELEASE_PLAN.md calibration checklist 완료 후 환산 비율 결정 |
+
+---
+
+*분석 완료: 2026-05-05 / 추가 보정: 2026-05-06 / Known Issues 추가: 2026-05-07*

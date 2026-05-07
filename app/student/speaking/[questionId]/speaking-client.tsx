@@ -305,20 +305,37 @@ export function SpeakingClient({
           // Pronunciation evaluation via /api/pronunciation
           (async () => {
             try {
+              // For qt-reading, extract only the reading text after the first blank line.
+              // The prompt format is: "지시문\n\n<reading text to be assessed>"
+              let referenceText = question.prompt
+              if (question.typeId === 'qt-reading') {
+                const idx = question.prompt.indexOf('\n\n')
+                if (idx !== -1) {
+                  const candidate = question.prompt.slice(idx + 2).trim()
+                  if (candidate) referenceText = candidate
+                }
+              }
+
               const fd = new FormData()
               fd.append('audio', blob, 'recording.webm')
               fd.append('questionId', question.id)
-              fd.append('referenceText', question.prompt)
+              fd.append('referenceText', referenceText)
               const res = await fetch('/api/pronunciation', { method: 'POST', body: fd })
               if (res.ok) {
                 const data = await res.json()
                 if (typeof data?.normalizedScore === 'number') {
                   pronunciationResult = {
                     normalizedScore: data.normalizedScore,
+                    rawScore: typeof data.rawScore === 'number' ? data.rawScore : undefined,
                     wordScores: Array.isArray(data.wordScores) ? data.wordScores : [],
                     feedback: typeof data.feedback === 'string' ? data.feedback : '',
                     providerName: typeof data.providerName === 'string' ? data.providerName : 'mock',
                     latencyMs: typeof data.latencyMs === 'number' ? data.latencyMs : 0,
+                    fallbackReason: typeof data.fallbackReason === 'string' ? data.fallbackReason : undefined,
+                    calibratedScore: typeof data.calibratedScore === 'number' ? data.calibratedScore : undefined,
+                    calibrationVersion: typeof data.calibrationVersion === 'string' ? data.calibrationVersion : undefined,
+                    calibrationStatus: typeof data.calibrationStatus === 'string' ? data.calibrationStatus as ClientPronunciationResult['calibrationStatus'] : undefined,
+                    calibrationNote: typeof data.calibrationNote === 'string' ? data.calibrationNote : undefined,
                   }
                 }
               }
@@ -351,7 +368,7 @@ export function SpeakingClient({
       setSubmitError(true)
       setPhase('review')
     }
-  }, [question.id, question.prompt, questionSetId, router, recorder.state, recorder.blobUrl, recorder.durationSec, recorder.audioStats, blobSize])
+  }, [question.id, question.prompt, question.typeId, questionSetId, router, recorder.state, recorder.blobUrl, recorder.durationSec, recorder.audioStats, blobSize])
 
   const handleRetake = useCallback(() => {
     recorder.reset()

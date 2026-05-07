@@ -4,6 +4,269 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-7 추가 수정 — q1 문항 AI 참고평가에 ETRI calibratedScore 반영
+
+**날짜**: 2026-05-07  
+**배경**: q1 낭독 문항에서 ETRI 발음평가 성공 시 하단 ETRI 카드에 calibratedScore가 표시되지만 상단 "문항 AI 참고평가"는 여전히 기존 AI aggregate 점수(예: 78/C)를 표시하여 혼동. ETRI calibratedScore를 q1 AI 참고평가에 일부 반영하되 교수자 확정 전 참고값 성격을 유지.
+
+### q1ReferenceScore 산식 (임시 — 교수자 확정 후 비율 조정 예정)
+
+```
+q1ReferenceScore = round(etriCalibratedScore × 0.6 + aiReadingTaskScore × 0.4)
+예: calibratedScore=91, AI=78 → round(91×0.6 + 78×0.4) = round(54.6+31.2) = round(85.8) = 86
+```
+
+### 점수 구분 유지 정책
+
+| 필드 | 값 예시 | 표시 위치 | 성격 |
+|---|---|---|---|
+| `rawScore` | 3.88 / 5 | ETRI 카드 | ETRI 원점수 (변경 불가) |
+| `normalizedScore` | 78 / 100 | ETRI 카드 | 단순 환산 (rawScore/5×100) |
+| `calibratedScore` | 91 / 100 | ETRI 카드 | 보정 참고값 (provisional) |
+| `q1ReferenceScore` | 86 / 100 | 문항 AI 참고평가 카드 | AI+ETRI 혼합 참고값 (최종 아님) |
+
+- rawScore / normalizedScore / calibratedScore 3단계 구분 표시 유지
+- `calibratedScore`는 `teacher final score`로 자동 확정하지 않음
+- `q1ReferenceScore`는 1~4번 전체 세트 공식 종합점수에 자동 반영하지 않음
+- 최종점수는 교수자 검토 후 별도 확정
+
+### Fallback 정책
+
+- ETRI 성공 + calibratedScore 있음 → q1ReferenceScore에 반영
+- ETRI 성공 + calibratedScore 없음 → rawScore에 `calibrateEtriScore()` 적용 후 반영
+- ETRI 실패 → 기존 AI 점수 유지 ("ETRI 발음평가가 반영되지 않은 AI 참고평가")
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/student/speaking/[questionId]/result/page.tsx` | `calibrateEtriScore` import 추가, `computeQ1ReferenceScore()` / `q1ReferenceGrade()` helper 추가, `isReadingQuestion` / `q1EtriReflected` / `displayScore` / `displayGrade` 계산 추가, CardHeader 부제 분기, 점수·등급 표시 교체, 낭독 기준 ETRI 마커 추가, 안내 문구 분기 |
+| `tests/unit/q1-reference-score-policy.test.ts` | **신규** — 산식 검증, ETRI 성공/실패 분기, 등급 산정, legacy breakdown 미표시, calibratedScore 최종점수 미자동확정, q2/q3/q4 흐름 유지 등 작업 8 전체 테스트 |
+
+---
+
+## Phase 10-E-7 통합 후속 수정 — ETRI 실제 API 실패 복구 + q1 낭독 문항 표시 정책
+
+**날짜**: 2026-05-07  
+**배경**: ETRI 실제 API endpoint URL 오류 진단 후 → 전체 URL env override 추가, 오류 메시지 세분화, q1 낭독 문항에서 잘못된 rubric-speaking-01 5개 항목 breakdown 숨김.
+
+### 변경 요약
+
+1. **ETRI_PRONUNCIATION_ENDPOINT 환경변수 추가** (A-2): `ETRI_API_BASE_URL`(base-only) 외에 전체 URL 재정의 가능. 기본값 `http://epretx.etri.re.kr:8000/api/WiseASR_PronunciationKor`. 로깅은 hostname/path만.
+2. **ETRI 오류 메시지 세분화** (A-6): `etri_fetch_failed`/"ETRI 서버 호출에 실패했습니다. 네트워크 또는 endpoint 확인이 필요합니다.", `etri_http_error`/"ETRI 서버가 정상 응답을 반환하지 않았습니다.", `etri_api_error`/"ETRI API 오류 응답을 받았습니다." 케이스 추가. `getEtriErrorMessage()` 헬퍼 함수화.
+3. **q1 낭독 문항 표시 정책** (B-2): `question?.typeId === 'qt-reading'`이면 종합점수 카드를 "문항 AI 참고평가"로 표시, rubric-speaking-01 5개 항목 breakdown 숨김, 낭독 기준 4개 항목 표시, "공식 종합점수는 1~4번 전체 응시 후 산출됩니다." 안내 추가.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/providers/pronunciation/etri.ts` | `ETRI_PRONUNCIATION_ENDPOINT` const 추가, fetch URL을 `ETRI_ENDPOINT` 사용, endpoint hostname/path 로그 추가 |
+| `app/student/speaking/[questionId]/result/page.tsx` | `getEtriErrorMessage()` 헬퍼 추가, `READING_CRITERIA` 상수 추가, qt-reading 분기 렌더링 추가 |
+| `tests/unit/pronunciation-display-policy.test.ts` | ETRI 오류 메시지 매핑(6), fallbackReason별 분기(3), q1 낭독 표시 정책(10), ETRI 카드 questionType 무관 확인(2), endpoint 정책(4) — 총 25개 신규 테스트 |
+| `.env.local.example` | `ETRI_PRONUNCIATION_ENDPOINT` 예시값 추가 |
+
+---
+
+## Phase 10-E-7 통합 수정 — AI 1차 평가·ETRI 점수 분리 표시 + 보정 참고점수 구조 추가
+
+**날짜**: 2026-05-07  
+**배경**: 상단 종합점수 카드의 "발음 14/20"이 ETRI 원점수로 오해될 수 있음. ETRI rawScore 2.5~2.7/5 저평가 관측. 보정 전 calibratedScore 파일럿 참고값 구조 필요.
+
+### 핵심 변경 요약
+
+1. **상단 "발음 14/20" → "AI 발음 추정 14/20"**: provider=etri이면 종합점수 카드의 ri-pronunciation 항목 라벨을 "AI 발음 추정"으로 변경. ETRI 원점수와 명확히 구분.
+2. **상단 카드 안내 문구 강화**: "상단의 'AI 발음 추정'은 ETRI 원점수가 아니며, 실제 ETRI 발음평가 결과는 아래 카드에서 별도로 확인하세요." (data-testid=ai-pronunciation-note)
+3. **발음 평가 카드 제목 변경**: provider=etri이면 "발음 평가" → "ETRI 발음평가 API 결과"
+4. **ETRI 카드 3단계 점수 구분 표시**: ETRI 원점수(rawScore) / 단순 환산 점수(normalizedScore) / 보정 참고점수(calibratedScore) 분리 표시
+5. **calibratedScore**: 파일럿 보정용 참고값. 최종점수 자동 반영 없음. calibrationStatus="provisional"
+6. **보정 안내 문구 강화**: 원점수/단순환산/보정참고 각각의 의미, 마이크/녹음 품질 안내, 교수자 검토 후 확정 안내
+
+### 14/20 고정값 원인 (재확인)
+
+- 상단 발음 14/20 = `detailToLLMEvalResult` → `pronunciation_reference_score: 72(mock)` → `toRubricScore(72)` = 14/20
+- ETRI rawScore(예: 51/100)와 완전히 무관한 mock AI aggregate 파생값
+- 구조적으로 분리되어 있으나 라벨이 "발음"으로 동일했음 → "AI 발음 추정"으로 변경하여 혼동 해소
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/lib/pronunciation-calibration.ts` | **신규** — ETRI piecewise linear 보정 함수, calibrationStatus="provisional" |
+| `src/types/providers.ts` | `PronunciationResult`에 `calibratedScore?`, `calibrationVersion?`, `calibrationStatus?`, `calibrationNote?` 추가 |
+| `src/providers/pronunciation/etri.ts` | `calibrateEtriScore()` 호출 및 결과에 calibration 4개 필드 포함 |
+| `app/student/speaking/actions.ts` | `ClientPronunciationResult`에 calibration 4개 필드 추가, `buildClientPronunciation()`에서 전달 |
+| `app/student/speaking/[questionId]/result/page.tsx` | 상단 발음 라벨 "AI 발음 추정" 변경, ETRI 카드 제목 변경, calibratedScore "보정 참고점수" 표시, 안내 문구 강화 |
+| `tests/unit/pronunciation-calibration.test.ts` | **신규** — calibrateEtriScore() 앵커 검증, 실제 관측값, 정책 검증 |
+| `tests/unit/pronunciation-display-policy.test.ts` | 라벨 분기, 카드 제목, calibratedScore 표시, 3단계 점수 구분 테스트 추가 |
+
+### ETRI calibration 보정 함수 정책
+
+- 보정 곡선: piecewise linear (CALIBRATION_ANCHORS v0.1-pilot)
+  - rawScore 2.5 → calibratedScore 75
+  - rawScore 2.7 → calibratedScore 약 78
+  - rawScore 3.0 → calibratedScore 82
+  - rawScore 4.0 → calibratedScore 93
+  - rawScore 5.0 → calibratedScore 100
+- calibrationVersion: "v0.1-pilot"
+- calibrationStatus: "provisional" (파일럿 샘플 수집 후 재조정 필요)
+- calibratedScore는 최종 종합점수에 자동 반영하지 않음
+- 원점수(rawScore)는 절대 수정하지 않음
+
+### ETRI 저평가 원인 후보 (업데이트)
+
+상단 "발음 14/20"이 ETRI와 무관한 AI aggregate 파생값임을 재확인.
+ETRI 원점수 자체의 저평가 원인은 다음과 같음:
+1. 긴 지문 전체를 한 번에 평가 — 문장 단위 분리 평가 검토 필요
+2. script와 실제 발화 불완전 일치 (recognizedStringPrefix vs scriptPreview)
+3. STT 전사 오류로 script 불일치
+4. 마이크 음량/거리/녹음 품질 (rmsApprox < 200이면 의심)
+5. webm→WAV 변환 후 음질/샘플레이트 영향
+6. ETRI 점수 체계가 원어민 기준 calibration 미적용
+7. 외국인 발음평가 모델 특성상 원어민도 낮게 나올 수 있음
+8. 원어민/비원어민/부정확 발화 샘플 기반 calibration 미완료
+
+---
+
+## Phase 10-E-7 추가 수정 2차 — 종합점수 AI 1차 평가 라벨·14점 고정 원인 문서화·ETRI 단정 표현 완화
+
+**날짜**: 2026-05-07  
+**배경**: ETRI 발음평가 결과 2.5~2.7/5 저평가 관측. 종합점수 카드의 발음 항목 14점이 고정되는 원인 진단 및 UI 혼동 해소.
+
+### 진단 결과
+
+#### 발음 14점 고정 원인
+- `detailToLLMEvalResult`에서 `ri-pronunciation` 점수 = `toRubricScore(detail.pronunciation_reference_score ?? detail.fluency_score)`
+- mock에서 `pronunciation_reference_score: 72` (하드코딩 고정값)
+- `toRubricScore(72)` = `Math.round(72 × 20 / 100)` = **14/20**
+- ETRI rawScore(예: 51/100)와 완전히 무관한 mock AI aggregate 파생값
+
+#### rubric 혼재 known issue
+- result page가 `rubric-speaking-01`(레거시 5개 항목 100점)을 항상 hardcode로 사용
+- q1 reading의 실제 rubric은 `rubric-reading-01`(4개 항목 15점)
+- llmEvalResult.scores는 항상 ri-pronunciation/ri-fluency/ri-vocabulary/ri-grammar/ri-task 5개 항목으로 채워짐
+- q1에서도 종합점수 카드가 5개 항목 20점 구조로 표시됨 → **Known Issue: Phase 후속 수정 대상**
+
+#### ETRI 점수와 종합점수 분리
+- ETRI normalizedScore는 `pronunciationResult` 카드에 표시 (이미 분리됨)
+- 종합점수 카드의 "발음" 14/20은 mock LLM aggregate에서 파생된 별개 값
+- 두 값이 이미 구조적으로 분리되어 있으나 라벨이 명확하지 않았음
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/providers/pronunciation/etri.ts` | `normalizeFeedback` 하단 케이스 "발음 연습이 필요합니다" 단정 표현 → 참고값 안내 문구로 완화 |
+| `app/student/speaking/[questionId]/result/page.tsx` | 종합점수 CardHeader에 `description="AI 1차 평가 · 교수자 확정 전 참고값"` 추가; ETRI provider일 때 발음 항목 "AI 추정" 안내 (data-testid=ai-pronunciation-note); 카드 하단 "교수자 검토 후 확정" disclaimer (data-testid=ai-eval-disclaimer) |
+| `tests/unit/etri-score-parser.test.ts` | rawScore 2.53596→51, 2.73→55, 2.726668→55 실제 관측값 케이스 추가 |
+| `tests/unit/pronunciation-display-policy.test.ts` | 신규 — ETRI/mock 분기 정책, 세부막대 표시 조건, 14점 AI 추정 분리, q1/q2/q3/q4 흐름 유지 검증 |
+
+### ETRI 저평가 원인 후보 (추가 정리)
+
+| 원인 후보 | 가능성 | 진단 방법 |
+|---|---|---|
+| 긴 지문 전체 한 번에 평가 | 높음 | 짧은 문장 단위 vs 전체 비교 |
+| script와 발화 불완전 일치 | 중간 | recognizedStringPrefix vs scriptPreview 비교 |
+| STT 전사 오류 | 중간 | STT transcript 직접 확인 |
+| 마이크 음량/거리 | 중간 | rmsApprox < 200이면 의심 |
+| webm→WAV 변환 후 음질 | 낮음 | durationSec, rmsApprox 확인 |
+| ETRI 점수 체계(원어민/비원어민 calibration 미적용) | 높음 | 원어민 3개 이상 샘플 비교 |
+| 기준문장 일치율 저하 | 높음 | recognized text vs script 40자 비교 |
+
+---
+
+## Phase 10-E-7 (추가 보정) — ETRI 점수 표시 보정 및 저평가 원인 진단 체계 구축
+
+**날짜**: 2026-05-07  
+**배경**: q1 낭독 원어민 샘플 실제 제출 결과 ETRI rawScore 2.73/5 (환산 55/100) 관찰. 원어민 낭독에 비해 저평가 가능성 있음. 점수 보정 전 calibration 필요.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/providers/pronunciation/etri.ts` | **진단 로그 강화** — WAV 오디오 duration/RMS/maxAbs 계산, script preview(앞 40자), 지시문 포함 여부 감지, recognized text 40자 표시, word score count 로그, script를 `.trim()` 후 ETRI에 전달 |
+| `app/student/speaking/[questionId]/result/page.tsx` | **ETRI provider 전용 표시 분기** — ETRI일 때 원점수(rawScore.toFixed(2)/5) + 참고 환산(normalizedScore/100) 표시, 5개 세부 항목 막대 숨김, calibration 안내 배너 추가, "세부 항목별 점수 없음" 메시지 추가 / mock provider는 기존 5개 막대 유지 |
+| `app/teacher/submissions/[id]/step-rubric-adjust.tsx` | AI 1차 평가 안내 박스에 ETRI 발음 원점수 교수자 안내 텍스트 추가 |
+| `tests/unit/etri-score-parser.test.ts` | rawScore 2.726668 표시 형식, subcriteria 표시 조건 로직, script normalization 추가 테스트 |
+
+### ETRI 저평가 원인 후보 (진단 항목)
+
+다음 항목을 서버 로그로 확인해야 함:
+1. **script 지시문 포함 여부** — `scriptHasLeadingInstruction` 로그 확인 (extractReadingText로 이미 제거되어야 함)
+2. **audio duration** — WAV `durationSec` 로그 확인 (beginner q1 기준 약 25~40초 예상)
+3. **audio RMS** — `rmsApprox` < 100이면 음량 부족 가능성
+4. **maxAbs** — 32767에 근접하면 clipping 위험
+5. **recognized text** — ETRI가 인식한 텍스트가 기준 script와 얼마나 일치하는지 (`recognizedStringPrefix` 확인)
+6. **word score count** — `wordScoreCount` = 0이면 ETRI가 어절 단위 평가 미제공
+
+### 점수 표시 보정 정책
+
+- ETRI rawScore: "원점수 X.XX / 5" 표시
+- normalizedScore: "참고 환산 점수 Y / 100" + "참고값" 배지
+- 세부 항목 막대: ETRI는 숨김 (word scores 있을 때만 표시), mock는 기존 유지
+- calibration 안내 배너: "ETRI 원점수는 보정 전 참고값입니다. 최종 발음 점수는 교수자 검토 후 확정됩니다."
+
+### ETRI 점수 calibration 과제 (후속)
+
+- 원어민 샘플 3개 / 학습자 샘플 3개 / 부정확 발화 샘플 3개 비교 필요
+- q1 전체 텍스트를 한 번에 평가 vs 문장 단위 분리 평가 비교 필요
+- PILOT_RELEASE_PLAN.md에 calibration checklist 추가
+
+---
+
+## Phase 10-E-7 — ETRI 한국어 발음평가 실제 연동
+
+**날짜**: 2026-05-06  
+**목표**: ETRI WiseASR PronunciationKor API를 실제 연동. q1 낭독 문항 우선 적용. ETRI 1~5점 → 앱 0~100 환산. 실패 시 mock fallback 안전 유지.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/providers/pronunciation/etri.ts` | **핵심 수정** — URL `http://epretx.etri.re.kr:8000/api/WiseASR_PronunciationKor`, API key를 Authorization 헤더로 이동, ETRI 1~5점 → 0~100 환산 (`rawScore / 5 * 100`), word-level 점수도 동일 환산, `rawScore` 반환 |
+| `src/types/providers.ts` | `PronunciationResult`에 `rawScore?: number`, `fallbackReason?: string` 추가 |
+| `app/api/pronunciation/route.ts` | 응답에 `rawScore` 추가, provider_events metadata에 rawScore/normalizedScore/hasWordScores 기록, fallback 응답에 `normalizedScore: 0` + `fallbackReason: 'provider_error'` (기존 72점 mock 제거 — 실패와 mock을 혼동하지 않기 위해) |
+| `app/student/speaking/actions.ts` | `ClientPronunciationResult`에 `rawScore?`, `fallbackReason?` 추가; `buildClientPronunciation()`에서 두 필드 전달 |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | qt-reading: referenceText로 prompt 전체 대신 `\n\n` 이후 낭독 본문만 추출; rawScore/fallbackReason 캡처; useCallback 의존성에 `question.typeId` 추가 |
+| `app/student/speaking/[questionId]/result/page.tsx` | 발음 카드 header에 ETRI 원점수 표시; fallback 경고 배너 추가; "(ETRI 연동 전 참고용)" 문구 제거 |
+| `.env.local.example` | ETRI 항목 정리 — 엔드포인트/Authorization 방식 설명, `PRONUNCIATION_PROVIDER=mock` 기본값 유지 |
+| `tests/smoke/api-smoke.spec.ts` | ETRI API 실패 시 crash 없음, fallback 명확화(mock/etri 구분) 테스트 2개 추가 |
+
+### ETRI 점수 환산 정책
+
+- ETRI 원점수: 1~5 정수 (float 허용)
+- 앱 표시 점수: `Math.round(rawScore / 5 * 100)`, clamp 0~100
+  - 1점 → 20, 2점 → 40, 3점 → 60, 4점 → 80, 5점 → 100
+- 어절별 word score도 동일 방식 환산
+- 최종 평가 반영 비율은 교수자 검토 후 확정 (현재 `pronunciation_reference_score`로 LLM eval에 참고용 전달)
+
+### q1 낭독 referenceText 추출
+
+- 기존: `question.prompt` 전체 (지시문 + 낭독 본문 혼재)
+- 변경: `qt-reading`에서 `\n\n` 이후 본문만 추출 → ETRI script로 전달
+- 예시: `"다음 글을 소리 내어 읽으세요.\n\n안녕하세요. 저는..."` → script = `"안녕하세요. 저는..."`
+
+### q2/q3/q4 알려진 이슈 (known issue)
+
+- q2 자료 설명, q3 듣고 답하기: 기준 문장이 없어 ETRI script 적용 불명확 → provider 구조는 연결, script는 question.prompt 그대로 전달 (발음 참고 점수로만 활용)
+- q4 dialogue_mission: 자유 발화이므로 script 없이 ETRI 발음 점수를 참고용으로만 활용
+- 위 문항들의 ETRI 적용 기준은 파일럿 교수자 검토 후 확정 예정
+
+### webm 포맷 수동 검증 필요
+
+- 브라우저 녹음 포맷: `audio/webm` (Chromium 계열)
+- ETRI가 webm을 수용하는지 실제 호출로 확인 필요
+- 거부 시 대응 방안: 서버에서 ffmpeg-static으로 wav 변환, 또는 브라우저에서 wav 직접 녹음
+- 현재 단계에서는 무리한 패키지 추가 없이 실제 응답 확인 후 결정
+
+### 검증 결과
+
+- `npx tsc --noEmit`: ✅ 오류 없음
+- `npm run lint`: ✅ 경고 없음
+- `npm run build`: ✅ 성공
+- `npm run test:smoke:api`: ✅ 43/43 통과
+
+---
+
 ## Phase 10-E-5-C/D 통합 보정 — language question 우선순위, 무음 차단, q2 이미지 구조
 
 **날짜**: 2026-05-06  

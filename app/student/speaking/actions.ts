@@ -24,10 +24,16 @@ function resolveId(id: string): string {
 
 export type ClientPronunciationResult = {
   normalizedScore: number
+  rawScore?: number
   wordScores: Array<{ word: string; score: number }>
   feedback: string
   providerName: string
   latencyMs: number
+  fallbackReason?: string
+  calibratedScore?: number
+  calibrationVersion?: string
+  calibrationStatus?: string
+  calibrationNote?: string
 }
 
 export interface SpeakingSubmitMeta {
@@ -71,7 +77,7 @@ export async function submitSpeaking(
   // Covers: no-speech from /api/stt size check, empty STT result, STT error fallback.
   // Prevents mock/hallucinated transcripts from generating ai_evaluations.
   if (sttResult.providerName === 'no-speech' || !transcript.trim()) {
-    const submissionId = `mock-${questionId}-${Date.now()}`
+    const submissionId = `sub-${questionId}-${Date.now()}`
 
     const noSpeechRecord: SpeakingEvalRecord = {
       submissionId,
@@ -111,11 +117,17 @@ export async function submitSpeaking(
     if (!p) return null
     return {
       normalizedScore: p.normalizedScore,
+      rawScore: p.rawScore,
       wordScores: p.wordScores,
       feedback: p.feedback,
       providerName: p.providerName as ProviderName,
       providerVersion: '1.0',
       latencyMs: p.latencyMs,
+      fallbackReason: p.fallbackReason,
+      calibratedScore: p.calibratedScore,
+      calibrationVersion: p.calibrationVersion,
+      calibrationStatus: p.calibrationStatus as PronunciationResult['calibrationStatus'],
+      calibrationNote: p.calibrationNote,
     }
   }
 
@@ -199,7 +211,7 @@ export async function submitSpeaking(
     llmEvalRaw.latencyMs,
   )
 
-  const submissionId = `mock-${questionId}-${Date.now()}`
+  const submissionId = `sub-${questionId}-${Date.now()}`
 
   const record = {
     submissionId,

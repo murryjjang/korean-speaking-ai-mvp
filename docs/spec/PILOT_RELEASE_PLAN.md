@@ -73,6 +73,80 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 | beginner q2 실제 사진 교체 | `public/images/official/beginner-restaurant-scene.jpg` 파일 배치 후 확인 | 식당 사진이 정상 표시됨 (현재는 placeholder) |
 | intermediate/advanced q2 차트 | 해당 문항 접근 | 50%/30%/20% 및 120명/180명/260명 수치 정상 표시 |
 | Azure TTS 수동 검증 | `TTS_PROVIDER=azure` + 실제 키 설정 후 AI 발화 재생 | Azure 음성으로 재생. 키 없으면 browser fallback |
+| ETRI 점수 calibration | 원어민 샘플 제출 후 서버 로그 확인 | rawScore 3.5 이상이면 calibration 기준 적합. 2.5 이하면 audio/script 문제 의심 |
+
+---
+
+## ETRI 발음평가 Calibration Checklist (파일럿 전 완료 권장)
+
+파일럿에서 ETRI 발음 점수를 참고값 이상으로 활용하기 전에 다음 항목을 확인한다.
+
+| 항목 | 설명 | 기준 | 상태 |
+|---|---|---|---|
+| 원어민 샘플 3개 이상 제출 | q1 낭독 원어민 발화 ETRI rawScore 분포 확인 | rawScore 3.5~5.0 범위 예상 | 🔜 |
+| 학습자(비원어민) 샘플 3개 이상 제출 | 한국어 능숙도별 rawScore 분포 확인 | 원어민보다 낮은 점수 분포 | 🔜 |
+| 의도적 부정확 발화 샘플 3개 | 점수 하한 범위 확인 | rawScore 1.0~2.5 범위 예상 | 🔜 |
+| WAV 오디오 품질 진단 | 서버 로그 `durationSec`, `rmsApprox`, `maxAbs` 확인 | durationSec > 10, rmsApprox > 200, maxAbs < 30000 | 🔜 |
+| script vs recognized 일치율 확인 | 서버 로그 `recognizedStringPrefix` vs `scriptPreview` 비교 | 앞 40자 기준 일치 | 🔜 |
+| q1 문장 길이 영향 확인 | 짧은 문장(1문장)과 전체 낭독 비교 | 점수 차이 < 0.5 이면 길이 영향 없음 | 🔜 |
+| 최종 점수 반영 비율 결정 | 교수자와 협의 후 확정 | 예: ETRI 원점수 30% + LLM 평가 70% | 🔜 |
+
+### 상세 샘플 수집 가이드 (Phase 10-E-7 추가)
+
+파일럿 전 아래 샘플을 수집하여 ETRI 점수 분포를 확인한다.
+
+| 샘플 유형 | 수량 | 확인 목적 |
+|---|---|---|
+| 원어민 정확 낭독 (표준 속도) | 3개 | rawScore 상한 기준 확인 (예상: 3.5~5.0) |
+| 원어민 빠른 낭독 (속도 영향) | 3개 | 속도가 점수에 미치는 영향 확인 |
+| 원어민 일부러 부정확 낭독 | 3개 | 점수 하한 기준 확인 (예상: 1.0~2.5) |
+| 외국인 초급 학습자 낭독 | 3개 | 학습자 점수 분포 확인 |
+| 무음/저음량 샘플 | 2개 | rmsApprox 임계값 확인 (< 100이면 불량) |
+| 짧은 문장 단위 낭독 (분리 평가) | 3개 | 긴 지문 vs 짧은 문장 점수 차이 확인 |
+
+### 샘플별 기록 항목
+
+각 샘플 제출 시 다음 항목을 기록한다:
+
+| 기록 항목 | 서버 로그 필드 | 설명 |
+|---|---|---|
+| ETRI 원점수 | `scoreValue` | return_object.score 실제값 |
+| STT 전사 정확도 | `recognizedStringPrefix` | 인식 텍스트 앞 40자 |
+| script 일치 여부 | scriptPreview vs recognizedStringPrefix 비교 | 기준문장 일치 정도 |
+| 오디오 길이 | `durationSec` | 정상: 낭독 길이와 일치 |
+| 음량(RMS) | `rmsApprox` | 정상: > 200, 불량: < 100 |
+| 피크 음량 | `maxAbs` | 클리핑 위험: > 30000 |
+| 마이크 환경 | (수동 기록) | 헤드셋/내장/외부 마이크 구분 |
+| 교수자 체감 점수 | (수동 기록) | 교수자가 직접 들어보고 평가한 점수 (0~5) |
+
+**calibration 판정 기준:**
+- 원어민 정확 낭독 3개 평균 rawScore < 3.0 → script 또는 audio 문제 의심
+- rmsApprox < 100인 샘플 다수 → 마이크/녹음 환경 개선 필요
+- recognizedStringPrefix와 script 불일치 → WAV 변환 또는 script 문제 의심
+
+**파일럿 기간 발음 점수 정책 (calibration 완료 전, Phase 10-E-7 추가 수정 이후):**
+- ETRI endpoint: `ETRI_PRONUNCIATION_ENDPOINT` env로 재정의 가능. 기본값 `http://epretx.etri.re.kr:8000/api/WiseASR_PronunciationKor`
+- ETRI API 오류 시 세분화된 안내 메시지 표시: fetch 실패 / HTTP 오류 / API 오류 각각 구분
+- q1 낭독 문항(qt-reading): 종합점수 카드 "문항 AI 참고평가", rubric-speaking-01 breakdown 숨김, 낭독 기준 4개 표시
+- **q1 AI 참고점수에 ETRI 보정 참고값 일부 반영** (Phase 10-E-7 추가 수정):
+  - ETRI 성공 시: `q1ReferenceScore = round(calibratedScore × 0.6 + aiScore × 0.4)` 산식 적용 (임시)
+  - ETRI 실패 시: 기존 AI 참고점수 유지, "ETRI 발음평가가 반영되지 않은 AI 참고평가" 안내
+  - q1 카드 부제: ETRI 성공 시 "AI 1차 평가 + ETRI 보정 참고값 · 교수자 확정 전 참고값"
+  - q1ReferenceScore는 최종점수가 아님 — 교수자 검토 후 확정
+  - q1ReferenceScore는 1~4번 세트 공식 종합점수에 자동 반영하지 않음
+  - 0.6/0.4 반영 비율은 파일럿 calibration 샘플 수집 후 재조정 필요
+- q2/q3/q4 문항: 기존 rubric-speaking-01 5개 항목 breakdown 유지 (변경 없음)
+- 상단 종합점수 카드의 발음 항목: provider=etri이면 "AI 발음 추정 X/20" (ETRI 원점수 아님, AI aggregate 파생값)
+- ETRI 발음평가 카드 3단계 표시: 원점수(rawScore) / 단순 환산(normalizedScore) / 보정 참고점수(calibratedScore)
+- calibratedScore는 "파일럿 보정용 참고값" (calibrationStatus="provisional") — teacher final score 자동 확정 없음
+- 교수자가 최종 발음 점수를 직접 확정
+- calibration 완료(calibrationStatus="validated") 후 종합점수 반영 비율 재설정
+
+**종합점수 반영 정책:**
+- 현재: ETRI calibratedScore는 공식 종합점수에 자동 반영하지 않음
+- q1 문항 AI 참고평가: calibratedScore 일부 반영 (provisional 산식 — 참고값만)
+- 파일럿: 교수자가 발음 점수를 직접 결정 (teacher final review workflow 유지)
+- 후속: 공식 세트(q1~q4) 전체 응시 흐름 완성 후 반영 비율 확정
 
 ---
 
@@ -419,10 +493,10 @@ VALUES ('<student-auth-user-uuid>', 'student', '홍길동', '<students-table-uui
 | **모바일 교수자 채점 화면** — 좁은 화면에서 테이블·위저드 레이아웃 깨질 수 있음 | 중 | 교수자는 노트북 사용 권장. Phase 7-A에서 반응형 보완 예정 |
 | **모바일 관리자 화면** — 통계 테이블이 좁은 화면에서 가로 오버플로 가능 | 낮 | 관리자는 노트북 사용 권장 |
 | **provider_events DB 수동 적용 필요** — Phase 8-E 신규 컬럼(status, model 등)은 ALTER TABLE 수동 실행 필요 | 낮 | SUPABASE_SCHEMA.sql 하단 Phase 8-E Migration 섹션 참조. 미적용 시 STT 이벤트 INSERT 실패(기록 누락) — 제출 흐름은 영향 없음 |
-| **ETRI 발음평가 실제 미검증** — Phase 8-F에서 ETRI API 연동 구조 추가됨. `ETRI_API_KEY` 없으면 mock fallback | 낮 | `.env.local.example` 참조. 실제 키 없이도 mock provider로 파일럿 진행 가능. 기존 제출 흐름 무영향 |
+| **ETRI 발음평가 Phase 10-E-7에서 실제 연동 착수** — URL/Authorization/점수환산 수정 완료. 파일럿 전 q1 낭독 3개 샘플로 수동 검증 권장 | 낮 | `PRONUNCIATION_PROVIDER=etri` + `ETRI_API_KEY` 설정 필요. 실패 시 자동 mock fallback. **파일럿 전 수동 검증 목록**: q1 낭독 샘플 3개, 무음 샘플, 짧은 녹음, 정확/부정확 발음 비교 |
 | **LLM 채점 실제 연동 안내** — Phase 8-G에서 OpenAI `gpt-4o-mini` LLM 채점 구조 추가. `LLM_EVAL_PROVIDER=openai` + `OPENAI_API_KEY` 없으면 mock fallback 자동 사용 | 낮 | `.env.local.example`의 `LLM_EVAL_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_EVAL_MODEL` 참조. 파일럿은 mock 채점으로도 진행 가능. 실제 LLM 채점 시 OpenAI 과금 발생 |
 | **LLM 채점 결과 teacher review 화면 미반영** — Phase 8-G LLM 평가 결과(`speakingEvalDetail`)가 결과 페이지에는 표시되나 교수자 채점 화면에는 미반영 | 낮 | 교수자는 학생 결과 페이지 URL을 직접 확인. Phase 9+에서 teacher review 화면 연동 예정 |
-| **ETRI 오디오 포맷** — 브라우저 WebM 녹음을 그대로 ETRI에 전송. ETRI는 PCM/WAV 권장 | 낮 | `PRONUNCIATION_PROVIDER=mock` 유지 시 영향 없음. 실제 ETRI 연동 시 ffmpeg 변환 검토 필요 |
+| **ETRI 오디오 포맷 미검증** — 브라우저 WebM 녹음을 그대로 ETRI에 전송. ETRI가 webm을 거부하면 wav/pcm 변환 필요 | 낮 | 실제 q1 낭독 녹음으로 ETRI 호출 후 응답 확인 필요. 거부 시: 서버 ffmpeg-static 변환 또는 브라우저 WAV 녹음으로 전환. 현재 단계에서는 수동 검증 후 대응 결정 |
 | **iOS Safari 녹음 포맷 차이** — mp4/aac 포맷, STT 제공자에 따라 변환 처리 필요 | 중 | Phase 8-D에서 iOS 경고 배너 추가. Phase 8-A에서 서버 측 포맷 변환 처리 예정 |
 | **iOS Safari < 15** — MediaRecorder 미지원, 녹음 불가 | 중 | Phase 8-D: 미지원 브라우저 안내 메시지 + 녹음 없이 fallback 제출 가능 |
 | **iOS Safari 빈 Blob** — 일부 기기에서 0바이트 Blob 생성 | 중 | Phase 8-D: blob.size 체크 추가, blobUrl=null 시 빈 transcript fallback 제출 유지 |
@@ -597,7 +671,7 @@ D+15 출시 전 아래 기기·브라우저 조합에서 핵심 경로 수동 �
 | `TTS_MODEL` | 선택 | `tts-1` | TTS 모델 (`tts-1` 또는 `tts-1-hd`) |
 | `TTS_VOICE` | 선택 | `nova` | TTS 음성 (`alloy`·`echo`·`fable`·`onyx`·`nova`·`shimmer`) |
 | `ETRI_API_KEY` | 조건부 | — | `PRONUNCIATION_PROVIDER=etri` 시 필요. 서버 전용 |
-| `ETRI_API_BASE_URL` | 선택 | `https://aiopen.etri.re.kr:8000` | ETRI API base URL |
+| `ETRI_API_BASE_URL` | 선택 | `http://epretx.etri.re.kr:8000` | ETRI enterprise API base URL (Phase 10-E-7 변경) |
 | `SMOKE_TEST_MODE` | **금지** | — | **Vercel에 절대 설정하지 말 것** — proxy.ts auth 우회 전용 |
 
 ---
