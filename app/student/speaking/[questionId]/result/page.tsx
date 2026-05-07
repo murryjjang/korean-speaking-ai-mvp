@@ -106,16 +106,6 @@ const errorTypeLabels: Record<string, string> = {
   grammar: '문법 오류',
 }
 
-function getEtriErrorMessage(errorCode: string): string {
-  switch (errorCode) {
-    case 'audio_conversion_failed': return 'ETRI 발음평가용 음원 변환에 실패했습니다.'
-    case 'etri_score_missing': return 'ETRI 발음평가 응답은 받았지만 점수 필드를 확인하지 못했습니다.'
-    case 'etri_fetch_failed': return 'ETRI 서버 호출에 실패했습니다. 네트워크 또는 endpoint 확인이 필요합니다.'
-    case 'etri_http_error': return 'ETRI 서버가 정상 응답을 반환하지 않았습니다.'
-    case 'etri_api_error': return 'ETRI API 오류 응답을 받았습니다.'
-    default: return 'ETRI 발음평가 응답 실패: 음원 형식 또는 응답 구조 확인이 필요합니다.'
-  }
-}
 
 const NEXT_ACTIVITY_PLACEHOLDERS = [
   {
@@ -386,7 +376,7 @@ export default async function SpeakingResultPage({
                   {q1EtriReflected
                     ? '이 점수는 AI 1차 평가에 ETRI 보정 참고점수를 일부 반영한 문항 참고값입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
                     : pronunciationResult.fallbackReason
-                      ? 'ETRI 발음평가가 반영되지 않은 AI 참고평가입니다. 네트워크 또는 endpoint 확인 후 다시 시도할 수 있습니다. 최종 점수는 교수자 검토 후 확정됩니다.'
+                      ? 'ETRI 발음평가는 현재 외부 서버 연결 확인 중입니다. 이번 결과에는 AI 참고평가만 반영되었습니다. 최종 점수는 교수자 검토 후 확정됩니다.'
                       : 'ETRI 발음평가가 반영되지 않은 AI 참고평가입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
                   }
                 </p>
@@ -803,20 +793,15 @@ export default async function SpeakingResultPage({
               }`}
             />
             <CardBody>
-              {/* Error state — ETRI 실패 또는 score 파싱 실패 */}
+              {/* ETRI 연결 확인 중 — 학습자 친화적 소형 안내 */}
               {pronunciationResult.fallbackReason && (
-                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                  <p className="text-xs text-amber-700 leading-relaxed">
-                    <strong>
-                      {getEtriErrorMessage(pronunciationResult.fallbackReason ?? '')}
-                    </strong>
-                    {pronunciationResult.fallbackReason === 'etri_fetch_failed' ? (
-                      <> 현재 제출에는 ETRI 발음평가가 반영되지 않았습니다. 네트워크 또는 endpoint를 확인해 주세요. AI 1차 참고평가만 표시됩니다.</>
-                    ) : pronunciationResult.rawScore === undefined ? (
-                      <> 점수를 표시할 수 없습니다. 다시 녹음해 주세요.</>
-                    ) : null}
-                  </p>
-                </div>
+                <p
+                  className="mb-3 text-xs text-text-muted"
+                  data-testid="etri-fallback-notice"
+                >
+                  ETRI 발음평가는 현재 외부 서버 연결 확인 중입니다. 이번 결과에는 AI 참고평가만
+                  반영되었습니다.
+                </p>
               )}
 
               {/* ETRI 성공: rawScore가 실제 숫자일 때 표시 (spec: typeof rawScore === 'number' 기준) */}
@@ -958,6 +943,21 @@ export default async function SpeakingResultPage({
                   </div>
                 </details>
               )}
+
+              {/* ETRI 발음 교정 데모 진입점 */}
+              <div className="mt-4 pt-3 border-t border-border">
+                <Link
+                  href="/student/etri-pronunciation-demo"
+                  className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 py-2 rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 whitespace-nowrap"
+                  data-testid="etri-demo-link"
+                >
+                  ETRI 발음 교정 데모 보기
+                </Link>
+                <p className="mt-1.5 text-xs text-text-muted">
+                  실제 ETRI 발음평가 결과와 인식 결과를 바탕으로 발음 교정 흐름을 보여주는 시연용
+                  화면입니다.
+                </p>
+              </div>
             </CardBody>
           </Card>
         ) : !isDialogueMission ? (

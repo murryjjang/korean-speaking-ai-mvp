@@ -25,7 +25,7 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 | **D+3** — 최소기능 시연판 | 2026-05-07 | Supabase 연결 + 핵심 경로 저장 확인 | ✅ 완료 (Phase 6-B1~B2) |
 | **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 | ✅ 완료 (Phase 6-B2~B5) |
 | **D+10** — 로그인/역할 분기 | 2026-05-14 | Supabase Auth 기반 로그인 + 역할별 route 보호 | ✅ 완료 (Phase 9-A) |
-| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | P0 처리 완료 (10-E-1), P1-1~P1-4 처리 완료 (10-E-2), 정식 문항 콘텐츠 입력 완료 (10-E-3), reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정), asset 구조·listenLimit·student-safe rendering 완료 (10-E-4), dialogue_mission 단발 녹음 UI 비표시·준비 중 상태 표시 완료 (10-E-4 추가 수정), dialogue_mission 실제 AI 대화 UI + TTS 재생 완료 (10-E-5-A), 교수자 채점 official rubric 강화 완료 (10-E-5-B), assessment/practice 정책 분리·페르소나 구조·Azure TTS provider 준비 완료 (10-E-5-C/D), q2 제출 오류(ETRI 빈 blob crash) 수정 완료 (10-E-6-B), ETRI timeout 단축·q3 TTS fallback 명확화·q4 복수 품목 처리 완료 (10-E-6-C), q2/q3 평가 표시 정리·q4 메뉴판·점수 환산·조사 처리 수정 완료 (10-E-6-D/E), q2/q3 안내문구·q4 결제 goal·총액·결과화면·STT 카드명·goalResults 피드백 완료 (10-E-6-F), **q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H)**, Known issues: 실제 식당 사진·음원 mp3 교체 필요, q2/q3/q4 점수 산식 파일럿 보정 필요, q4 실제 LLM provider 연결 후 대화 품질 추가 개선 필요 |
+| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | P0 처리 완료 (10-E-1), P1-1~P1-4 처리 완료 (10-E-2), 정식 문항 콘텐츠 입력 완료 (10-E-3), reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정), asset 구조·listenLimit·student-safe rendering 완료 (10-E-4), dialogue_mission 단발 녹음 UI 비표시·준비 중 상태 표시 완료 (10-E-4 추가 수정), dialogue_mission 실제 AI 대화 UI + TTS 재생 완료 (10-E-5-A), 교수자 채점 official rubric 강화 완료 (10-E-5-B), assessment/practice 정책 분리·페르소나 구조·Azure TTS provider 준비 완료 (10-E-5-C/D), q2 제출 오류(ETRI 빈 blob crash) 수정 완료 (10-E-6-B), ETRI timeout 단축·q3 TTS fallback 명확화·q4 복수 품목 처리 완료 (10-E-6-C), q2/q3 평가 표시 정리·q4 메뉴판·점수 환산·조사 처리 수정 완료 (10-E-6-D/E), q2/q3 안내문구·q4 결제 goal·총액·결과화면·STT 카드명·goalResults 피드백 완료 (10-E-6-F), q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H), q2 SVG 이미지·중급/고급 범위 조사 완료 (10-E-6-I), ETRI 발음 교정 데모 화면·q1 오류 표시 완화 완료 (10-E-6-K), **q1~q4 채점 안정화·q4 흐름 안정화·q2 SVG 개선·STT timeout·목표달성 피드백 일관화 완료 (10-E-6-L 보강)**, Known issues: 실제 식당 사진·음원 mp3 교체 필요, q2/q3/q4 점수 산식 파일럿 보정 필요, q4 실제 LLM provider 연결 후 대화 품질 추가 개선 필요, ETRI 실시간 network 안정성 1차 시연 후 별도 확인 필요 |
 
 ---
 
@@ -1363,7 +1363,68 @@ AZURE_TTS_VOICE=ko-KR-SunHiNeural
 - [x] result page 발음 카드 — qt-reading 전용, q2/q3/q4 quiet notice/hidden
 
 ### 파일럿 전 잔여 항목
-- [ ] q2 이미지 파일 등록: public/images/official/beginner-restaurant-scene.jpg
+- [x] q2 이미지 파일 등록: public/images/official/beginner-restaurant-scene.svg (10-E-6-I 완료 — SVG 임시본. 파일럿 전 실제 사진 교체 권장)
 - [ ] q3 실제 mp3 등록: public/audio/official/beginner-korean-class-announcement.mp3 등 3개
 - [ ] ETRI 점수 calibration 완료 후 환산 비율 결정
 - [ ] Azure TTS 수동 검증 체크리스트 실행
+
+---
+
+## 시연 계획 및 2차 시연 대비 메모 (2026-05-07 기준)
+
+### 1차 시연 (기준일 +12시간 이내)
+
+**범위**: 초급 평가세트 (beginner-set-1) 중심
+
+| 항목 | 상태 | 비고 |
+|---|---|---|
+| q1 낭독 | ✅ 정상 | ETRI 실패 시 AI 참고점수 fallback 표시 |
+| q2 자료 설명 | ✅ SVG 이미지 표시 | 파일럿 전 실제 사진 교체 권장 |
+| q3 듣고 답하기 | ✅ TTS fallback 가능 | 실제 mp3 미등록 — TTS 음성으로 대체 |
+| q4 대화 미션 | ✅ 카페 미션 동작 | Mock dialogue provider 사용, 실제 LLM 연결 전 단계 |
+| ETRI 발음평가 | ✅ fallback 처리 | 실패 시 AI 참고점수 유지, 공식 점수 미사용 |
+| 교수자 채점 | ✅ 동작 | 제출 목록·루브릭 조정·최종 확정 3-step 위저드 |
+
+**1차 시연 시 주의사항**:
+- ETRI는 실패해도 평가 흐름 중단 없음 — 공식 발음점수로 사용하지 않음
+- q3 TTS 재생 버튼 활성화 여부: TTS_PROVIDER 환경변수 확인 (browser fallback으로도 동작)
+- 중급/고급 세트는 isActive=true이나 1차 시연은 초급 중심 진행 권장
+- 시연 환경에서 중급/고급을 숨기려면 `question-sets.json` isActive=false 일시 변경 가능
+
+---
+
+### 2차 시연 전 중급/고급 정비 계획 (~60시간 이내)
+
+#### 현재 상태
+
+| 항목 | 중급 (intermediate-set-1) | 고급 (advanced-set-1) |
+|---|---|---|
+| q1~q4 문항 정의 | ✅ 모두 존재 | ✅ 모두 존재 |
+| q2 자료 asset | ✅ 인라인 차트 (ready) | ✅ 인라인 차트 (ready) |
+| q3 음원 | ⚠️ TTS fallback | ⚠️ TTS fallback |
+| q4 missionGoals | ✅ 3개 정의됨 (행정실 문의) | ✅ 3개 정의됨 (이벤트 협의) |
+| requiredElements 평가 보정 | ✅ 공통 로직 적용됨 | ✅ 공통 로직 적용됨 |
+| result / attempt summary | ✅ 공통 로직 적용됨 | ✅ 공통 로직 적용됨 |
+| q2/q3 결과 화면 세부 안내 문구 | ⚠️ 초급 수준 정비 미반영 | ⚠️ 초급 수준 정비 미반영 |
+| q4 대화 흐름 충분히 검증됨 | ⚠️ 미검증 | ⚠️ 미검증 |
+
+#### 2차 시연 전 필수 작업 목록
+
+| 우선순위 | 작업 | 대상 파일 |
+|---|---|---|
+| 필수 | q2/q3 결과 화면: 초급에서 정리한 문항별 안내 문구(능력 중심, 학습자 친화)를 중급/고급에도 적용 확인 | `result/page.tsx` (이미 typeId 기준 공유 — 확인만) |
+| 필수 | q3 피드백 오류 방지: allElementsFound 시 이미 포함된 요소를 보완점에 표시하지 않는 보정이 중급/고급 q3 requiredElements에도 올바르게 작동하는지 수동 확인 | `llm-eval/index.ts` (범용 로직 — 테스트 확인) |
+| 필수 | q4 대화 흐름 수동 확인: intermediate-q4 (행정실) 및 advanced-q4 (이벤트 협의) 실제 대화 진행 테스트 | 수동 확인 |
+| 필수 | q4 결과 화면: missionGoals 기준 잘한 점/보완할 점 피드백이 중급/고급 goal 텍스트로 표시되는지 확인 | `result/page.tsx` |
+| 필수 | attempt summary: 중급/고급 세트 전체 응시 후 점수 환산(0~100 clamp, 100% 초과 방지) 정상 동작 수동 확인 | 수동 확인 |
+| 권장 | q2 실제 이미지: 중급/고급은 인라인 차트로 이미 ready — 추가 작업 불필요 | — |
+| 권장 | q3 실제 mp3: 세 레벨 모두 TTS fallback → 파일럿 전 실제 녹음본 등록 권장 | `public/audio/official/` |
+| 참고 | 중급/고급 isActive 현재 true — 2차 시연 전 정비 완료 후 활성화 유지 가능 | `question-sets.json` |
+
+#### 2차 시연 후 정비 필요 항목
+
+- q4 실제 LLM provider 연결 후 중급/고급 대화 품질 추가 개선
+- q2/q3/q4 점수 산식 파일럿 샘플 수집 후 보정 (세 레벨 공통)
+- ETRI calibration 완료 후 q1 점수 반영 비율 확정
+- 중급/고급 전용 모범답안(`modelAnswer`)이 교수자 화면에 올바르게 표시되는지 확인
+- 각 레벨별 교수자 teacherNotes 화면 표시 확인

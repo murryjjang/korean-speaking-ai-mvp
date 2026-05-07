@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="식당에서 손님이 음식을 주문하는 장면">
+  <title>식당 주문 장면</title>
+  <desc>식당 내부에 손님 두 명과 직원 한 명이 있다. 한 손님은 물을 마시고 있고, 다른 손님은 주문하고 있다. 벽에는 메뉴판과 시계가 있다.</desc>
+  <defs>
+    <linearGradient id="wallGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fdf6ee"/>
+      <stop offset="100%" stop-color="#f5e8d4"/>
+    </linearGradient>
+    <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d4a97a"/>
+      <stop offset="100%" stop-color="#b8885a"/>
+    </linearGradient>
+    <linearGradient id="tableTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d4a868"/>
+      <stop offset="100%" stop-color="#b88848"/>
+    </linearGradient>
+    <linearGradient id="windowGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e8f4ff"/>
+      <stop offset="100%" stop-color="#c0dff8"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#00000022"/>
+    </filter>
+  </defs>
+
+  <!-- ── Background wall ── -->
+  <rect width="640" height="295" fill="url(#wallGrad)"/>
+
+  <!-- Wall wainscoting -->
+  <rect x="0" y="260" width="640" height="8" fill="#c8956a"/>
+  <rect x="0" y="268" width="640" height="4" fill="#d4a878" opacity="0.5"/>
+
+  <!-- ── Floor ── -->
+  <rect x="0" y="272" width="640" height="128" fill="url(#floorGrad)"/>
+  <!-- Tile grid -->
+  <g stroke="#b07850" stroke-width="0.8" opacity="0.4">
+    <line x1="0" y1="306" x2="640" y2="306"/>
+    <line x1="0" y1="340" x2="640" y2="340"/>
+    <line x1="0" y1="374" x2="640" y2="374"/>
+    <line x1="80"  y1="272" x2="80"  y2="400"/>
+    <line x1="160" y1="272" x2="160" y2="400"/>
+    <line x1="240" y1="272" x2="240" y2="400"/>
+    <line x1="320" y1="272" x2="320" y2="400"/>
+    <line x1="400" y1="272" x2="400" y2="400"/>
+    <line x1="480" y1="272" x2="480" y2="400"/>
+    <line x1="560" y1="272" x2="560" y2="400"/>
+  </g>
+
+  <!-- ── Menu board (upper-left wall) ── -->
+  <rect x="28" y="22" width="168" height="142" rx="6" fill="#2a1a08" filter="url(#shadow)"/>
+  <rect x="32" y="26" width="160" height="134" rx="4" fill="#1e1208"/>
+  <!-- Board header band -->
+  <rect x="32" y="26" width="160" height="26" rx="4" fill="#3a2212"/>
+  <text x="112" y="44" font-family="'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" font-size="13" font-weight="bold" fill="#f5d080" text-anchor="middle" letter-spacing="2">MENU  메뉴</text>
+  <line x1="42" y1="54" x2="182" y2="54" stroke="#f5d080" stroke-width="0.7" opacity="0.5"/>
+  <!-- Menu items with dot separators -->
+  <text x="44" y="72" font-family="sans-serif" font-size="10.5" fill="#e8c870">아메리카노</text>
+  <text x="178" y="72" font-family="sans-serif" font-size="10.5" fill="#e8c870" text-anchor="end">₩ 3,500</text>
+  <line x1="44" y1="78" x2="180" y2="78" stroke="#4a3218" stroke-width="0.5"/>
+  <text x="44" y="92" font-family="sans-serif" font-size="10.5" fill="#e8c870">카페라테</text>
+  <text x="178" y="92" font-family="sans-serif" font-size="10.5" fill="#e8c870" text-anchor="end">₩ 4,000</text>
+  <line x1="44" y1="98" x2="180" y2="98" stroke="#4a3218" stroke-width="0.5"/>
+  <text x="44" y="112" font-family="sans-serif" font-size="10.5" fill="#e8c870">오렌지 주스</text>
+  <text x="178" y="112" font-family="sans-serif" font-size="10.5" fill="#e8c870" text-anchor="end">₩ 4,500</text>
+  <line x1="44" y1="118" x2="180" y2="118" stroke="#4a3218" stroke-width="0.5"/>
+  <text x="44" y="132" font-family="sans-serif" font-size="10.5" fill="#e8c870">팥빙수</text>
+  <text x="178" y="132" font-family="sans-serif" font-size="10.5" fill="#e8c870" text-anchor="end">₩ 6,000</text>
+  <line x1="44" y1="138" x2="180" y2="138" stroke="#4a3218" stroke-width="0.5"/>
+  <text x="44" y="152" font-family="sans-serif" font-size="10.5" fill="#e8c870">조각 케이크</text>
+  <text x="178" y="152" font-family="sans-serif" font-size="10.5" fill="#e8c870" text-anchor="end">₩ 5,000</text>
+  <!-- Mounting hooks -->
+  <rect x="72"  y="16" width="14" height="10" rx="3" fill="#7a5030"/>
+  <rect x="112" y="16" width="14" height="10" rx="3" fill="#7a5030"/>
+
+  <!-- ── Clock (upper-right wall) ── -->
+  <circle cx="565" cy="82" r="44" fill="#faf0e0" stroke="#8b6030" stroke-width="5" filter="url(#shadow)"/>
+  <circle cx="565" cy="82" r="36" fill="#fdfaf4" stroke="#c4a060" stroke-width="1"/>
+  <!-- 12 tick marks -->
+  <g stroke="#5a4020" stroke-linecap="round">
+    <line x1="565" y1="49" x2="565" y2="56" stroke-width="3"/><!-- 12 -->
+    <line x1="565" y1="108" x2="565" y2="115" stroke-width="3"/><!-- 6 -->
+    <line x1="532" y1="82" x2="539" y2="82" stroke-width="3"/><!-- 9 -->
+    <line x1="598" y1="82" x2="591" y2="82" stroke-width="3"/><!-- 3 -->
+    <line x1="590" y1="55" x2="587" y2="61" stroke-width="1.5"/><!-- 2 -->
+    <line x1="598" y1="68" x2="593" y2="71" stroke-width="1.5"/><!-- 3:30 approx -->
+    <line x1="598" y1="96" x2="593" y2="93" stroke-width="1.5"/>
+    <line x1="590" y1="109" x2="587" y2="103" stroke-width="1.5"/>
+    <line x1="540" y1="55" x2="543" y2="61" stroke-width="1.5"/>
+    <line x1="532" y1="68" x2="537" y2="71" stroke-width="1.5"/>
+    <line x1="532" y1="96" x2="537" y2="93" stroke-width="1.5"/>
+    <line x1="540" y1="109" x2="543" y2="103" stroke-width="1.5"/>
+  </g>
+  <!-- Hour hand ~2 o'clock -->
+  <line x1="565" y1="82" x2="583" y2="65" stroke="#2a1a08" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Minute hand ~12 -->
+  <line x1="565" y1="82" x2="565" y2="53" stroke="#2a1a08" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="565" cy="82" r="3.5" fill="#2a1a08"/>
+  <!-- Clock hanger -->
+  <rect x="558" y="37" width="14" height="7" rx="3.5" fill="#7a5030"/>
+
+  <!-- ── Window (right wall) ── -->
+  <rect x="590" y="140" width="42" height="54" rx="4" fill="url(#windowGlow)" stroke="#7a5030" stroke-width="3.5"/>
+  <line x1="611" y1="140" x2="611" y2="194" stroke="#7a5030" stroke-width="2"/>
+  <line x1="590" y1="167" x2="632" y2="167" stroke="#7a5030" stroke-width="2"/>
+  <!-- Sunlight shimmer -->
+  <rect x="592" y="142" width="17" height="23" rx="2" fill="white" opacity="0.18"/>
+
+  <!-- ── Decorative plant (left corner) ── -->
+  <rect x="590" y="240" width="30" height="34" rx="3" fill="#8b6030"/>
+  <ellipse cx="605" cy="240" rx="15" ry="5" fill="#7a5020"/>
+  <!-- Leaves -->
+  <ellipse cx="600" cy="220" rx="10" ry="18" fill="#4a8a40" transform="rotate(-15 600 220)"/>
+  <ellipse cx="612" cy="215" rx="9" ry="16" fill="#5a9a50" transform="rotate(10 612 215)"/>
+  <ellipse cx="595" cy="210" rx="8" ry="14" fill="#3a7a38" transform="rotate(-25 595 210)"/>
+
+  <!-- ── Table ── -->
+  <ellipse cx="280" cy="268" rx="132" ry="22" fill="#8a6030"/>
+  <rect x="148" y="254" width="264" height="22" fill="#a07840"/>
+  <ellipse cx="280" cy="254" rx="132" ry="20" fill="url(#tableTop)"/>
+  <!-- Table highlight -->
+  <ellipse cx="280" cy="251" rx="128" ry="15" fill="none" stroke="#ddb870" stroke-width="1.5" opacity="0.5"/>
+  <!-- Table legs -->
+  <rect x="218" y="274" width="15" height="38" rx="5" fill="#8a6030"/>
+  <rect x="327" y="274" width="15" height="38" rx="5" fill="#8a6030"/>
+
+  <!-- Items on table -->
+  <!-- Water glass (left, Customer 1) -->
+  <rect x="183" y="236" width="23" height="28" rx="4" fill="#c8e8f8" opacity="0.85"/>
+  <rect x="183" y="236" width="23" height="6" rx="4" fill="#e0f4ff" opacity="0.7"/>
+  <ellipse cx="194.5" cy="240" rx="10" ry="3" fill="#d8f0ff" opacity="0.5"/>
+  <!-- Plate & cutlery -->
+  <ellipse cx="268" cy="252" rx="22" ry="8" fill="#e8dcc8"/>
+  <ellipse cx="268" cy="250" rx="18" ry="6" fill="#f5ece0"/>
+  <line x1="247" y1="244" x2="244" y2="264" stroke="#c0a070" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="251" y1="244" x2="248" y2="264" stroke="#c0a070" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Cup near Customer 2 -->
+  <rect x="348" y="238" width="22" height="25" rx="4" fill="#f0d8c0" opacity="0.9"/>
+  <ellipse cx="359" cy="238" rx="11" ry="4" fill="#f8e8d8"/>
+
+  <!-- ── Customer 1 — drinking water (left) ── -->
+  <!-- Legs -->
+  <rect x="150" y="256" width="17" height="34" rx="4" fill="#1a4a8a"/>
+  <rect x="171" y="256" width="17" height="34" rx="4" fill="#1a4a8a"/>
+  <!-- Body -->
+  <rect x="146" y="180" width="46" height="82" rx="10" fill="#3a80d0"/>
+  <!-- Neck -->
+  <rect x="163" y="173" width="13" height="14" rx="4" fill="#e8c090"/>
+  <!-- Head -->
+  <circle cx="169.5" cy="160" r="23" fill="#e8c090"/>
+  <!-- Hair -->
+  <ellipse cx="169.5" cy="142" rx="23" ry="13" fill="#2a1a08"/>
+  <rect x="146.5" y="142" width="46" height="11" rx="5" fill="#2a1a08"/>
+  <!-- Eyes (looking up — drinking) -->
+  <circle cx="161" cy="157" r="4" fill="#2a1a08"/>
+  <circle cx="178" cy="157" r="4" fill="#2a1a08"/>
+  <circle cx="162" cy="156" r="1.4" fill="white"/>
+  <circle cx="179" cy="156" r="1.4" fill="white"/>
+  <!-- Eyebrows -->
+  <path d="M158 151 Q161 149 164 151" stroke="#2a1a08" stroke-width="1.5" fill="none"/>
+  <path d="M175 151 Q178 149 181 151" stroke="#2a1a08" stroke-width="1.5" fill="none"/>
+  <!-- Mouth (O — drinking) -->
+  <circle cx="169.5" cy="168" r="3.5" fill="#b06050" opacity="0.85"/>
+  <!-- Arm raised holding glass -->
+  <path d="M153 196 Q132 212 166 240" stroke="#3a80d0" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <circle cx="169" cy="241" r="9" fill="#e8c090"/>
+  <!-- Other arm resting -->
+  <path d="M187 196 Q198 218 196 248" stroke="#3a80d0" stroke-width="13" stroke-linecap="round" fill="none"/>
+
+  <!-- ── Customer 2 — ordering (right) ── -->
+  <!-- Legs -->
+  <rect x="350" y="256" width="17" height="34" rx="4" fill="#a03030"/>
+  <rect x="371" y="256" width="17" height="34" rx="4" fill="#a03030"/>
+  <!-- Body -->
+  <rect x="346" y="180" width="46" height="82" rx="10" fill="#c85050"/>
+  <!-- Neck -->
+  <rect x="363" y="173" width="13" height="14" rx="4" fill="#f0c080"/>
+  <!-- Head -->
+  <circle cx="369.5" cy="160" r="23" fill="#f0c080"/>
+  <!-- Hair (longer — female) -->
+  <ellipse cx="369.5" cy="142" rx="23" ry="13" fill="#1e1208"/>
+  <rect x="346.5" y="142" width="46" height="15" rx="5" fill="#1e1208"/>
+  <rect x="346.5" y="152" width="9" height="36" rx="4" fill="#1e1208"/>
+  <rect x="383" y="152" width="9" height="36" rx="4" fill="#1e1208"/>
+  <!-- Eyes -->
+  <circle cx="361" cy="157" r="4" fill="#2a1a08"/>
+  <circle cx="378" cy="157" r="4" fill="#2a1a08"/>
+  <circle cx="362" cy="156" r="1.4" fill="white"/>
+  <circle cx="379" cy="156" r="1.4" fill="white"/>
+  <!-- Eyebrows (raised — speaking) -->
+  <path d="M358 150 Q361 148 364 150" stroke="#2a1a08" stroke-width="1.5" fill="none"/>
+  <path d="M375 150 Q378 148 381 150" stroke="#2a1a08" stroke-width="1.5" fill="none"/>
+  <!-- Mouth (open — speaking) -->
+  <path d="M363 167 Q369.5 173 376 167" stroke="#b05050" stroke-width="1.5" fill="#dd8080" opacity="0.8"/>
+  <!-- Arm raised pointing -->
+  <path d="M390 196 Q422 180 440 188" stroke="#c85050" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <circle cx="442" cy="189" r="9" fill="#f0c080"/>
+  <!-- Arm on table -->
+  <path d="M350 196 Q338 222 308 252" stroke="#c85050" stroke-width="13" stroke-linecap="round" fill="none"/>
+
+  <!-- ── Staff — taking order (right side) ── -->
+  <!-- Shoes -->
+  <ellipse cx="483" cy="302" rx="13" ry="6" fill="#2a1a08"/>
+  <ellipse cx="503" cy="302" rx="13" ry="6" fill="#2a1a08"/>
+  <!-- Legs -->
+  <rect x="475" y="258" width="17" height="44" rx="4" fill="#e0e0e0"/>
+  <rect x="495" y="258" width="17" height="44" rx="4" fill="#e0e0e0"/>
+  <!-- Body / uniform -->
+  <rect x="467" y="164" width="47" height="98" rx="10" fill="#f0f0f0"/>
+  <!-- Apron -->
+  <rect x="472" y="178" width="37" height="70" rx="5" fill="#e4e4e4"/>
+  <!-- Apron stripe -->
+  <rect x="488" y="178" width="7" height="70" rx="2" fill="#d8d8d8"/>
+  <!-- Collar tie/badge detail -->
+  <path d="M487 174 L492 180 L487 200 L482 180 Z" fill="#c0183c"/>
+  <!-- Badge dot -->
+  <circle cx="484" cy="182" r="3" fill="#e8c040"/>
+  <!-- Neck -->
+  <rect x="484" y="152" width="14" height="18" rx="4" fill="#e0b060"/>
+  <!-- Head -->
+  <circle cx="491" cy="136" r="25" fill="#e0b060"/>
+  <!-- Hair (short) -->
+  <ellipse cx="491" cy="117" rx="25" ry="14" fill="#4a3010"/>
+  <rect x="466" y="117" width="50" height="13" rx="5" fill="#4a3010"/>
+  <!-- Eyes (looking at Customer 2) -->
+  <circle cx="481" cy="133" r="4" fill="#2a1a08"/>
+  <circle cx="500" cy="133" r="4" fill="#2a1a08"/>
+  <circle cx="480" cy="132" r="1.4" fill="white"/>
+  <circle cx="499" cy="132" r="1.4" fill="white"/>
+  <!-- Eyebrows -->
+  <path d="M478 126 Q481 124 484 126" stroke="#2a1a08" stroke-width="1.5" fill="none"/>
+  <path d="M497 126 Q500 124 503 126" stroke="#2a1a08" stroke-width="1.5" fill="none"/>
+  <!-- Smile -->
+  <path d="M483 143 Q491 149 500 143" stroke="#9a5030" stroke-width="1.5" fill="none"/>
+  <!-- Arm holding notepad -->
+  <path d="M471 182 Q452 194 448 222" stroke="#f0f0f0" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <!-- Notepad -->
+  <rect x="430" y="216" width="30" height="38" rx="4" fill="#fafae8" stroke="#c0c080" stroke-width="1.5" filter="url(#shadow)"/>
+  <line x1="437" y1="228" x2="453" y2="228" stroke="#909060" stroke-width="1.2"/>
+  <line x1="437" y1="237" x2="453" y2="237" stroke="#909060" stroke-width="1.2"/>
+  <line x1="437" y1="246" x2="449" y2="246" stroke="#909060" stroke-width="1.2"/>
+  <!-- Pen in right arm -->
+  <path d="M513 182 Q530 194 536 210" stroke="#f0f0f0" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <line x1="536" y1="210" x2="547" y2="228" stroke="#2a1a08" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- ── Speech bubble — staff ── -->
+  <rect x="494" y="95" width="134" height="42" rx="14" fill="white" stroke="#d0c0a8" stroke-width="1.5" filter="url(#shadow)"/>
+  <polygon points="510,136 518,144 526,133" fill="white" stroke="#d0c0a8" stroke-width="1.5"/>
+  <text x="561" y="115" font-family="'Apple SD Gothic Neo','Malgun Gothic',sans-serif" font-size="11" fill="#333" text-anchor="middle">어서 오세요!</text>
+  <text x="561" y="130" font-family="'Apple SD Gothic Neo','Malgun Gothic',sans-serif" font-size="11" fill="#333" text-anchor="middle">주문 도와드릴게요.</text>
+
+  <!-- ── Speech bubble — Customer 2 ── -->
+  <rect x="270" y="100" width="130" height="42" rx="14" fill="white" stroke="#d0c0a8" stroke-width="1.5" filter="url(#shadow)"/>
+  <polygon points="365,141 372,149 378,139" fill="white" stroke="#d0c0a8" stroke-width="1.5"/>
+  <text x="335" y="120" font-family="'Apple SD Gothic Neo','Malgun Gothic',sans-serif" font-size="11" fill="#333" text-anchor="middle">아메리카노 한 잔</text>
+  <text x="335" y="135" font-family="'Apple SD Gothic Neo','Malgun Gothic',sans-serif" font-size="11" fill="#333" text-anchor="middle">주세요.</text>
+
+  <!-- ── Bottom label ── -->
+  <rect x="0" y="376" width="640" height="24" fill="rgba(40,24,8,0.45)"/>
+  <text x="320" y="393" font-family="'Apple SD Gothic Neo','Malgun Gothic',sans-serif" font-size="12" fill="white" text-anchor="middle" letter-spacing="0.5">식당에서 손님이 음식을 주문하는 장면</text>
+</svg>

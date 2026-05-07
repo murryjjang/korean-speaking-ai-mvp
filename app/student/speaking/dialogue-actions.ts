@@ -111,24 +111,60 @@ export async function submitDialogue(
     console.warn('[provider_events] dialogue llm-eval log failed:', logErr)
   }
 
-  // Adjust task_completion_score based on mission achievement
+  // Adjust task_completion_score and overall_score based on mission achievement
   const llmDetail = { ...llmEvalRaw.detail }
   if (totalGoals > 0) {
-    const missionBonus = achievementRate
+    const goalRatio = achievedCount / totalGoals
+
+    // Task score: mission bonus first
     llmDetail.task_completion_score = Math.max(
       llmDetail.task_completion_score,
-      Math.round(missionBonus * 0.9),
+      Math.round(achievementRate * 0.9),
     )
-    llmDetail.overall_score = Math.round(
-      (llmDetail.task_completion_score +
-        llmDetail.fluency_score +
-        llmDetail.grammar_score +
-        llmDetail.vocabulary_score) /
-        4,
-    )
+
+    // q4 minimum overall floors based on goal achievement ratio
+    if (goalRatio >= 1.0) {
+      llmDetail.task_completion_score = Math.max(llmDetail.task_completion_score, 88)
+      llmDetail.overall_score = Math.max(llmDetail.overall_score, 85)
+    } else if (goalRatio >= 0.75) {
+      llmDetail.task_completion_score = Math.max(llmDetail.task_completion_score, 80)
+      llmDetail.overall_score = Math.max(llmDetail.overall_score, 75)
+    } else if (goalRatio >= 0.5) {
+      llmDetail.task_completion_score = Math.max(llmDetail.task_completion_score, 65)
+      llmDetail.overall_score = Math.max(llmDetail.overall_score, 60)
+    } else if (goalRatio >= 0.25) {
+      llmDetail.task_completion_score = Math.max(llmDetail.task_completion_score, 50)
+      llmDetail.overall_score = Math.max(llmDetail.overall_score, 45)
+    }
+
+    // Re-derive grade from floored overall
+    const s = llmDetail.overall_score
+    llmDetail.grade = s >= 90 ? 'A' : s >= 80 ? 'B' : s >= 70 ? 'C' : s >= 60 ? 'D' : 'F'
+
+    // Goal-aware strengths and improvements
+    const achievedGoals = goalResults.filter((g) => g.achieved)
+    const unachievedGoals = goalResults.filter((g) => !g.achieved)
+
+    if (achievedGoals.length > 0) {
+      llmDetail.strengths = achievedGoals.map((g) => `"${g.labelKo}" 달성`)
+    }
+
+    if (achievedCount >= totalGoals) {
+      llmDetail.improvements = ['주문 표현을 더 또렷하게 정리해 말하면 더욱 자연스럽습니다.']
+      llmDetail.learner_feedback_ko = '모든 미션 목표를 달성했습니다! 대화를 자연스럽게 이어나갔습니다.'
+      llmDetail.learner_feedback_simple = '훌륭해요! 모든 목표 달성!'
+    } else if (unachievedGoals.length > 0) {
+      llmDetail.improvements = unachievedGoals.map((g) => `"${g.labelKo}"을(를) 말하지 않았습니다. 다음에는 꼭 포함해 보세요.`)
+      llmDetail.learner_feedback_ko = achievedCount >= Math.ceil(totalGoals * 0.75)
+        ? '미션 목표를 대부분 달성했습니다! 나머지 목표도 함께 연습해 보세요.'
+        : achievedCount >= Math.ceil(totalGoals * 0.5)
+          ? '절반 이상의 미션 목표를 달성했습니다. 빠진 부분을 보충하면 더 좋아질 거예요.'
+          : '미션 목표를 더 포함해 말하는 연습을 해 보세요. 천천히 순서대로 말하면 도움이 됩니다.'
+      llmDetail.learner_feedback_simple = achievedCount > 0 ? '잘 했어요! 더 연습해요.' : '다시 해 봐요. 순서대로 말해 보세요.'
+    }
+
     // Append mission summary to teacher_note
     llmDetail.teacher_note = `[대화형 미션 평가]\n미션 달성률: ${achievementRate}% (${achievedCount}/${totalGoals})\n${missionSummary}\n\n${llmDetail.teacher_note ?? ''}`
-    // Append mission goals to corrected_answer
     if (!llmDetail.corrected_answer) {
       llmDetail.corrected_answer = (question as { modelAnswer?: string })?.modelAnswer ?? ''
     }

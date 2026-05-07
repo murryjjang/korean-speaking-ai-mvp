@@ -21,21 +21,20 @@ type OfficialAsset = StudentVisibleAsset & {
 }
 
 const OFFICIAL_ASSETS: OfficialAsset[] = [
-  // beginner q2: 식당 사진
-  // 파일럿 전 직접 촬영 또는 사용 허가 이미지로 교체 필요.
-  // 파일이 없으면 렌더러가 placeholder를 표시한다.
+  // beginner q2: 카페 주문 장면 (PNG — 시연용 제공 이미지)
+  // SVG fallback: public/images/official/beginner-restaurant-scene.svg
   {
-    assetId: 'beginner-restaurant-image',
+    assetId: 'beginner-cafe-order-image',
     questionId: 'beginner-q2-material-description',
     assetType: 'image',
-    displayTitle: '식당 안 모습',
-    studentVisibleDescription: '식당에서 손님이 음식을 주문하는 장면을 보고 설명하세요.',
-    src: '/images/official/beginner-restaurant-scene.jpg',
-    alt: '식당에서 손님이 음식을 주문하는 장면',
-    status: 'placeholder',
+    displayTitle: '카페에서 음료를 주문하는 장면',
+    studentVisibleDescription: '카페에서 손님이 음료를 주문하는 장면을 보고 설명하세요.',
+    src: '/images/official/beginner-cafe-order-scene.png',
+    alt: '카페에서 손님이 아이스 아메리카노를 주문하는 장면',
+    status: 'ready',
     teacherOnlyNote:
-      '파일럿 전 직접 촬영 또는 사용 허가 이미지로 교체 필요. 대상 경로: public/images/official/beginner-restaurant-scene.jpg. Getty·Google 검색 이미지 사용 금지. 직접 촬영·CC0·AI 생성 이미지만 사용 가능.',
-    replacementRequiredBeforePilot: true,
+      '시연용 제공 PNG 사용 중. 파일럿 전 저작권 확인 필요. fallback SVG: public/images/official/beginner-restaurant-scene.svg.',
+    replacementRequiredBeforePilot: false,
   },
   // intermediate q2: 수업 방식 선호도 차트 (앱 내부 렌더링)
   {

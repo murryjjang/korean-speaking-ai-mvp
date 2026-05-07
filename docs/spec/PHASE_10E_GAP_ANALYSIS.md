@@ -3,7 +3,32 @@
 **Korean Speaking AI MVP — 평가 설계 정렬 분석**  
 **작성일**: 2026-05-05  
 **분석자**: Claude (Phase 10-E-0)  
-**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05) / 정식 문항 콘텐츠 입력 완료 (10-E-3 콘텐츠, 2026-05-05) / reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정, 2026-05-06) / asset 구조·listenLimit UI·student-safe rendering 완료 (10-E-4, 2026-05-06) / dialogue_mission 단발 녹음→제출 UI 비표시 완료 (10-E-4 추가 수정, 2026-05-06) / q2 제출 오류 수정 완료 (10-E-6-B, 2026-05-07) / 제출 지연 완화·ETRI fallback·q3 TTS·q4 복수 품목 처리 완료 (10-E-6-C, 2026-05-07) / q2/q3 평가 표시·q4 메뉴판·점수 환산 수정 완료 (10-E-6-D/E, 2026-05-07) / q2/q3 안내문구·q4 결제·총액·결과화면·STT 카드명·피드백 완료 (10-E-6-F, 2026-05-07) / **q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H, 2026-05-07)**
+**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05) / 정식 문항 콘텐츠 입력 완료 (10-E-3 콘텐츠, 2026-05-05) / reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정, 2026-05-06) / asset 구조·listenLimit UI·student-safe rendering 완료 (10-E-4, 2026-05-06) / dialogue_mission 단발 녹음→제출 UI 비표시 완료 (10-E-4 추가 수정, 2026-05-06) / q2 제출 오류 수정 완료 (10-E-6-B, 2026-05-07) / 제출 지연 완화·ETRI fallback·q3 TTS·q4 복수 품목 처리 완료 (10-E-6-C, 2026-05-07) / q2/q3 평가 표시·q4 메뉴판·점수 환산 수정 완료 (10-E-6-D/E, 2026-05-07) / q2/q3 안내문구·q4 결제·총액·결과화면·STT 카드명·피드백 완료 (10-E-6-F, 2026-05-07) / q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H, 2026-05-07) / q2 SVG 이미지 등록·중급/고급 반영 범위 조사 완료 (10-E-6-I, 2026-05-07) / ETRI 발음 교정 데모 화면 추가·q1 오류 표시 완화 완료 (10-E-6-K, 2026-05-07) / **q1~q4 채점 안정화·q4 흐름 안정화·q2 SVG 개선 완료 (10-E-6-L 보강, 2026-05-07)**
+
+**10-E-6-L 보강 처리 결과 (2026-05-07):**
+- ✅ q2 elementRatio floor 확대: `≥0.8(4/5+)→80`, `≥0.5(3/5)→70`, `≥0.33(2/5)→60`
+- ✅ q3 elementRatio floor 동일 기준 적용. `allFound+≥80→improvements=[]`, `allFound+≥70→가벼운 피드백 1개`
+- ✅ q2 `allFound+score≥80→improvements=[]` 추가
+- ✅ q1 floor: `elementRatio≥1.0 && wordCount≥15 → overall min 75, taskScore min 78` (유지 확인)
+- ✅ q4 goal 달성률 기반 overall_score 최저점 보장: `4/4→85, 3/4→75, 2/4→60, 1/4→45`
+- ✅ q4 goal-aware strengths: 달성 목표 → 강점 표시
+- ✅ q4 goal-aware improvements: 미달성 목표만 보완점 표시 (달성 목표 재표시 금지)
+- ✅ q4 goal-aware learner_feedback_ko: 달성률별 차등 피드백
+- ✅ q4 grade 재산정 (floored overall 기반)
+- ✅ STT fetch 10초 timeout (AbortController). AI response fetch 15초 timeout.
+- ✅ STT 실패 오류 문구: "음성 인식이 원활하지 않습니다. 다시 한 번 말해 주세요."
+- ✅ q2 SVG 전면 리디자인: gradient, 그림자, 식물, 개선된 인물·말풍선·메뉴판
+- ✅ `docs/spec/WORK_LOG.md` 오탈자 "들을"→"들를" 수정 (2곳)
+- ✅ 유닛 테스트 41개 추가 (`scoring-calibration-policy.test.ts`): 462 passed
+- ✅ lint: 0 errors / tsc: 0 errors / build: success / smoke: 193 passed
+
+**Known Issues (10-E-6-L 기준):**
+- 현재 점수는 1차 시연용 calibration. 실제 파일럿 응시 데이터 후 재보정 필요.
+- ETRI 실시간 endpoint/network 안정성 별도 확인 필요.
+- STT confidence 낮은 경우 교수자 확인 권장.
+- q2 이미지: 파일럿용 내부 SVG — 2차 시연 전 고품질 사진 교체 권장.
+- q3 실제 mp3: 2차 시연 전 품질 보강 필요.
+- q4: 실제 LLM provider 연결 후 대화 품질 추가 개선 필요.
 
 **10-E-6-G/H 처리 결과 (2026-05-07):**
 - ✅ q2/q3 `elementRatio ≥ 1.0` → 최저 80점 보장 (`llm-eval/index.ts`)
@@ -684,7 +709,7 @@ D. corrected_answer 섹션:
 
 ---
 
-*분석 완료: 2026-05-05 / 추가 보정: 2026-05-06 / Known Issues 추가: 2026-05-07*
+*분석 완료: 2026-05-05 / 추가 보정: 2026-05-06 / Known Issues 추가: 2026-05-07 / 10-E-6-I 업데이트: 2026-05-07*
 
 ---
 
@@ -703,7 +728,62 @@ D. corrected_answer 섹션:
 
 ### 잔존 Known Issues
 - ETRI 점수 calibration 미완료 (KI-3 유지)
-- q2 이미지 파일 미등록 (파일럿 전 교체 필요, KI-1 유지)
-- q3 실제 mp3 미등록 (파일럿 전 교체 필요)
+- q2 이미지: SVG 파일럿용 임시 자료 등록 완료 (10-E-6-I) — 파일럿 전 실제 사진으로 교체 권장
+- q3 실제 mp3 미등록 (파일럿 전 교체 필요, 세 레벨 모두)
+
+*업데이트: 2026-05-07*
+
+---
+
+## Phase 10-E-6-I 업데이트 (2026-05-07)
+
+### 해소된 갭
+
+| 갭 | 내용 | 해결 방법 |
+|---|---|---|
+| beginner q2 placeholder 표시 | `status: 'placeholder'` + 이미지 파일 없어 placeholder 박스 표시 | `beginner-restaurant-scene.svg` 직접 제작 SVG 등록, `status: 'ready'` 변경 → 실제 이미지 표시 |
+| "임시 이미지 · 실제 사진 교체 예정" 문구 노출 | `status === 'placeholder'` 조건 의존 | `status: 'ready'`로 변경하여 자동 제거 |
+
+### 중급/고급 반영 범위 조사 결과
+
+| 항목 | 상태 |
+|---|---|
+| intermediate-set-1 / advanced-set-1 q1~q4 문항 존재 | ✅ 모두 존재 (`questions.json`) |
+| q2 자료 asset | ✅ 중급/고급은 인라인 차트 (`status: 'ready'`), 이미지 파일 불필요 |
+| q3 script / TTS fallback | ✅ ttsScript 등록됨. 실제 mp3는 미등록 (파일럿 전 교체 필요) |
+| q4 dialogue mission 공통 로직 | ✅ question-id 기준 분기 (`detectBeginnerCafe` / `detectIntermediateAdmin` / `detectAdvancedEvent`) |
+| q4 missionGoals 구조 | ✅ 중급 3개(수업시간·결석자료·상담시간), 고급 3개(일정조정·발표주제·별도회의) — 초급 4개와 다른 구조, 이미 별도 정의됨 |
+| q2/q3 requiredElements 기반 평가 보정 | ✅ `detectRequiredElements()` 범용 처리 — 모든 레벨 동일 적용 |
+| result page / attempt summary 공통 수정 | ✅ typeId 기준 분기 — 레벨 무관 공유 |
+| 중급/고급 시연 활성화 안전성 | `isActive: true` 이미 활성화됨. 코드 버그 없음. 단 q3 TTS 의존, q4 대화 흐름 충분히 검증되지 않음 |
+| 1차 시연 전 비활성화 권장 여부 | 1차 시연은 초급 중심 권장. 비활성화 필요 시 `question-sets.json` isActive 변경으로 즉시 가능 |
+
+### 잔존 Known Issues (10-E-6-I 이후)
+- beginner q2 SVG: 파일럿 전 실제 사진 교체 권장 (`teacherOnlyNote` 유지)
+- q3 실제 mp3: 세 레벨 모두 미등록 (TTS fallback 상태)
+- 중급/고급 q2/q3 결과 화면 세부 안내 문구 및 q4 대화 흐름 정비: 2차 시연 전 별도 작업 필요
+
+*업데이트: 2026-05-07*
+
+---
+
+## Phase 10-E-6-K 업데이트 (2026-05-07)
+
+### 해소된 갭
+
+| 갭 | 내용 | 해결 방법 |
+|---|---|---|
+| ETRI 실패 시 학습자 화면에 큰 오류 카드 노출 | "ETRI 서버 호출에 실패했습니다. endpoint 확인 필요" 등 개발자식 문구가 amber 큰 카드로 표시 | `etri-fallback-notice` 작은 텍스트로 교체. "ETRI 발음평가는 현재 외부 서버 연결 확인 중입니다." 학습자 친화 문구 사용 |
+| 1차 시연에서 ETRI 발음평가 흐름을 보여줄 수 없음 | ETRI 실패 시 데모 불가 | `/student/etri-pronunciation-demo` 데모 페이지 신규 추가. 시연용 샘플 2개로 교정 흐름 시연 가능 |
+| q1 결과에서 ETRI 데모 진입점 없음 | ETRI 발음 교정 흐름을 별도 화면으로 안내하지 못함 | q1 결과 발음 카드 하단에 "ETRI 발음 교정 데모 보기" 버튼 추가 |
+| 발음 오류 위치 표시 수단 없음 | recognized vs reference 비교 로직 없음 | `computeEtriWordDiff()` 유틸 신규 추가. 구두점 제거 후 word-level sequential diff |
+
+### 잔존 Known Issues (10-E-6-K 이후)
+- ETRI 실시간 endpoint/network 안정성: 1차 시연 후 별도 확인 필요
+- 발음 오류 위치: ETRI score와 recognized 결과를 바탕으로 앱에서 추정 (직접 음소 반환 아님)
+- 정밀 음소 단위 발음 교정: 후속 단계에서 검토 예정
+- beginner q2 SVG: 파일럿 전 실제 사진 교체 권장
+- q3 실제 mp3: 세 레벨 모두 미등록 (TTS fallback 상태)
+- 중급/고급 q2/q3/q4 세부 정비: 2차 시연 전 별도 작업 필요
 
 *업데이트: 2026-05-07*

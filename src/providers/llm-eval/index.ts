@@ -101,7 +101,7 @@ export function detailToLLMEvalResult(
 const MOCK_MODEL_ANSWERS: Record<string, string> = {
   // Official questions (Phase 10-E-3)
   'beginner-q1-reading': '이 문항은 정해진 지문을 자연스럽게 낭독하는 문항입니다. 지문을 빠뜨리지 않고 또박또박 읽는 것이 중요합니다.',
-  'beginner-q2-material-description': '이 사진은 식당 안 모습입니다. 손님 두 명이 있고, 한 사람은 물을 마시고 있습니다. 직원은 주문을 받으러 오고 있습니다. 벽에는 메뉴판과 시계가 보입니다.',
+  'beginner-q2-material-description': '이 사진은 카페에서 손님이 음료를 주문하는 장면입니다. 여자 손님이 점원에게 아이스 아메리카노를 주문하고 있습니다. 점원은 계산대 앞에서 주문을 받고 있습니다. 뒤에는 메뉴판과 시계가 보이고, 다른 손님들도 카페 안에 있습니다.',
   'beginner-q3-listening-response': '한국어 수업은 내일 오전 10시에 시작합니다. 장소는 2층 203호입니다. 학생들은 교재와 필기구를 가져와야 합니다.',
   'beginner-q4-dialogue-mission': '안녕하세요. 아이스 아메리카노 하나 주세요. 포장해 주세요.',
   'intermediate-q1-reading': '이 문항은 도서관 운영 시간 변경 안내문을 정확하고 자연스럽게 낭독하는 문항입니다.',
@@ -338,14 +338,25 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
   const isDialogueMission = qType === 'qt-dialogue-mission'
 
   // q2/q3: requiredElements 기반 최저점 보장 — STT 신뢰도/provider=mock이어도 과도하게 낮추지 않음
+  // q2: 5개 중 4개(≥0.8) → 80, 3개(≥0.5) → 70, 2개(≥0.33) → 60
+  // q3: 3개 중 3개(=1.0) → 80, 2개(≥0.5) → 70, 1개(≥0.33) → 60
   if ((isMaterialDesc || isListeningResp) && requiredElements.length > 0) {
-    if (elementRatio >= 1.0) {
+    if (elementRatio >= 0.8) {
       taskScore = Math.max(taskScore, 80)
       overall = Math.max(overall, 80)
-    } else if (elementRatio >= 0.66) {
+    } else if (elementRatio >= 0.5) {
       taskScore = Math.max(taskScore, 70)
       overall = Math.max(overall, 70)
+    } else if (elementRatio >= 0.33) {
+      taskScore = Math.max(taskScore, 60)
+      overall = Math.max(overall, 60)
     }
+  }
+
+  // q1: 모든 필수 요소를 포함하고 충분히 읽었으면 과도한 감점 방지
+  if (isReading && elementRatio >= 1.0 && wordCount >= 15) {
+    taskScore = Math.max(taskScore, 78)
+    overall = Math.max(overall, 75)
   }
 
   // Type-aware improvements — reading must NEVER suggest vocabulary variety or content expansion
@@ -380,13 +391,20 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
       ]
     : ['더 다양한 어휘를 사용해 보세요.', '문법적 정확도를 높이면 좋겠습니다.']
 
-  // q3: missingElements가 없으면 일반 개선 피드백만 표시 — 포함된 요소를 보완점에 넣지 않음
   const allElementsFound = missing.length === 0 && requiredElements.length > 0
   const improvements = missing.length > 0
     ? [`"${missing[0]}"을(를) 포함하면 더 좋겠습니다.`, typeImprovements[0] ?? typeImprovements[0]]
-    : allElementsFound && (isMaterialDesc || isListeningResp)
-      ? ['핵심 정보를 잘 포함했습니다. 문장을 조금 더 자연스럽게 연결해 말하면 좋겠습니다.']
-      : [typeImprovements[0] ?? '더 많이 말해 보세요.', typeImprovements[1] ?? '']
+    : allElementsFound && isReading && overall >= 78
+      ? ['전반적으로 잘 읽으셨습니다. 받침과 연음 발음을 더 또박또박 읽으면 더욱 좋아질 거예요.']
+      : allElementsFound && isListeningResp && overall >= 80
+        ? []
+        : allElementsFound && isListeningResp && overall >= 70
+          ? ['핵심 정보를 잘 포함했습니다. 문장을 더 또렷하게 말하면 더 좋습니다.']
+          : allElementsFound && isMaterialDesc && overall >= 80
+            ? []
+            : allElementsFound && (isMaterialDesc || isListeningResp)
+              ? ['핵심 정보를 잘 포함했습니다. 문장을 조금 더 자연스럽게 연결해 말하면 좋겠습니다.']
+              : [typeImprovements[0] ?? '더 많이 말해 보세요.', typeImprovements[1] ?? '']
 
   const readingCorrectedAnswer = isReading
     ? (MOCK_MODEL_ANSWERS[input.questionId ?? ''] ?? '이 문항은 정해진 지문을 자연스럽게 낭독하는 문항입니다. 지문을 빠뜨리지 않고 또박또박 읽고, 문장 끝에서 자연스럽게 끊어 읽는 것이 중요합니다.')
@@ -407,10 +425,12 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
     corrected_answer: readingCorrectedAnswer,
     teacher_note: `필수 요소 ${found.length}/${requiredElements.length} 확인됨. 문법과 어휘 연습 권장.`,
     learner_feedback_ko:
-      overall >= 60
-        ? '잘 했습니다! 조금 더 연습하면 더욱 좋아질 거예요.'
-        : '열심히 시도했습니다. 빠진 내용을 보충하여 다시 시도해 보세요.',
-    learner_feedback_simple: overall >= 60 ? '잘 했어요! 계속 연습하세요.' : '다시 해 봐요. 조금 더 말해 주세요.',
+      overall >= 80
+        ? '훌륭합니다! 핵심 내용을 잘 말했습니다. 이 수준을 유지하면서 계속 연습해 보세요.'
+        : overall >= 60
+          ? '잘 했습니다! 조금 더 연습하면 더욱 좋아질 거예요.'
+          : '열심히 시도했습니다. 빠진 내용을 보충하여 다시 시도해 보세요.',
+    learner_feedback_simple: overall >= 80 ? '훌륭해요! 잘 하고 있어요.' : overall >= 60 ? '잘 했어요! 계속 연습하세요.' : '다시 해 봐요. 조금 더 말해 주세요.',
     required_elements_found: found,
     missing_elements: missing,
     evidence,

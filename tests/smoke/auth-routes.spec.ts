@@ -226,15 +226,15 @@ test.describe('Phase 10-E-3: 공식 문항 12개 URL 접근성', () => {
 test.describe('Phase 10-E-4: 공식 문항 asset rendering', () => {
   // --- material_description q2 ---
 
-  test('beginner q2 image placeholder가 렌더링됨 (식당 안 모습)', async ({ page }) => {
+  test('beginner q2 image 또는 placeholder가 렌더링됨 (카페 주문 장면)', async ({ page }) => {
     await page.goto('/student/speaking/beginner-q2-material-description?setId=beginner-set-1')
     await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
     // 이미지 placeholder 또는 실제 이미지 컨테이너 중 하나가 있어야 함
     const hasPlaceholder = await page.locator('[data-testid="image-asset-placeholder"]').isVisible().catch(() => false)
     const hasImage = await page.locator('[data-testid="image-asset-container"]').isVisible().catch(() => false)
     expect(hasPlaceholder || hasImage).toBe(true)
-    // 식당 제목이 보여야 함
-    await expect(page.getByText('식당 안 모습')).toBeVisible()
+    // 카페 제목이 보여야 함
+    await expect(page.getByText('카페에서 음료를 주문하는 장면')).toBeVisible()
   })
 
   test('intermediate q2 chart에 50%/30%/20% 수치가 표시됨', async ({ page }) => {
@@ -1061,7 +1061,7 @@ test.describe('Phase 10-E-5-C/D 통합 수정: language question 우선순위, �
     expect(hasPlaceholder || hasImage).toBe(true)
 
     // 제목 표시
-    await expect(page.getByText('식당 안 모습')).toBeVisible()
+    await expect(page.getByText('카페에서 음료를 주문하는 장면')).toBeVisible()
 
     // 내부 메타데이터가 학습자에게 노출되면 안 됨
     const bodyText = await page.locator('body').innerText()
@@ -1141,5 +1141,94 @@ test.describe('Phase 10-E-5-C/D 통합 수정: language question 우선순위, �
       const res = await request.get(url)
       expect(res.status(), `Expected 200 for ${url}`).toBe(200)
     }
+  })
+})
+
+// ── Phase 10-E-6-K: ETRI 발음 교정 데모 화면 ────────────────────────────────
+test.describe('ETRI 발음 교정 데모 — /student/etri-pronunciation-demo', () => {
+  test('데모 페이지가 200으로 로드됨 (테스트 7-4)', async ({ request }) => {
+    const res = await request.get('/student/etri-pronunciation-demo')
+    expect(res.status()).toBe(200)
+  })
+
+  test('데모 페이지 제목이 표시됨', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.getByRole('heading', { name: 'ETRI 발음 교정 데모' })).toBeVisible()
+  })
+
+  test('시연용 데모 배너가 표시됨', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.locator('[data-testid="demo-notice-banner"]')).toBeVisible()
+  })
+
+  test('좋은 발음 샘플 카드가 표시됨 (테스트 7-5)', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.locator('[data-testid="demo-card-good"]')).toBeVisible()
+    await expect(page.getByText('좋은 발음 샘플')).toBeVisible()
+  })
+
+  test('교정이 필요한 발음 샘플 카드가 표시됨 (테스트 7-5)', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.locator('[data-testid="demo-card-correction"]')).toBeVisible()
+    await expect(page.getByText('교정이 필요한 발음 샘플')).toBeVisible()
+  })
+
+  test('ETRI 원점수가 표시됨 (테스트 7-6)', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.locator('[data-testid="raw-score-good"]')).toBeVisible()
+    await expect(page.locator('[data-testid="raw-score-correction"]')).toBeVisible()
+  })
+
+  test('환산점수가 표시됨 (테스트 7-6)', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.locator('[data-testid="normalized-score-good"]')).toBeVisible()
+    await expect(page.locator('[data-testid="normalized-score-correction"]')).toBeVisible()
+  })
+
+  test('인식 결과가 표시됨 (테스트 7-6)', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.locator('[data-testid="demo-reference-script"]')).toBeVisible()
+  })
+
+  test('교정 필요 샘플에 제시문과 다른 부분이 표시됨 (테스트 7-7)', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.locator('[data-testid="mismatch-summary-correction"]')).toBeVisible()
+    await expect(page.locator('[data-testid="mismatch-summary-correction"]')).toContainText('약국에')
+  })
+
+  test('"ETRI 점수와 인식 결과 기반 추정" 안내가 표시됨 (테스트 7-8)', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.locator('[data-testid="etri-estimation-notice"]')).toBeVisible()
+    await expect(page.locator('[data-testid="etri-estimation-notice"]')).toContainText('추정')
+  })
+
+  test('"시연용 샘플" 배지가 표시됨 — 데모 데이터 명시', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    const badges = page.getByText('시연용 샘플')
+    await expect(badges.first()).toBeVisible()
+  })
+
+  test('실시간 ETRI 연결 상태 안내가 표시됨', async ({ page }) => {
+    await page.goto('/student/etri-pronunciation-demo')
+    if (!page.url().includes('/student')) return
+    await expect(page.locator('[data-testid="etri-live-status-note"]')).toBeVisible()
+  })
+})
+
+// ── Phase 10-E-6-K: q1 결과 화면 ETRI 데모 버튼 — 진입점 접근성 확인 ─────────
+test.describe('q1 결과 화면 ETRI 표시 (10-E-6-K)', () => {
+  test('ETRI 데모 진입 경로가 200으로 접근 가능함 (테스트 7-3)', async ({ request }) => {
+    const res = await request.get('/student/etri-pronunciation-demo')
+    expect(res.status()).toBe(200)
   })
 })

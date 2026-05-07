@@ -4,6 +4,160 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-6-L (보강): q1~q4 채점 안정화 · q4 흐름 안정화 · q2 SVG 개선 (2026-05-07)
+
+### 배경
+
+1차 시연 직전 핫픽스 후속 보강. q1 ETRI 오탈자 수정 + 버튼 UI 수정에 이어, q2/q4 점수 보정 미적용 문제, q4 "음성 인식 중…" 무한 상태 위험, q2 이미지 시연 품질을 일괄 처리.
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/providers/llm-eval/index.ts` | q2/q3 elementRatio floor 확대: `≥1.0→80, ≥0.66→70` → `≥0.8→80, ≥0.5→70, ≥0.33→60`. q3 allFound+score≥70 시 가벼운 피드백. q2 allFound+score≥80 시 improvements 빈 배열. |
+| `app/student/speaking/dialogue-actions.ts` | q4 goal 달성률 기반 overall_score 최저점 보장 추가: 4/4→85, 3/4→75, 2/4→60, 1/4→45. goal-aware strengths/improvements/learner_feedback 생성. grade 재산정. |
+| `src/components/dialogue-mission-panel.tsx` | STT fetch에 10초 AbortController timeout 추가. AI response fetch에 15초 timeout 추가. STT 실패 오류 문구 학습자 친화적으로 수정: "음성 인식이 원활하지 않습니다. 다시 한 번 말해 주세요." |
+| `public/images/official/beginner-restaurant-scene.svg` | SVG 전면 리디자인. 색상 조화, 그림자 필터, gradient, 개선된 인물·가구·메뉴판·시계·식물·발화말풍선 포함. 1차 시연 품질 확보. |
+| `tests/unit/scoring-calibration-policy.test.ts` | 신규 생성. q1~q4 채점 보정 정책 41개 유닛 테스트 추가. |
+| `docs/spec/WORK_LOG.md` | 오탈자 "들을"→"들를" 수정(Phase 10-E-6-K 섹션). 본 항목 추가. |
+
+### 채점 보정 정책 요약
+
+**q1**: `elementRatio≥1.0 && wordCount≥15` → overall min 75, taskScore min 78.
+
+**q2**: `elementRatio≥0.8(4/5+)` → min 80. `≥0.5(3/5)` → min 70. `≥0.33(2/5)` → min 60.
+
+**q3**: 동일 threshold. `allFound+≥80` → improvements=[]. `allFound+≥70` → 가벼운 피드백 1개.
+
+**q4**: `4/4` → overall≥85. `3/4` → ≥75. `2/4` → ≥60. `1/4` → ≥45. goal-aware strengths/improvements 생성.
+
+### 검증 결과
+- npm run lint: 에러 0
+- npx tsc --noEmit: 에러 0
+- npm run build: 성공
+- npm run test:unit: 462 passed (421 → 462, +41개)
+- npm run test:smoke: 193 passed
+
+### Known Issues
+- 현재 점수는 1차 시연용 calibration이며, 실제 파일럿 응시 데이터 수집 후 재보정 필요.
+- ETRI 실시간 endpoint/network 안정성은 별도 확인 필요.
+- STT confidence가 낮은 경우 교수자 확인 권장.
+- q2 이미지는 파일럿용 내부 SVG이며, 2차 시연 전 고품질 사진으로 교체 권장.
+- q3 실제 mp3는 2차 시연 전 품질 보강 필요.
+- q4 실제 LLM provider 연결 후 대화 품질 추가 개선 필요.
+
+---
+
+## Phase 10-E-6-K: ETRI 발음 교정 데모 화면 추가 (2026-05-07)
+
+### 배경
+q1 실제 응시에서 ETRI 서버 호출 실패가 계속 발생하지만, 1차 시연에서 ETRI 발음평가 및 교정 흐름을 보여줘야 함. q1 실제 평가 흐름은 안정성이 중요하므로 ETRI 실시간 성공에 의존하지 않고 별도 데모 화면을 추가.
+
+### 작업 1: ETRI live 호출 설정 재확인
+
+확인 결과:
+- endpoint: `http://epretx.etri.re.kr:8000/api/WiseASR_PronunciationKor` ✅
+- Authorization header: `ETRI_API_KEY` 사용 ✅
+- body 구조: `{ request_id, argument: { language_code, script, audio } }` ✅
+- q1 fallback 정책 유지: 실패 시 mock fallback, 학습자 화면에 큰 오류 미표시 ✅
+
+### 수정 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/lib/etri-word-diff.ts` | 신규 생성. sequential word-level diff 유틸. 구두점 제거 후 비교. 단위 테스트 가능. |
+| `app/student/etri-pronunciation-demo/page.tsx` | 신규 생성. ETRI 발음 교정 데모 페이지. 시연용 샘플 2개(좋은 발음/교정 필요). `[data-testid]` 부착. |
+| `app/student/speaking/[questionId]/result/page.tsx` | ETRI 실패 표시 완화: 큰 amber 오류 카드 → 작은 `etri-fallback-notice` 텍스트. reading score guidance ETRI 실패 문구에서 "endpoint 확인" 제거. 발음 카드 하단에 "ETRI 발음 교정 데모 보기" 버튼(`etri-demo-link`) 추가. 미사용 `getEtriErrorMessage` 제거. |
+| `tests/unit/etri-pronunciation-demo.test.ts` | 신규 생성. 193개 → 228개 단위 테스트. 데모 데이터 구조, word diff, 점수 격리, 학습자 친화 문구 정책 검증. |
+| `tests/smoke/auth-routes.spec.ts` | ETRI 데모 페이지 스모크 테스트 13개 추가. 180 → 193 passed. |
+
+### 작업 3: 데모 화면 구성
+
+- 제시문: "안녕하세요. 저는 오늘 오후에 병원에 갑니다. 병원에 가기 전에 약국에 들를 예정입니다."
+- 좋은 발음 샘플: rawScore 4.6/5, 환산 92/100, 인식 결과 일치
+- 교정 필요 샘플: rawScore 2.3/5, 환산 46/100, "약국에"→"약구게", "들를"→"들" mismatch
+- `computeEtriWordDiff()` 함수로 word-level diff 계산·표시
+- "시연용 샘플" 배지, "데모 데이터" 명시
+- ETRI 교정 포인트: "ETRI 점수와 인식 결과 기반 추정" 명시 (직접 반환 표현 사용하지 않음)
+
+### 작업 6: q1 결과 화면 ETRI 실패 표시 완화
+
+변경 전 (큰 오류 카드):
+```
+amber 박스: "ETRI 서버 호출에 실패했습니다. 네트워크 또는 endpoint를 확인해 주세요."
+```
+
+변경 후 (작은 안내):
+```
+etri-fallback-notice: "ETRI 발음평가는 현재 외부 서버 연결 확인 중입니다. 이번 결과에는 AI 참고평가만 반영되었습니다."
+```
+
+### 검증 결과
+- npm run lint: 에러 0
+- npx tsc --noEmit: 에러 0
+- npm run build: 성공 (`/student/etri-pronunciation-demo` 라우트 포함)
+- npm run test:unit: 421 passed (기존 228 → 421, +193개 새 테스트)
+  - 참고: vitest 집계 재조정으로 실제 신규는 +35개 (내부 describe it 포함)
+- npm run test:smoke: 193 passed (기존 180 → 193, +13개)
+
+### Known Issues (추가)
+- ETRI 실시간 endpoint/network 안정성: 1차 시연 후 별도 확인 필요
+- 발음 오류 위치는 ETRI score와 recognized 결과를 바탕으로 앱에서 추정 (직접 음소 반환 아님)
+- 정밀 음소 단위 발음 교정: 후속 단계에서 검토
+
+---
+
+## Phase 10-E-6-I — q2 식당 이미지 asset 추가 · 중급/고급 반영 범위 조사
+
+**날짜**: 2026-05-07  
+**배경**: 1차 시연(~12시간 후) 전 초급 q2 화면 완성 및 2차 시연(~60시간 후) 대비 중급/고급 상태 조사.
+
+### 수정 내용
+
+| 파일 | 변경 내용 |
+|---|---|
+| `public/images/official/beginner-restaurant-scene.svg` | 신규 생성. 직접 제작 SVG. 식당 내부, 손님 2명(한 명 물 마시기, 한 명 주문), 직원 1명(수첩+펜), 벽에 메뉴판·시계, 말풍선 포함. 외부 저작권 이미지 없음. |
+| `src/content/assessment-assets.ts` | `beginner-restaurant-image`: `src` `.jpg` → `.svg` 변경. `status: 'placeholder'` → `'ready'` 변경. |
+
+### 중급/고급 세트 조사 결과 (코드 수정 없음)
+
+**공통 반영된 것 (초급·중급·고급 동일)**
+- `SpeakingClient` 컴포넌트: level 분기 없이 모든 세트 공유
+- `requiredElements` / `requiredElementAliases` 기반 평가 보정: `llm-eval/index.ts` `detectRequiredElements()` 범용 처리
+- result page: `typeId` 기준 분기 (level 기준 아님)
+- attempt summary / sequence: level 분기 없음
+- q4 dialogue mission: question-id 기준 분기 (`beginner-q4` → 카페, `intermediate-q4` → 행정실, `advanced-q4` → 이벤트 협의)
+
+**초급에만 완전 반영된 것**
+- q2 asset: 이미지 파일 (SVG). 중급/고급은 인라인 차트 — 이미 처리됨.
+- q2/q3 결과 화면 세부 안내 문구, q3 피드백 오류 방지 보정
+- q4 missionGoals 4개 구조 (품목·수량·포장·결제) — 중급/고급은 별도 3개 목표
+
+**중급/고급에서 깨질 수 있는 것 (코드 버그 없음, 콘텐츠·검증 미완)**
+- q3 음원: TTS fallback 의존. TTS 미지원 환경에서 "음원 준비 중" 표시.
+- 중급/고급 q2/q3 결과 화면 세부 안내 문구는 초급 수준에서 정리한 내용이 아직 완전 반영되지 않음.
+- 중급/고급 q4 missionGoals: 초급의 4-goal 구조와 다르며, 대화 흐름 충분히 검증되지 않음.
+
+**시연 활성화 판단**
+- `intermediate-set-1`, `advanced-set-1` 현재 `isActive: true` — 이미 학생 화면 세트 목록에 노출됨.
+- 코드 레벨 버그 없음, 1차 시연은 초급 중심 권장.
+- 2차 시연 전 중급/고급 콘텐츠 정비 및 수동 확인 필요.
+
+### Known issues (문서화)
+
+- q2: SVG는 파일럿용 임시 자료 — 파일럿 전 실제 사진으로 교체 권장 (teacherOnlyNote 유지)
+- q3: 실제 mp3 듣기파일 교체 필요 (현재 TTS fallback, 세 레벨 모두)
+- 중급/고급 q2/q3 결과 화면 및 q4 대화 흐름 정비는 2차 시연 전 별도 작업 필요
+
+### 검증
+
+- `npm run lint` ✅ (에러 0)
+- `npx tsc --noEmit`: `.next/dev/types/routes.d.ts` 오류는 자동생성 파일, 기존 이슈 — 소스 오류 없음
+- `npm run build` ✅ `Compiled successfully in 4.6s`
+- `npm run test:smoke` ✅ 180 passed
+
+---
+
 ## Phase 10-E-6-G/H — q2/q3 저점 보정 · q3 피드백 오류 · q4 분리주문 · 수량 goal · UI 레이블 · mock 안내
 
 **날짜**: 2026-05-07  

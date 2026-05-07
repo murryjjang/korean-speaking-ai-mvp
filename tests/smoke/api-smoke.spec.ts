@@ -415,7 +415,7 @@ test.describe('/api/evaluate-speaking 정식 문항 유형 smoke (Phase 10-E-2)'
     const res = await request.post('/api/evaluate-speaking', {
       data: {
         questionId: 'beginner-q2-material-description',
-        transcript: '이 사진은 식당입니다. 손님들이 앉아서 물을 마시고 있습니다. 직원이 주문을 받으러 오고 있습니다.',
+        transcript: '이 사진은 카페입니다. 손님이 점원에게 아이스 아메리카노를 주문하고 있습니다. 점원이 계산대 앞에서 주문을 받고 있습니다.',
         rubricId: 'rubric-material-desc-01',
       },
     })
@@ -984,7 +984,7 @@ test.describe('/api/pronunciation ETRI score missing 및 error code 처리', () 
   test('q1/q2/q3 문항 — 오디오 없이도 정상 응답 구조 유지', async ({ request }) => {
     const cases = [
       { qId: 'beginner-q1-reading', ref: '저는 오늘 병원에 갑니다.' },
-      { qId: 'beginner-q2-material-description', ref: '이 사진은 식당입니다.' },
+      { qId: 'beginner-q2-material-description', ref: '이 사진은 카페에서 손님이 음료를 주문하는 장면입니다.' },
       { qId: 'beginner-q3-listening-response', ref: '들은 내용을 말해 보세요.' },
     ]
     for (const { qId, ref } of cases) {

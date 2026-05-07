@@ -5,6 +5,36 @@ import { isLikelySttHallucination } from '@/src/lib/stt-sanity'
 // Whisper hallucinates with near-silent audio (< ~1s). Block before calling the provider.
 const MIN_AUDIO_SIZE_BYTES = 3000
 
+// Demo mode: cycle through question-aware transcripts so dialogue missions advance naturally.
+// Only used when STT_PROVIDER=mock (default dev mode). Real providers use actual audio.
+const dialogueMockTurnMap = new Map<string, number>()
+
+const DIALOGUE_MOCK_POOLS: Record<string, string[]> = {
+  'beginner-q4-dialogue-mission': [
+    '아이스 아메리카노 한 잔 주세요.',
+    '포장해 주세요.',
+    '카드로 결제할게요.',
+  ],
+  'intermediate-q4-dialogue-mission': [
+    '말하기 수업이 언제 있나요?',
+    '결석한 날 자료를 받을 수 있나요?',
+    '교수님 상담은 언제 가능한가요?',
+  ],
+  'advanced-q4-dialogue-mission': [
+    '일정 조정이 가능한지 확인하고 싶습니다.',
+    '발표 주제와 진행 방식에 대한 의견을 듣고 싶습니다.',
+    '실무 협의를 위해 별도 회의를 제안드립니다.',
+  ],
+}
+
+function getDialogueMockTranscript(questionId: string): string | null {
+  const pool = DIALOGUE_MOCK_POOLS[questionId]
+  if (!pool) return null
+  const idx = dialogueMockTurnMap.get(questionId) ?? 0
+  dialogueMockTurnMap.set(questionId, Math.min(idx + 1, pool.length - 1))
+  return pool[idx]
+}
+
 export async function POST(request: Request) {
   let blob: Blob
   let questionId: string | null = null
@@ -56,6 +86,20 @@ export async function POST(request: Request) {
 
   // Used to identify the intended provider in error-path logging.
   const configuredProvider = process.env.STT_PROVIDER ?? 'mock'
+
+  // Demo mode: return cycling dialogue-aware transcript instead of generic mock text.
+  if (configuredProvider === 'mock' && questionId) {
+    const mockTranscript = getDialogueMockTranscript(questionId)
+    if (mockTranscript !== null) {
+      return Response.json({
+        transcript: mockTranscript,
+        confidence: 0.9,
+        providerName: 'mock',
+        latencyMs: 0,
+        source: 'stt',
+      })
+    }
+  }
 
   try {
     const provider = getSTTProvider()

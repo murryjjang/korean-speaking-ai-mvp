@@ -210,15 +210,18 @@ export function DialogueMissionPanel({
       return
     }
 
-    // STT call
+    // STT call — 10s timeout prevents infinite "음성 인식 중..." state
     let transcript = ''
     let sttProviderName = ''
     let sttWarning = ''
     try {
+      const sttAbort = new AbortController()
+      const sttTimeout = setTimeout(() => sttAbort.abort(), 10000)
       const fd = new FormData()
       fd.append('audio', audioBlob, 'recording.webm')
       fd.append('questionId', questionId)
-      const res = await fetch('/api/stt', { method: 'POST', body: fd })
+      const res = await fetch('/api/stt', { method: 'POST', body: fd, signal: sttAbort.signal })
+      clearTimeout(sttTimeout)
       if (res.ok) {
         const data = await res.json()
         if (typeof data?.transcript === 'string') transcript = data.transcript
@@ -226,7 +229,7 @@ export function DialogueMissionPanel({
         if (typeof data?.warning === 'string') sttWarning = data.warning
       }
     } catch {
-      // STT failure
+      // STT failure or timeout — fall through to no-speech guard
     }
 
     // No-speech / hallucination guard
@@ -235,7 +238,7 @@ export function DialogueMissionPanel({
       sttWarning === 'stt_hallucination_filtered' ||
       !transcript.trim()
     ) {
-      setTurnError('음성이 감지되지 않았습니다. 다시 말해 주세요.')
+      setTurnError('음성 인식이 원활하지 않습니다. 다시 한 번 말해 주세요.')
       setPanelStatus('recorded')
       return
     }
@@ -262,6 +265,8 @@ export function DialogueMissionPanel({
     setProcessingMessage('AI 응답 생성 중...')
 
     try {
+      const dialogueAbort = new AbortController()
+      const dialogueTimeout = setTimeout(() => dialogueAbort.abort(), 15000)
       const res = await fetch('/api/dialogue/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -273,7 +278,9 @@ export function DialogueMissionPanel({
           mode,
           personaId,
         }),
+        signal: dialogueAbort.signal,
       })
+      clearTimeout(dialogueTimeout)
 
       let aiText = '네, 알겠습니다.'
       let aiProvider = 'fallback'

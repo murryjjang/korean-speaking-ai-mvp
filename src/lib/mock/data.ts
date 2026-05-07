@@ -669,7 +669,7 @@ export const mockAIEvaluations: AIEvaluation[] = [
     id: 'ai-eval-020',
     submissionId: 'sub-020',
     transcript:
-      '이 사진은 식당입니다. 손님 두 명이 있어요. 한 사람은 물을 마시고 있습니다. 직원이 주문을 받으러 오고 있어요. 벽에 메뉴판이 있습니다.',
+      '이 사진은 카페입니다. 손님이 점원에게 아이스 아메리카노를 주문하고 있습니다. 점원이 계산대 앞에서 주문을 받고 있어요. 뒤에 메뉴판과 시계가 보입니다.',
     rubricId: 'rubric-material-desc-01',
     rubricVersion: '1.0',
     scores: {
