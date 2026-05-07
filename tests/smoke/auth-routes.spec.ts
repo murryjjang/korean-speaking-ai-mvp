@@ -213,7 +213,7 @@ test.describe('Phase 10-E-3: 공식 문항 12개 URL 접근성', () => {
     await page.goto('/student/speaking/beginner-q4-dialogue-mission?setId=beginner-set-1')
     await expect(page.getByText('AI와 대화하며 미션을 달성하는 평가입니다')).toBeVisible()
     // 미션 목표 목록 중 하나 — exact match로 strict mode 위반 방지
-    await expect(page.getByText('차가운/따뜻한 음료 선택').first()).toBeVisible()
+    await expect(page.getByText('수량 말하기').first()).toBeVisible()
   })
 
   test('listening_response 화면에 학습자 안내 요소가 표시됨', async ({ page }) => {
@@ -273,11 +273,12 @@ test.describe('Phase 10-E-4: 공식 문항 asset rendering', () => {
 
   // --- listening_response q3 ---
 
-  test('beginner q3 listening card가 렌더링되고 음원 미등록 안내가 표시됨', async ({ page }) => {
+  test('beginner q3 listening card가 렌더링되고 TTS fallback 안내가 표시됨', async ({ page }) => {
     await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
     await expect(page.getByRole('button', { name: '준비 시작' })).toBeVisible()
     await expect(page.locator('[data-testid="listening-asset-card"]')).toBeVisible()
-    await expect(page.locator('[data-testid="audio-not-ready"]')).toBeVisible()
+    // q3 has ttsScript → shows TTS fallback notice (not "audio-not-ready")
+    await expect(page.locator('[data-testid="audio-tts-fallback-notice"]')).toBeVisible()
     await expect(page.locator('[data-testid="listen-count"]')).toBeVisible()
   })
 
@@ -313,12 +314,12 @@ test.describe('Phase 10-E-4: 공식 문항 asset rendering', () => {
     expect(bodyText).not.toContain('내일부터 한국어 수업이 시작됩니다')
   })
 
-  test('q3 audio 미등록 상태에서 listen 버튼이 disabled 상태임', async ({ page }) => {
+  test('q3 TTS fallback 상태에서 listen 버튼이 활성화 상태임', async ({ page }) => {
     await page.goto('/student/speaking/beginner-q3-listening-response?setId=beginner-set-1')
     const btn = page.locator('[data-testid="listen-button"]')
     await expect(btn).toBeVisible()
-    // 음원 없음 → 버튼이 비활성화됨
-    await expect(btn).toBeDisabled()
+    // ttsScript 있음 → TTS 재생 가능하므로 버튼 활성화
+    await expect(btn).toBeEnabled()
   })
 
   // --- dialogue_mission q4 ---
@@ -329,7 +330,7 @@ test.describe('Phase 10-E-4: 공식 문항 asset rendering', () => {
     await expect(page.locator('[data-testid="start-dialogue-button"]')).toBeVisible()
     await expect(page.getByText('AI와 대화하며 미션을 달성하는 평가입니다')).toBeVisible()
     // 미션 목표 중 타이틀과 겹치지 않는 항목 사용 (strict mode 위반 방지)
-    await expect(page.getByText('차가운/따뜻한 음료 선택').first()).toBeVisible()
+    await expect(page.getByText('수량 말하기').first()).toBeVisible()
   })
 
   test('intermediate q4 missionGoals 표시됨', async ({ page }) => {
@@ -609,7 +610,7 @@ test.describe('Phase 10-E-5-B: 교수자 최종확정 화면 — official rubric
 
     // 미션 달성 현황 패널 확인
     await expect(page.getByText('미션 목표 달성 현황')).toBeVisible()
-    await expect(page.getByText('음료 주문').first()).toBeVisible()
+    await expect(page.getByText('품목 주문하기').first()).toBeVisible()
     // AI 판정 안내 메시지 확인
     await expect(page.getByText(/AI 미션 달성 판정은 1차 참고용/).first()).toBeVisible()
   })

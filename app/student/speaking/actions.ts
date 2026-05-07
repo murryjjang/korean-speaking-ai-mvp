@@ -4,6 +4,7 @@ import { getSTTProvider } from '@/src/providers/stt'
 import { getPronunciationProvider } from '@/src/providers/pronunciation'
 import { evaluateSpeakingDetail, detailToLLMEvalResult } from '@/src/providers/llm-eval'
 import { saveSpeakingEval, type SpeakingEvalRecord } from '@/src/lib/mock/speaking-store'
+import { saveAttemptSubmission } from '@/src/lib/attempt/attempt-store'
 import { getEvaluationRepository } from '@/src/lib/repositories'
 import { logProviderEvent } from '@/src/lib/supabase/provider-events'
 import questionsJson from '@/src/content/questions.json'
@@ -47,6 +48,8 @@ export interface SpeakingSubmitMeta {
   audioUrl?: string
   /** Pronunciation result from /api/pronunciation; omit to use server-side mock fallback. */
   pronunciationResult?: ClientPronunciationResult
+  /** Attempt UUID — when present, records this submission in the attempt store. */
+  attemptId?: string
 }
 
 export async function submitSpeaking(
@@ -107,11 +110,33 @@ export async function submitSpeaking(
     }
 
     saveSpeakingEval(noSpeechRecord)
+    if (meta?.attemptId) {
+      saveAttemptSubmission(meta.attemptId, questionSetId, resolveId(questionId), submissionId)
+    }
     // Supabase persistence intentionally skipped — no ai_evaluations for no-speech
     return { submissionId }
   }
 
-  // ── 2. Resolve pronunciation result ──────────────────────────────────────
+  // ── 2. Look up question — needed for type-aware pronunciation policy ─────────
+  const question = questionsJson.find((q) => q.id === resolveId(questionId))
+  // ETRI 발음평가 정책: qt-reading(q1)에만 적용. q2/q3/q4는 직접 mock 사용.
+  const isReadingQuestion = question?.typeId === 'qt-reading'
+
+  // Safe diagnostic log — no secrets, no audio content
+  console.info('[submitSpeaking] start', {
+    questionId,
+    questionType: question?.typeId ?? 'unknown',
+    questionSetId,
+    attemptIdPresent: Boolean(meta?.attemptId),
+    hasRecording: meta?.hasRecording ?? false,
+    hasSttTranscript: meta?.sttTranscript !== undefined,
+    pronunciationResultPresent: Boolean(meta?.pronunciationResult),
+    isReadingQuestion,
+  })
+
+  // ── 3. Resolve pronunciation result ──────────────────────────────────────────
+  // q2/q3/q4: 클라이언트에서 pronunciationResult를 보내지 않으므로 mock 직접 사용.
+  // q1(qt-reading): 클라이언트 제공 결과 우선. 없으면 서버 provider 호출 (catch로 crash 방지).
   const buildClientPronunciation = (): PronunciationResult | null => {
     const p = meta?.pronunciationResult
     if (!p) return null
@@ -134,10 +159,33 @@ export async function submitSpeaking(
   const clientPronunciation = buildClientPronunciation()
   const pronunciationPromise: Promise<PronunciationResult> = clientPronunciation
     ? Promise.resolve(clientPronunciation)
-    : getPronunciationProvider().evaluate(new Blob([], { type: 'audio/webm' }), transcript)
+    : isReadingQuestion
+      ? getPronunciationProvider()
+          .evaluate(new Blob([], { type: 'audio/webm' }), transcript)
+          .catch((err: unknown): PronunciationResult => {
+            const msg = err instanceof Error ? err.message : String(err)
+            const code = msg.startsWith('etri_') ? msg.split(':')[0] : 'pronunciation_error'
+            console.warn('[submitSpeaking] pronunciation provider fallback', { questionId, errorCode: code })
+            return {
+              normalizedScore: 0,
+              wordScores: [],
+              feedback: '발음평가 서비스에 연결하지 못했습니다.',
+              providerName: 'etri',
+              providerVersion: '1.0',
+              latencyMs: 0,
+              fallbackReason: code,
+            }
+          })
+      : Promise.resolve<PronunciationResult>({
+          normalizedScore: 0,
+          wordScores: [],
+          feedback: '자유발화 문항에서는 발음평가 API가 별도 적용되지 않습니다.',
+          providerName: 'mock',
+          providerVersion: '1.0.0',
+          latencyMs: 0,
+        })
 
-  // ── 3. LLM evaluation ────────────────────────────────────────────────────
-  const question = questionsJson.find((q) => q.id === resolveId(questionId))
+  // ── 4. LLM evaluation ────────────────────────────────────────────────────────
   const pronunciationForEval = clientPronunciation ?? null
 
   const llmEvalPromise = evaluateSpeakingDetail({
@@ -233,6 +281,10 @@ export async function submitSpeaking(
   // Always save to mock store — result page reads from here.
   saveSpeakingEval(record)
 
+  if (meta?.attemptId) {
+    saveAttemptSubmission(meta.attemptId, questionSetId, resolveId(questionId), submissionId)
+  }
+
   // Supabase persistence: only when REPOSITORY_PROVIDER=supabase.
   if (process.env.REPOSITORY_PROVIDER === 'supabase') {
     try {
@@ -242,6 +294,17 @@ export async function submitSpeaking(
       console.error('[submitSpeaking] Supabase persistence failed:', err)
     }
   }
+
+  console.info('[submitSpeaking] success', {
+    questionId,
+    questionType: question?.typeId ?? 'unknown',
+    submissionId,
+    attemptIdPresent: Boolean(meta?.attemptId),
+    pronunciationProvider: record.pronunciationResult.providerName,
+    pronunciationFallbackReason: record.pronunciationResult.fallbackReason ?? null,
+    llmEvalProvider: record.llmEvalResult.providerName,
+    resultUrl: `/student/speaking/${questionId}/result?sub=${submissionId}${meta?.attemptId ? `&attemptId=${meta.attemptId}` : ''}`,
+  })
 
   return { submissionId }
 }

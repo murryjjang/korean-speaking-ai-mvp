@@ -3,6 +3,7 @@ import questionSetsJson from '@/src/content/question-sets.json'
 import questionsJson from '@/src/content/questions.json'
 import questionTypesJson from '@/src/content/question-types.json'
 import { PageHeader, Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
+import { StartSetButton } from './start-set-button'
 
 const difficultyLabel: Record<string, string> = {
   beginner: '초급',
@@ -41,11 +42,16 @@ export default function SpeakingSelectionPage() {
     <div>
       <PageHeader
         title="말하기 평가"
-        description="아래 평가 세트에서 문항을 선택하여 말하기 평가를 시작하세요."
+        description="아래 평가 세트에서 문항을 선택하거나 세트 전체를 순서대로 응시하세요."
       />
 
       <div className="flex flex-col gap-6">
-        {activeSets.map((set) => (
+        {activeSets.map((set) => {
+          const sortedQuestions = [...set.questions].sort((a, b) => a.order - b.order)
+          const firstActiveQuestion = sortedQuestions.find(
+            (sq) => questionMap.get(sq.questionId)?.isActive,
+          )
+          return (
           <Card key={set.id}>
             <CardHeader
               title={set.name}
@@ -56,6 +62,17 @@ export default function SpeakingSelectionPage() {
                 </Badge>
               }
             />
+            {firstActiveQuestion && (
+              <div className="px-4 pb-3 md:px-5">
+                <StartSetButton
+                  setId={set.id}
+                  firstQuestionId={firstActiveQuestion.questionId}
+                  className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[40px] rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700"
+                >
+                  1번부터 순서대로 응시하기 →
+                </StartSetButton>
+              </div>
+            )}
             <CardBody noPadding>
               <ul className="divide-y divide-border">
                 {set.questions.map(({ questionId, order }) => {
@@ -117,7 +134,8 @@ export default function SpeakingSelectionPage() {
               </ul>
             </CardBody>
           </Card>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

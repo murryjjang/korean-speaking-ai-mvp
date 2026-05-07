@@ -523,7 +523,25 @@ test.describe('Phase 10-E-5-A: /api/dialogue/respond smoke', () => {
     expect(['success', 'fallback']).toContain(body.status)
   })
 
-  test('beginner 카페: 음료만 말하면 온도(차가운/따뜻한)를 묻는 응답', async ({ request }) => {
+  test('beginner 카페: 음료만 말하면 수량을 묻는 응답', async ({ request }) => {
+    const res = await request.post('/api/dialogue/respond', {
+      data: {
+        questionId: 'beginner-q4-dialogue-mission',
+        level: 'beginner',
+        turns: [
+          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
+          { role: 'student', text: '아메리카노 주세요.' },
+        ],
+        latestStudentText: '아메리카노 주세요.',
+      },
+    })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    // 음료는 말했지만 수량 미포함 → 수량 확인 응답
+    expect(body.aiText).toContain('몇 잔')
+  })
+
+  test('beginner 카페: 음료+수량 말했지만 포장 여부 없으면 포장/매장 묻는 응답', async ({ request }) => {
     const res = await request.post('/api/dialogue/respond', {
       data: {
         questionId: 'beginner-q4-dialogue-mission',
@@ -537,48 +555,28 @@ test.describe('Phase 10-E-5-A: /api/dialogue/respond smoke', () => {
     })
     expect(res.ok()).toBe(true)
     const body = await res.json()
-    // 음료는 말했지만 온도 미선택 → 온도 확인 응답
-    expect(body.aiText).toContain('따뜻')
+    // 음료+수량 모두 포함 → 포장 여부 확인 응답
+    expect(body.aiText).toMatch(/포장|드시고|매장/)
   })
 
-  test('beginner 카페: 음료+온도 말했지만 포장 여부 없으면 포장/매장 묻는 응답', async ({ request }) => {
+  test('beginner 카페: 4개 미션 목표 모두 포함 시 완료 응답 반환', async ({ request }) => {
     const res = await request.post('/api/dialogue/respond', {
       data: {
         questionId: 'beginner-q4-dialogue-mission',
         level: 'beginner',
         turns: [
           { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
-          { role: 'student', text: '아이스 아메리카노 주세요.' },
-          { role: 'ai', text: '차가운 음료로 드릴까요, 따뜻한 음료로 드릴까요?' },
-          { role: 'student', text: '아이스로 주세요.' },
-        ],
-        latestStudentText: '아이스로 주세요.',
-      },
-    })
-    expect(res.ok()).toBe(true)
-    const body = await res.json()
-    // 음료+온도 모두 포함 → 포장 여부 확인 응답
-    expect(body.aiText).toContain('포장')
-  })
-
-  test('beginner 카페: 3개 미션 목표 모두 포함 시 완료 응답 반환', async ({ request }) => {
-    const res = await request.post('/api/dialogue/respond', {
-      data: {
-        questionId: 'beginner-q4-dialogue-mission',
-        level: 'beginner',
-        turns: [
-          { role: 'ai', text: '어서 오세요. 무엇을 드릴까요?' },
-          { role: 'student', text: '아이스 아메리카노 주세요.' },
+          { role: 'student', text: '아이스 아메리카노 두 잔 주세요.' },
           { role: 'ai', text: '드시고 가세요, 아니면 포장해 드릴까요?' },
-          { role: 'student', text: '포장해 주세요.' },
+          { role: 'student', text: '포장해 주세요. 카드로 결제할게요.' },
         ],
-        latestStudentText: '포장해 주세요.',
+        latestStudentText: '포장해 주세요. 카드로 결제할게요.',
       },
     })
     expect(res.ok()).toBe(true)
     const body = await res.json()
-    // 3개 목표(음료+온도+포장) 모두 충족 → 감사 응답
-    expect(body.aiText).toContain('감사')
+    // 4개 목표(음료+수량+포장+결제) 모두 충족 → 구체적 완료 응답
+    expect(body.aiText).toContain('준비해 드리겠습니다')
   })
 
   test('questionId 없이 전송 → 400 반환', async ({ request }) => {
@@ -690,8 +688,8 @@ test.describe('Phase 10-E-5-C/D: 잘못된 표현 교정 및 assessment mode 응
     })
     expect(res.ok()).toBe(true)
     const body = await res.json()
-    // 음료+온도 주문 → 포장 여부를 물어보거나 온도 확인 질문
-    expect(body.aiText).toMatch(/따뜻|포장|드시고|차가운/)
+    // 음료 주문 → 수량 또는 포장 여부를 물어보는 응답
+    expect(body.aiText).toMatch(/따뜻|포장|드시고|차가운|몇 잔/)
   })
 
   test('assessment mode: "똑바로 알려주세요" → language question 감지', async ({ request }) => {

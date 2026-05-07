@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import type { StudentVisibleAsset } from '@/src/content/assessment-assets'
+import { useTTS } from '@/src/hooks/use-tts'
 
 // --- Inline chart data (student-visible only, teacher-only fields never stored here) ---
 const INLINE_CHART_DATA: Record<
@@ -55,7 +56,7 @@ function ImageAssetCard({ asset }: { asset: StudentVisibleAsset }) {
       </div>
     )
   }
-  // 실제 사진이 없을 때 — 깔끔한 placeholder 카드 (학습자에게 "임시" 표시 최소화)
+  // 실제 사진이 없을 때 — placeholder 카드 (파일럿 전 교체 예정 안내 포함)
   return (
     <div
       className="mt-4 flex flex-col items-center justify-center gap-2.5 rounded-md border-2 border-dashed border-border bg-surface py-8 px-4"
@@ -66,6 +67,14 @@ function ImageAssetCard({ asset }: { asset: StudentVisibleAsset }) {
       <p className="text-xs text-text-secondary text-center max-w-xs leading-relaxed">
         {asset.studentVisibleDescription}
       </p>
+      {asset.status === 'placeholder' && (
+        <p
+          className="text-[10px] text-text-muted italic mt-1"
+          data-testid="image-placeholder-notice"
+        >
+          임시 이미지 · 실제 사진 교체 예정
+        </p>
+      )}
     </div>
   )
 }
@@ -151,16 +160,37 @@ function AudioAssetCard({
 }) {
   const [listenCount, setListenCount] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const tts = useTTS()
 
   const hasAudio = Boolean(asset.src)
+  const hasTTSScript = Boolean(asset.ttsScript)
   const limitReached = listenCount >= listenLimit
 
   const handlePlay = useCallback(() => {
-    // 음원이 없거나 한도에 도달하면 카운트 증가 금지
     if (!hasAudio || limitReached) return
     setListenCount((c) => c + 1)
     audioRef.current?.play().catch(() => {})
   }, [hasAudio, limitReached])
+
+  const handleTTSPlay = useCallback(() => {
+    if (!hasTTSScript || limitReached) return
+    setListenCount((c) => c + 1)
+    tts.play(asset.ttsScript!, asset.questionId, 'listening-tts')
+  }, [hasTTSScript, limitReached, tts, asset.ttsScript, asset.questionId])
+
+  const isTTSActive = tts.state === 'loading' || tts.state === 'playing'
+
+  const buttonLabel = limitReached
+    ? '듣기 완료'
+    : hasAudio
+      ? '문제 듣기'
+      : hasTTSScript
+        ? isTTSActive ? '재생 중...' : '듣기 재생'
+        : '음원 준비 중'
+
+  const buttonEnabled = !limitReached && (hasAudio || (hasTTSScript && !isTTSActive))
+
+  const handleButtonClick = hasAudio ? handlePlay : handleTTSPlay
 
   return (
     <div
@@ -177,18 +207,18 @@ function AudioAssetCard({
       <div className="flex items-center gap-3 mb-2">
         <button
           type="button"
-          onClick={handlePlay}
-          disabled={!hasAudio || limitReached}
+          onClick={handleButtonClick}
+          disabled={!buttonEnabled}
           data-testid="listen-button"
           className={[
             'text-xs px-3 py-1.5 rounded border transition-colors',
-            hasAudio && !limitReached
+            buttonEnabled
               ? 'border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer'
               : 'border-border bg-surface text-text-muted cursor-not-allowed opacity-60',
           ].join(' ')}
-          aria-label={limitReached ? '듣기 완료' : hasAudio ? '문제 듣기' : '음원 준비 중'}
+          aria-label={buttonLabel}
         >
-          {limitReached ? '듣기 완료' : hasAudio ? '문제 듣기' : '음원 준비 중'}
+          {buttonLabel}
         </button>
         <span
           className="text-xs text-text-muted"
@@ -198,7 +228,12 @@ function AudioAssetCard({
         </span>
       </div>
 
-      {!hasAudio && (
+      {!hasAudio && hasTTSScript && (
+        <p className="text-xs text-blue-600" data-testid="audio-tts-fallback-notice">
+          현재 음원은 임시 TTS 음성입니다. 파일럿 전 실제 녹음본으로 교체 예정입니다.
+        </p>
+      )}
+      {!hasAudio && !hasTTSScript && (
         <p className="text-xs text-blue-600" data-testid="audio-not-ready">
           듣기 음원은 파일럿 전 등록 예정입니다.
         </p>

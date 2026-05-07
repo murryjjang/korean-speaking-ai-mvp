@@ -25,7 +25,7 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 | **D+3** — 최소기능 시연판 | 2026-05-07 | Supabase 연결 + 핵심 경로 저장 확인 | ✅ 완료 (Phase 6-B1~B2) |
 | **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 | ✅ 완료 (Phase 6-B2~B5) |
 | **D+10** — 로그인/역할 분기 | 2026-05-14 | Supabase Auth 기반 로그인 + 역할별 route 보호 | ✅ 완료 (Phase 9-A) |
-| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | **P0 처리 완료 (10-E-1), P1-1~P1-4 처리 완료 (10-E-2), 정식 문항 콘텐츠 입력 완료 (10-E-3), reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정), asset 구조·listenLimit·student-safe rendering 완료 (10-E-4), dialogue_mission 단발 녹음 UI 비표시·준비 중 상태 표시 완료 (10-E-4 추가 수정), dialogue_mission 실제 AI 대화 UI + TTS 재생 완료 (10-E-5-A), 교수자 채점 official rubric 강화 완료 (10-E-5-B), assessment/practice 정책 분리·페르소나 구조·Azure TTS provider 준비 완료 (10-E-5-C/D), 실제 식당 사진·음원 mp3 교체 대기 (파일럿 전 필수)** |
+| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | P0 처리 완료 (10-E-1), P1-1~P1-4 처리 완료 (10-E-2), 정식 문항 콘텐츠 입력 완료 (10-E-3), reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정), asset 구조·listenLimit·student-safe rendering 완료 (10-E-4), dialogue_mission 단발 녹음 UI 비표시·준비 중 상태 표시 완료 (10-E-4 추가 수정), dialogue_mission 실제 AI 대화 UI + TTS 재생 완료 (10-E-5-A), 교수자 채점 official rubric 강화 완료 (10-E-5-B), assessment/practice 정책 분리·페르소나 구조·Azure TTS provider 준비 완료 (10-E-5-C/D), q2 제출 오류(ETRI 빈 blob crash) 수정 완료 (10-E-6-B), ETRI timeout 단축·q3 TTS fallback 명확화·q4 복수 품목 처리 완료 (10-E-6-C), q2/q3 평가 표시 정리·q4 메뉴판·점수 환산·조사 처리 수정 완료 (10-E-6-D/E), q2/q3 안내문구·q4 결제 goal·총액·결과화면·STT 카드명·goalResults 피드백 완료 (10-E-6-F), **q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H)**, Known issues: 실제 식당 사진·음원 mp3 교체 필요, q2/q3/q4 점수 산식 파일럿 보정 필요, q4 실제 LLM provider 연결 후 대화 품질 추가 개선 필요 |
 
 ---
 
@@ -1350,3 +1350,20 @@ AZURE_TTS_VOICE=ko-KR-SunHiNeural
 - [ ] q4 AI turn 다시 듣기 버튼 클릭 → Azure TTS 재생 확인
 - [ ] q1 "문제 듣기" 버튼 → Azure TTS 재생 확인 (q1/q2/q3 흐름 영향 없음)
 - [ ] Azure 키 제거 후 fallback → browser speechSynthesis 정상 동작 확인
+
+---
+
+## Phase 10-E-6-A 체크리스트 업데이트 (2026-05-07)
+
+### 완료된 항목
+- [x] q2/q3 ETRI 실패 카드 제거 — 자유발화 문항 ETRI 완전 건너뜀
+- [x] q4 제출 오류 수정 — dialogue-actions.ts ETRI 호출 제거
+- [x] q3 TTS fallback 듣기 자극 — ttsScript 등록 + AudioAssetCard TTS 재생
+- [x] q4 AI 응답 자연화 — 완료 시 구체적 메시지, 절차 질문 분기
+- [x] result page 발음 카드 — qt-reading 전용, q2/q3/q4 quiet notice/hidden
+
+### 파일럿 전 잔여 항목
+- [ ] q2 이미지 파일 등록: public/images/official/beginner-restaurant-scene.jpg
+- [ ] q3 실제 mp3 등록: public/audio/official/beginner-korean-class-announcement.mp3 등 3개
+- [ ] ETRI 점수 calibration 완료 후 환산 비율 결정
+- [ ] Azure TTS 수동 검증 체크리스트 실행

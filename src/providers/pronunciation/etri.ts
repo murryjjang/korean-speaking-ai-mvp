@@ -250,7 +250,7 @@ export class ETRIPronunciationProvider implements PronunciationProvider {
           Authorization: this.apiKey,
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(7_000),
       })
     } catch (fetchErr) {
       const fetchMsg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr)

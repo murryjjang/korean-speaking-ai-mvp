@@ -1,18 +1,20 @@
 'use server'
 
 import { evaluateSpeakingDetail, detailToLLMEvalResult } from '@/src/providers/llm-eval'
-import { getPronunciationProvider } from '@/src/providers/pronunciation'
 import { saveSpeakingEval } from '@/src/lib/mock/speaking-store'
+import { saveAttemptSubmission } from '@/src/lib/attempt/attempt-store'
 import { getEvaluationRepository } from '@/src/lib/repositories'
 import { logProviderEvent } from '@/src/lib/supabase/provider-events'
 import questionsJson from '@/src/content/questions.json'
-import type { ProviderName } from '@/src/types/providers'
+import type { ProviderName, PronunciationResult } from '@/src/types/providers'
 import type { DialogueTurn, MissionGoalResult } from '@/src/types/dialogue'
 import { generateAggregatedTranscript } from '@/src/lib/dialogue-mission'
 
 export interface DialogueSubmitMeta {
   turns: DialogueTurn[]
   goalResults: MissionGoalResult[]
+  /** Attempt UUID — when present, records this submission in the attempt store. */
+  attemptId?: string
 }
 
 export async function submitDialogue(
@@ -20,7 +22,7 @@ export async function submitDialogue(
   questionSetId: string,
   meta: DialogueSubmitMeta,
 ): Promise<{ submissionId: string }> {
-  const { turns, goalResults } = meta
+  const { turns, goalResults, attemptId } = meta
 
   // Guard: must have at least one valid student turn
   const studentTurns = turns.filter((t) => t.role === 'student' && t.status === 'completed')
@@ -44,9 +46,9 @@ export async function submitDialogue(
     latencyMs: 0,
   }
 
-  // Compute mission achievement for LLM context
-  const achievedCount = goalResults.filter((g) => g.achieved).length
+  // Compute mission achievement for LLM context (cap at totalGoals for safety)
   const totalGoals = goalResults.length
+  const achievedCount = Math.min(goalResults.filter((g) => g.achieved).length, totalGoals)
   const achievementRate = totalGoals > 0 ? Math.round((achievedCount / totalGoals) * 100) : 0
   const missionSummary = goalResults
     .map((g) => `- ${g.labelKo}: ${g.achieved ? '달성' : '미달성'}`)
@@ -66,12 +68,18 @@ export async function submitDialogue(
     requiredElementAliases: (question as { requiredElementAliases?: Record<string, string[]> })?.requiredElementAliases,
   })
 
-  const pronunciationPromise = getPronunciationProvider().evaluate(
-    new Blob([], { type: 'audio/webm' }),
-    aggregatedTranscript,
-  )
+  // Dialogue missions do not run ETRI pronunciation evaluation — no real WAV audio available.
+  // A mock result is used so the result page shows a quiet notice rather than an error card.
+  const pronunciationResult: PronunciationResult = {
+    normalizedScore: 0,
+    wordScores: [],
+    feedback: '대화형 미션 평가에서는 발음평가 API가 별도 적용되지 않습니다.',
+    providerName: 'mock',
+    providerVersion: '1.0.0',
+    latencyMs: 0,
+  }
 
-  const [pronunciationResult, llmEvalRaw] = await Promise.all([pronunciationPromise, llmEvalPromise])
+  const llmEvalRaw = await llmEvalPromise
 
   // Log provider event for LLM eval
   try {
@@ -150,10 +158,19 @@ export async function submitDialogue(
       dialogueTurns: turns.length,
       achievedMissionGoals: achievedCount,
       totalMissionGoals: totalGoals,
+      goalResults: goalResults.map((g) => ({
+        goalIndex: g.goalIndex,
+        labelKo: g.labelKo,
+        achieved: g.achieved,
+      })),
     },
   }
 
   saveSpeakingEval(record)
+
+  if (attemptId) {
+    saveAttemptSubmission(attemptId, questionSetId, questionId, submissionId)
+  }
 
   if (process.env.REPOSITORY_PROVIDER === 'supabase') {
     try {

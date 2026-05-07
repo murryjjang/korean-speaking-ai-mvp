@@ -4,6 +4,179 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-6-G/H — q2/q3 저점 보정 · q3 피드백 오류 · q4 분리주문 · 수량 goal · UI 레이블 · mock 안내
+
+**날짜**: 2026-05-07  
+**배경**: 수동 확인에서 발견된 7가지 문제 수정.
+1. q2/q3 requiredElements 모두 충족 시에도 낮은 점수(60점대) 반환
+2. ETRI 실패 후 q1 점수 미표시
+3. q3 missingElements 없을 때 "시간, 장소" 등 포함된 요소를 보완점으로 오표시
+4. q4 품목별 분리 포장/분할 결제 요청 시 무한 루프
+5. q4 mock STT 경고 문구가 학습자에게 혼란을 줌
+6. q4 missionGoals 4개 재정의 필요 (수량 goal 누락, 음료 온도 goal 불필요)
+7. q4 UI "내 답변 녹음"/"녹음 완료" 용어가 대화 맥락과 맞지 않음
+
+### 수정 내용
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/providers/llm-eval/index.ts` | `const taskScore/overall` → `let`으로 변경. q2/q3 `elementRatio ≥ 1.0` → 최저 80점, `≥ 0.66` → 최저 70점 보장. `allElementsFound` 체크 추가: 모든 element 포함 시 "시간, 장소" 보완점 미표시, 일반 개선 피드백 표시. |
+| `src/content/questions.json` | beginner q4 `missionGoals` 재정의 (4개): "메뉴판에 있는 품목 주문하기", "수량 말하기", "포장/매장 이용 여부 말하기", "결제 방법 말하기". `guide` 업데이트. `requiredElements` 수량 포함으로 갱신. `requiredElementAliases`에 수량 별칭 추가. |
+| `src/lib/dialogue-mission.ts` | `VALID_DRINK_KEYWORDS` → `VALID_MENU_KEYWORDS` (팥빙수·빙수·케이크 추가). `QUANTITY_RE` 정규식 추가. `detectBeginnerCafe()` goal 1 → 수량 감지로 변경. |
+| `src/providers/conversation/index.ts` | `QUANTITY_RE_CONV` 추가. 분리 포장 감지(hasDineIn && hasTakeout) → 단순화 안내. 분할 결제 감지(카드&&현금) → 단순화 안내. 수량 없을 때 "몇 잔 준비해 드릴까요?" 응답. 팥빙수·케이크 메뉴 기본 응답 추가. |
+| `app/student/speaking/[questionId]/result/page.tsx` | q4 dialogue criteria 6개 → 4개로 교체. 보완점 goal별 맞춤 suggestions 맵 추가. STT 카드 제목 q4는 항상 "대화 기록" (mock 구분 없음). q4 mock 안내: "현재는 테스트용 대화 provider로 평가되었습니다." (비q4 기존 경고 유지). |
+| `src/components/dialogue-mission-panel.tsx` | ready 상태 버튼: "내 답변 녹음" → "말하기". recording 상태 버튼: "녹음 완료" → "말하기 완료". |
+| `tests/unit/etri-scope-policy.test.ts` | Phase 10-E-6-F 충돌 테스트 3개 업데이트 (criteria 6→4, mock STT 제목, missionGoals 내용). Phase 10-E-6-G/H 신규 테스트 22개 추가 (최저점 보장, allElementsFound, 분리 포장/결제, QUANTITY_RE, 대화 흐름, UI 레이블, mock 안내). |
+| `tests/smoke/api-smoke.spec.ts` | 대화 흐름 변경 반영: "음료만→온도 질문" → "음료만→수량 질문", "음료+온도→포장" → "음료+수량→포장", "3개 목표" → "4개 목표". |
+| `tests/smoke/auth-routes.spec.ts` | missionGoals 텍스트 업데이트: "차가운/따뜻한 음료 선택" → "수량 말하기". 교수자 화면: "음료 주문" → "품목 주문하기". |
+
+### Known issues (문서화)
+
+- q2: 실제 식당 사진 교체 필요 (현재 placeholder)
+- q3: 실제 mp3 듣기파일 교체 필요 (현재 TTS fallback)
+- q2/q3/q4 점수 산식은 파일럿 샘플 후 보정 필요
+- q4 실제 LLM provider 연결 후 대화 품질 추가 개선 필요
+
+---
+
+## Phase 10-E-6-F — q2/q3 안내문구 · q4 결제 goal · 총액 · 결과화면 · STT 카드명 · 피드백
+
+**날짜**: 2026-05-07  
+**배경**: 수동 확인에서 발견된 8가지 문제 수정.
+1. q2/q3 결과 화면에서 개발자식 "발음평가 API" 문구가 학습자에게 크게 노출
+2. q4에서 순댓국/부대찌개 주문 시 AI가 없다고 말하지 않음 (순댓국은 댓≠대로 감지 실패)
+3. q4 응답에 총액이 표시되지 않음
+4. q4에 결제 방법 missionGoal 없음
+5. q4 결과 화면에 legacy 발음/유창성/어휘/문법 breakdown이 공식 점수처럼 표시
+6. q4 결과 화면의 STT 카드명이 "음성 인식 결과(STT)"로 부정확
+7. q4 점수에 대한 구체적 피드백(잘한 점/보완할 점) 없음
+8. attempt summary에서 q4 missionGoals가 3개 기준으로 표시
+
+### 수정 내용
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/lib/mock/speaking-store.ts` | `SpeakingEvalRecord.meta` 타입 추가 (goalResults 포함). |
+| `src/content/questions.json` | beginner q4 `missionGoals` 3→4개. "결제 방법 말하기" 추가. `guide` 업데이트. |
+| `src/lib/dialogue-mission.ts` | `detectBeginnerCafe()` 4번째 goal (결제 방법 — 카드/현금/신용카드) 추가. |
+| `src/providers/conversation/index.ts` | `INVALID_CAFE_ITEMS`에 '순댓국', '순대국' 명시 추가 (댓≠대 유니코드 차이). `CAFE_MENU_PRICES` 가격 테이블 추가. `computeOrderTotal()` 추가. `beginnerCafeResponse()` 개정: 주문 확인 후 총액 + 결제 질문, 결제 확인 후 완료. `buildMultiItemCompletionMsg()` 제거 (인라인 대체). |
+| `app/student/speaking/dialogue-actions.ts` | meta에 `goalResults` 배열 저장. |
+| `app/student/speaking/[questionId]/result/page.tsx` | q2/q3 notice 카드를 학습자 친화적 능력 중심 문구로 변경 ("사진의 상황...", "들은 내용..."). q4 전용 평가 블록 추가 (대화 미션 기준 6개, 미션 달성 X/4). STT 카드 제목을 q4에서 "대화 기록"/"테스트용 대화 기록"으로 변경. q4 goalResults 기반 잘한 점/보완할 점 피드백 추가. |
+| `tests/unit/etri-scope-policy.test.ts` | Phase 10-E-6-F 테스트 45개 추가 (q2/q3 문구, q4 결제 goal, 총액 계산, missionGoals 4/4, 결과화면, STT 카드명, goalResults 피드백, 흐름 유지). |
+
+### Known issues (문서화)
+
+- q2: 실제 식당 사진 교체 필요 (현재 placeholder)
+- q3: 실제 mp3 듣기파일 교체 필요 (현재 TTS fallback)
+- q2/q3/q4 점수 산식은 파일럿 샘플 후 보정 필요
+- q4 실제 LLM provider 연결 후 대화 품질 추가 개선 필요
+
+---
+
+## Phase 10-E-6-D/E — q2/q3 평가 표시 · q4 메뉴판 · 점수 환산 수정
+
+**날짜**: 2026-05-07  
+**배경**: 수동 확인에서 발견된 8가지 문제 통합 수정.
+1. q2/q3 결과 화면에서 legacy 발음/유창성/어휘/문법/과제수행 breakdown이 공식처럼 표시
+2. q4 AI가 메뉴판 없는 "부대찌개" 요청을 무시
+3. q4 AI 응답에 "아이스아메리카노과" 같은 잘못된 조사·붙여쓰기
+4. attempt summary에서 q1 78/15=520%, q2 45/25=180% 등 잘못된 점수 환산
+5. missionGoals 달성 수가 4/3으로 표시 (cap 없음)
+
+### 수정 내용
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/student/speaking/[questionId]/result/page.tsx` | q2/q3 전용 AI 참고평가 기준 추가 (Q2_MATERIAL_CRITERIA, Q3_LISTENING_CRITERIA 5개 항목). q2/q3 typeId 감지 후 legacy rubric breakdown 대신 전용 기준과 안내 문구 표시. 카드 제목 "자료 설명 AI 참고평가" / "듣고 답하기 AI 참고평가" 분기 추가. |
+| `src/components/dialogue-mission-panel.tsx` | beginner-q4 카페 미션 화면에 메뉴판 카드 추가 (음료 5종 + 디저트 2종, 가격 표시). |
+| `src/providers/conversation/index.ts` | `withJosa()` 한국어 조사 helper 추가 (받침 유무 판정). 카페 메뉴 정의 (displayName 분리). `INVALID_CAFE_ITEMS` 목록 추가. `detectInvalidCafeItems()` / `hasValidCafeDrink()` / `buildInvalidItemResponse()` 추가. `beginnerCafeResponse()`에 invalid 품목 감지 → "저희 카페에는 없습니다" 응답 추가. `buildMultiItemCompletionMsg()`에 `withJosa()` 적용으로 조사 오류 수정. |
+| `src/lib/dialogue-mission.ts` | `detectBeginnerCafe()`: drinkAchieved 판정에서 `VALID_DRINK_KEYWORDS`만 사용 (invalid 품목·'주문' 제거). 메뉴 외 품목만 주문 시 음료 목표 미달성. |
+| `app/student/speaking/dialogue-actions.ts` | `achievedCount = Math.min(..., totalGoals)` cap 추가. |
+| `app/student/speaking/attempt/[attemptId]/page.tsx` | 점수 환산 수정: `score100 / 100 * maxScore = weightedScore`, `percent = score100` (clamped 0~100). missionGoalsAchieved cap 추가. AI 참고 총점 카드 추가 (전체 응시 완료 시 표시). |
+| `tests/unit/etri-scope-policy.test.ts` | Phase 10-E-6-D 테스트 60개 추가 (q2/q3 기준·제목, q4 메뉴판, invalid 품목, missionGoals cap, withJosa, 점수 환산 산식). |
+
+### Known issues (문서화)
+
+- q2: 실제 식당 사진 교체 필요 (현재 placeholder)
+- q3: 실제 mp3 듣기파일 교체 필요 (현재 TTS fallback)
+- q2/q3 점수 산식은 파일럿 샘플 후 보정 필요
+- q4 실제 LLM provider 연결 후 대화 품질 추가 개선 필요
+
+---
+
+## Phase 10-E-6-C — 제출 지연 완화 · ETRI fallback · q3 TTS · q4 복수 품목
+
+**날짜**: 2026-05-07  
+**배경**: 수동 확인에서 발견된 4가지 문제 수정.
+1. q1 ETRI 호출이 30초 timeout으로 제출 지연
+2. ETRI 실패 시 안내 메시지 불명확
+3. q3 TTS fallback 버튼 문구가 "문제 듣기 (임시 음원)"로 사용자 혼란
+4. q4 AI가 복수 품목 주문 중 일부만 반영
+
+### 수정 내용
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/providers/pronunciation/etri.ts` | ETRI fetch timeout 30초 → 7초 (`AbortSignal.timeout(7_000)`). 빠른 실패로 제출 지연 단축. |
+| `src/components/question-asset-renderer.tsx` | TTS fallback 버튼 레이블 `'문제 듣기 (임시 음원)'` → `'듣기 재생'`. 안내 텍스트 `'임시 TTS 음원입니다.'` → `'현재 음원은 임시 TTS 음성입니다.'` |
+| `src/providers/conversation/index.ts` | `extractOrderedItems()` 함수 추가 — 발화에서 복수 품목+수량 추출 (팥빙수, 아이스 아메리카노, 라떼, 주스). `buildMultiItemCompletionMsg()` 함수 추가 — 발화 순서 반영 자연스러운 완료 메시지 생성. `beginnerCafeResponse()` allDone 블록에서 `buildMultiItemCompletionMsg()` 호출로 교체. `drinkMet`에 '팥빙수', '빙수' 추가. |
+| `app/student/speaking/[questionId]/result/page.tsx` | reading-score-guidance: ETRI 실패(`fallbackReason` 있음) 시 "네트워크 또는 endpoint 확인 후 다시 시도할 수 있습니다." 안내 표시. etri_fetch_failed 발음 카드 메시지에도 동일 안내 추가. |
+| `tests/unit/etri-scope-policy.test.ts` | Phase 10-E-6-C 테스트 20개 추가 (timeout 정책, ETRI 실패 fallback, q3 TTS 버튼, q4 복수 품목 추출, q4 missionGoals 완료 후 응답, q4 제출 ETRI 비호출). |
+
+### Known issues (문서화)
+
+- q2: 실제 식당 사진 교체 필요 (현재 placeholder)
+- q3: 실제 mp3 듣기파일 교체 필요 (현재 TTS fallback)
+- ETRI: endpoint/network 안정성 별도 확인 필요
+- q4: 대화 품질은 실제 LLM provider 연결 후 추가 개선 필요
+
+### 검증
+
+- `npm run lint` ✅
+- `npx tsc --noEmit` ✅
+- `npm run build` ✅
+- `npm run test:unit` ✅ 281 passed (261 → 281, 20개 추가)
+- `npm run test:smoke` ✅ 180 passed
+- 커밋/푸시: 미실행 (보고만)
+
+---
+
+## Phase 10-E-6-B — q2 제출 오류 수정 + ETRI 흐름 차단 방지
+
+**날짜**: 2026-05-07  
+**배경**: q2(material-description) 제출 시 "제출 중 오류가 발생했습니다" 표시. 원인: `actions.ts`에서 q2/q3/q4에 대해서도 `getPronunciationProvider().evaluate()`를 서버측에서 호출. `PRONUNCIATION_PROVIDER=etri` 환경에서 빈 blob → ffmpeg 변환 실패 → Promise.all reject → 제출 오류.
+
+### 근본 원인
+
+`actions.ts` 구 코드:
+```typescript
+const pronunciationPromise = clientPronunciation
+  ? Promise.resolve(clientPronunciation)
+  : getPronunciationProvider().evaluate(new Blob([], { type: 'audio/webm' }), transcript)
+```
+- q2 클라이언트: pronunciationResult를 보내지 않음 (qt-reading 아니므로) → `clientPronunciation` = null
+- 서버: `getPronunciationProvider()` = ETRI provider → 빈 blob으로 WAV 변환 시도 → ffmpeg crash → throw
+- Promise.all reject → `submitSpeaking` throw → 클라이언트 catch → "제출 중 오류"
+
+### 수정 내용
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/student/speaking/actions.ts` | `question` lookup을 섹션 2 앞으로 이동; `isReadingQuestion` 체크 추가; q2/q3/q4는 mock PronunciationResult 직접 반환; q1 서버측 provider 호출에 `.catch()` 추가 (fallbackReason 설정, crash 방지); 진단 로그 추가 (시작/완료, no secrets) |
+| `app/student/speaking/[questionId]/result/page.tsx` | `qt-material-desc` 문항 결과 화면에 "이미지는 임시 placeholder 교체 예정" 안내 추가 |
+| `tests/unit/etri-scope-policy.test.ts` | Phase 10-E-6-B 테스트 12개 추가 (서버 provider 정책, q2 mock 결과, placeholder 분리, result URL, attemptId, LLM fallback, q1 ETRI 실패 흐름, q2 ETRI 카드 미표시, q3/q4 흐름, teacher review 유지) |
+
+### 검증
+
+- `npm run lint` ✅
+- `npx tsc --noEmit` ✅
+- `npm run build` ✅
+- `npm run test:unit` ✅ 261 passed
+- `npm run test:smoke` ✅ 180 passed
+- 커밋/푸시: 미실행 (보고만)
+
+---
+
 ## Phase 10-E-7 추가 수정 — q1 문항 AI 참고평가에 ETRI calibratedScore 반영
 
 **날짜**: 2026-05-07  
@@ -3387,3 +3560,63 @@ AI가 "네, 맞는 표현입니다. 계속 진행해 볼까요?" 반환 — 교�
 - npx tsc --noEmit: 에러 0
 - npm run build: 성공
 - npm run test:smoke: 164 passed (기존 158 → 164, +6개)
+
+---
+
+## Phase 10-E-6-A: 전체 응시 흐름 수동 점검 — q2/q3/q4 버그 수정 (2026-05-07)
+
+### 발견된 문제 (6개)
+1. q2 material-description: 실제 사진 없음 — 교체 예정 안내 미표시
+2. q2/q3 result page: ETRI 실패 amber 카드 반복 노출
+3. q3 listening-response: 듣기 자극 음원 없음 (버튼 비활성)
+4. q4 dialogue: 주문 완료 후 "네, 주문 도와드리겠습니다. 감사합니다!" 반복
+5. q4: "뭘 더 녹음할 게 있나요?" 절차 질문에 같은 AI 응답
+6. q4: "평가 제출하기" 클릭 시 제출 오류
+
+### 수정 파일 1: app/student/speaking/[questionId]/speaking-client.tsx
+- ETRI 평가 IIFE에 `if (question.typeId !== 'qt-reading') return` 가드 추가
+- q2/q3/q4 자유발화 문항은 `/api/pronunciation` 호출 완전 건너뜀
+
+### 수정 파일 2: app/student/speaking/dialogue-actions.ts
+- `getPronunciationProvider().evaluate(new Blob([]), aggregatedTranscript)` 제거
+- inline mock `PronunciationResult` 로 교체 — 대화형 미션에서 ETRI 미호출
+
+### 수정 파일 3: src/lib/dialogue-policy.ts
+- `isProceduralQuestion(text)` 함수 추가 — 15개 정규식 패턴
+- 절차 질문(제출 방법, 미션 완료 여부 등) 감지
+
+### 수정 파일 4: src/providers/conversation/index.ts
+- `isProceduralQuestion` import 추가
+- `beginnerCafeResponse` 재작성: 완료 시 구체적 자연어 응답 반환, 절차 질문 시 제출 안내 분기
+
+### 수정 파일 5: src/content/assessment-assets.ts
+- `StudentVisibleAsset` 타입에 `ttsScript?: string` 필드 추가
+- beginner/intermediate/advanced q3 음원에 ttsScript 스크립트 등록
+
+### 수정 파일 6: src/components/question-asset-renderer.tsx
+- `AudioAssetCard` 재작성: TTS fallback 지원 (src 없을 때 ttsScript로 TTS 재생)
+- 듣기 횟수 제한 (listenLimit) 적용
+- `ImageAssetCard`: status=placeholder 시 "임시 이미지 · 실제 사진 교체 예정" 표시
+
+### 수정 파일 7: app/student/speaking/[questionId]/result/page.tsx
+- 발음 카드를 question type별 조건 렌더링으로 교체
+  - qt-reading(q1): 기존 ETRI/mock 발음 카드 유지
+  - qt-material-description/qt-listening-response(q2/q3): 조용한 scope 안내 텍스트
+  - qt-dialogue-mission(q4): 발음 카드 완전 숨김
+
+### 신규 파일: tests/unit/etri-scope-policy.test.ts
+- 15개 시나리오 unit test 추가
+
+### 수정 파일: tests/smoke/api-smoke.spec.ts
+- 완료 응답 검증 조건 갱신: `'감사'` → `'준비해 드리겠습니다'`
+
+### 수정 파일: tests/smoke/auth-routes.spec.ts
+- q3 listening card 테스트: `audio-not-ready` → `audio-tts-fallback-notice`
+- q3 listen 버튼: `toBeDisabled` → `toBeEnabled` (TTS fallback 활성화)
+
+### 검증 결과
+- npm run lint: 에러 0, 경고 0
+- npx tsc --noEmit: 에러 0
+- npm run build: 성공 (Turbopack NFT 경고는 기존 known issue)
+- npm run test:unit: 228 passed (기존 213 → 228, +15개)
+- npm run test:smoke: 180 passed (기존 177 → 180, +3개 net, 3개 수정)

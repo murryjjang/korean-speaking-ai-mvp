@@ -29,6 +29,7 @@ export type DialogueMissionPanelProps = {
   // Dialogue mode: 'assessment' (default, q4 evaluation) or 'practice' (free conversation)
   mode?: DialogueMode
   personaId?: string
+  attemptId?: string
 }
 
 export function DialogueMissionPanel({
@@ -40,6 +41,7 @@ export function DialogueMissionPanel({
   maxDialogueDurationSec,
   mode = 'assessment',
   personaId,
+  attemptId,
 }: DialogueMissionPanelProps) {
   const router = useRouter()
   const recorder = useAudioRecorder()
@@ -331,16 +333,51 @@ export function DialogueMissionPanel({
       const { submissionId } = await submitDialogue(questionId, questionSetId, {
         turns,
         goalResults,
+        attemptId,
       })
-      router.push(`/student/speaking/${questionId}/result?sub=${submissionId}`)
+      const resultParams = new URLSearchParams({ sub: submissionId })
+      if (attemptId) resultParams.set('attemptId', attemptId)
+      router.push(`/student/speaking/${questionId}/result?${resultParams.toString()}`)
     } catch {
       setSubmitError(true)
       setPanelStatus('completed')
     }
-  }, [canSubmit, questionId, questionSetId, turns, goalResults, router])
+  }, [canSubmit, questionId, questionSetId, attemptId, turns, goalResults, router])
+
+  const isCafeScenario = questionId.includes('beginner') && questionId.includes('q4')
 
   return (
     <div className="space-y-4" data-testid="dialogue-mission-panel">
+      {/* Cafe menu board — beginner q4 카페 주문 미션 전용 */}
+      {isCafeScenario && (
+        <Card data-testid="cafe-menu-board">
+          <CardBody>
+            <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+              메뉴판
+            </p>
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs font-medium text-text-primary mb-1">음료</p>
+                <ul className="space-y-0.5 text-xs text-text-secondary">
+                  <li className="flex justify-between"><span>아이스 아메리카노</span><span>3,000원</span></li>
+                  <li className="flex justify-between"><span>따뜻한 아메리카노</span><span>3,000원</span></li>
+                  <li className="flex justify-between"><span>아이스 라테</span><span>3,500원</span></li>
+                  <li className="flex justify-between"><span>따뜻한 라테</span><span>3,500원</span></li>
+                  <li className="flex justify-between"><span>오렌지 주스</span><span>4,000원</span></li>
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-text-primary mb-1">디저트</p>
+                <ul className="space-y-0.5 text-xs text-text-secondary">
+                  <li className="flex justify-between"><span>팥빙수</span><span>6,000원</span></li>
+                  <li className="flex justify-between"><span>조각 케이크</span><span>5,000원</span></li>
+                </ul>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
       {/* Mission goals tracker */}
       <Card>
         <CardBody>
@@ -467,7 +504,7 @@ export function DialogueMissionPanel({
                   onClick={handleStartRecording}
                   data-testid="record-turn-button"
                 >
-                  내 답변 녹음
+                  말하기
                 </Button>
                 {canSubmit && (
                   <Button
@@ -502,7 +539,7 @@ export function DialogueMissionPanel({
                     onClick={handleStopRecording}
                     data-testid="stop-recording-button"
                   >
-                    녹음 완료
+                    말하기 완료
                   </Button>
                 </>
               )}

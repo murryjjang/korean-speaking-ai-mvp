@@ -114,12 +114,15 @@ export function SpeakingClient({
   question,
   questionSetId,
   setName,
+  attemptId: incomingAttemptId,
 }: {
   question: QuestionData
   questionSetId: string
   setName: string
+  attemptId?: string
 }) {
   const router = useRouter()
+  const [attemptId] = useState(() => incomingAttemptId ?? crypto.randomUUID())
   const [phase, setPhase] = useState<Phase>('prep')
   const [prepRemaining, setPrepRemaining] = useState(question.prepTimeSec)
   const [prepStarted, setPrepStarted] = useState(false)
@@ -302,18 +305,18 @@ export function SpeakingClient({
               // Storage upload failure is non-blocking — submit proceeds without audio_url
             }
           })(),
-          // Pronunciation evaluation via /api/pronunciation
+          // Pronunciation evaluation via /api/pronunciation — qt-reading only.
+          // q2/q3/q4 free-speech questions skip ETRI entirely; submitSpeaking uses mock fallback.
           (async () => {
+            if (question.typeId !== 'qt-reading') return
             try {
-              // For qt-reading, extract only the reading text after the first blank line.
+              // Extract only the reading text after the first blank line.
               // The prompt format is: "지시문\n\n<reading text to be assessed>"
               let referenceText = question.prompt
-              if (question.typeId === 'qt-reading') {
-                const idx = question.prompt.indexOf('\n\n')
-                if (idx !== -1) {
-                  const candidate = question.prompt.slice(idx + 2).trim()
-                  if (candidate) referenceText = candidate
-                }
+              const idx = question.prompt.indexOf('\n\n')
+              if (idx !== -1) {
+                const candidate = question.prompt.slice(idx + 2).trim()
+                if (candidate) referenceText = candidate
               }
 
               const fd = new FormData()
@@ -362,13 +365,15 @@ export function SpeakingClient({
         sttProviderName,
         audioUrl,
         pronunciationResult,
+        attemptId,
       })
-      router.push(`/student/speaking/${question.id}/result?sub=${submissionId}`)
+      const resultParams = new URLSearchParams({ sub: submissionId, attemptId })
+      router.push(`/student/speaking/${question.id}/result?${resultParams.toString()}`)
     } catch {
       setSubmitError(true)
       setPhase('review')
     }
-  }, [question.id, question.prompt, question.typeId, questionSetId, router, recorder.state, recorder.blobUrl, recorder.durationSec, recorder.audioStats, blobSize])
+  }, [question.id, question.prompt, question.typeId, questionSetId, attemptId, router, recorder.state, recorder.blobUrl, recorder.durationSec, recorder.audioStats, blobSize])
 
   const handleRetake = useCallback(() => {
     recorder.reset()
@@ -747,6 +752,7 @@ export function SpeakingClient({
           aiFirstUtterance={question.aiFirstUtterance ?? '안녕하세요.'}
           missionGoals={question.missionGoals ?? []}
           maxDialogueDurationSec={question.maxDialogueDurationSec ?? 180}
+          attemptId={attemptId}
         />
       )}
     </div>

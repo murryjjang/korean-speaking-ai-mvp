@@ -12,6 +12,15 @@ export type SpeakingEvalRecord = {
   audioUrl?: string | null
   /** Rich LLM evaluation detail (Phase 8-G+). Undefined when only mock LLM is used. */
   speakingEvalDetail?: SpeakingEvalDetail
+  /** Dialogue mission metadata — populated by dialogue-actions.ts. */
+  meta?: {
+    hasRecording?: boolean
+    recordingDurationSec?: number
+    dialogueTurns?: number
+    achievedMissionGoals?: number
+    totalMissionGoals?: number
+    goalResults?: Array<{ goalIndex: number; labelKo: string; achieved: boolean }>
+  }
 }
 
 // Module-level store — Phase 3 MVP only. Resets on server restart.

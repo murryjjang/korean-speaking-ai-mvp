@@ -53,6 +53,30 @@ export function shouldAnswerLanguageQuestion(text: string): boolean {
   return LANGUAGE_QUESTION_PATTERNS.some((p) => p.test(text))
 }
 
+// Patterns indicating the student is asking a procedural/system question
+// about the assessment process (recording, submission, next steps).
+const PROCEDURAL_QUESTION_PATTERNS: RegExp[] = [
+  /더\s*녹음/,
+  /뭘?\s*더\s*(해야|하면|할)/,
+  /제출\s*(하면|해도|할게|할까|해야|하나)/,
+  /평가\s*제출/,
+  /어떻게\s*제출/,
+  /이제\s*뭐\s*(해|하면|할)/,
+  /이제\s*어떻게/,
+  /다음\s*단계/,
+  /다음은\s*뭐/,
+  /끝났(나요|어요|나)/,
+  /다\s*됐(나요|어요|나)/,
+  /미션\s*(끝났|완료)/,
+  /완료\s*(됐|됩니|했)/,
+  /버튼\s*(어디|눌러|클릭)/,
+  /눌러야\s*(하나요|해요)/,
+]
+
+export function isProceduralQuestion(text: string): boolean {
+  return PROCEDURAL_QUESTION_PATTERNS.some((p) => p.test(text))
+}
+
 // Cafe ordering: STT misrecognition patterns and clearly unnatural expressions.
 // Each entry maps a bad pattern to the correction to suggest.
 const UNNATURAL_CAFE_PATTERNS: Array<{ pattern: RegExp; correction: string }> = [

@@ -17,6 +17,24 @@ const READING_CRITERIA = [
   '기본 발음·억양 이해 가능',
 ] as const
 
+// q2 자료 설명 전용 AI 참고평가 기준
+const Q2_MATERIAL_CRITERIA = [
+  '장소/상황을 언급함',
+  '인물 또는 대상자를 언급함',
+  '행동을 묘사함',
+  '배경 또는 세부 요소를 언급함',
+  '문장으로 연결해 설명함',
+] as const
+
+// q3 듣고 답하기 전용 AI 참고평가 기준
+const Q3_LISTENING_CRITERIA = [
+  '들은 내용의 핵심을 이해함',
+  '필수 정보를 포함함',
+  '질문에 맞게 답함',
+  '답변이 완결됨',
+  '불필요한 내용이 적음',
+] as const
+
 // 발음 평가 기준 5개 — ETRI 연동 후 실제 데이터로 교체 예정
 const PRONUNCIATION_CRITERIA = [
   { key: 'accuracy', label: '발음 정확도' },
@@ -128,11 +146,11 @@ export default async function SpeakingResultPage({
   searchParams,
 }: {
   params: Promise<{ questionId: string }>
-  searchParams: Promise<{ sub?: string }>
+  searchParams: Promise<{ sub?: string; attemptId?: string }>
 }) {
   const { questionId: rawId } = await params
   const questionId = QUESTION_ID_ALIASES[rawId] ?? rawId
-  const { sub: submissionId } = await searchParams
+  const { sub: submissionId, attemptId } = await searchParams
 
   const question = questionsJson.find((q) => q.id === questionId)
   const qType = questionTypesJson.find((t) => t.id === question?.typeId)
@@ -255,6 +273,12 @@ export default async function SpeakingResultPage({
   const totalMax = 100
 
   const isReadingQuestion = question?.typeId === 'qt-reading'
+  const isQ2 = question?.typeId === 'qt-material-desc'
+  const isQ3 = question?.typeId === 'qt-listening-resp'
+  const isDialogueMission = question?.typeId === 'qt-dialogue-mission'
+  const goalResults = evalRecord.meta?.goalResults ?? []
+  const achievedMissionGoals = evalRecord.meta?.achievedMissionGoals ?? 0
+  const totalMissionGoals = evalRecord.meta?.totalMissionGoals ?? 0
   const isEtriSuccess = pronunciationResult.providerName === 'etri' && typeof pronunciationResult.rawScore === 'number'
   // ETRI 성공 + calibratedScore 있으면 직접 사용, rawScore만 있으면 calibration 함수로 계산
   const effectiveCalibratedScore: number | undefined =
@@ -314,7 +338,13 @@ export default async function SpeakingResultPage({
         {/* 총점 */}
         <Card>
           <CardHeader
-            title={isReadingQuestion ? '문항 AI 참고평가' : '종합 점수'}
+            title={
+              isReadingQuestion ? '문항 AI 참고평가'
+              : isQ2 ? '자료 설명 AI 참고평가'
+              : isQ3 ? '듣고 답하기 AI 참고평가'
+              : isDialogueMission ? '대화 미션 AI 참고평가'
+              : '종합 점수'
+            }
             description={isReadingQuestion && q1EtriReflected
               ? 'AI 1차 평가 + ETRI 보정 참고값 · 교수자 확정 전 참고값'
               : 'AI 1차 평가 · 교수자 확정 전 참고값'
@@ -355,12 +385,85 @@ export default async function SpeakingResultPage({
                 >
                   {q1EtriReflected
                     ? '이 점수는 AI 1차 평가에 ETRI 보정 참고점수를 일부 반영한 문항 참고값입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
-                    : 'ETRI 발음평가가 반영되지 않은 AI 참고평가입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
+                    : pronunciationResult.fallbackReason
+                      ? 'ETRI 발음평가가 반영되지 않은 AI 참고평가입니다. 네트워크 또는 endpoint 확인 후 다시 시도할 수 있습니다. 최종 점수는 교수자 검토 후 확정됩니다.'
+                      : 'ETRI 발음평가가 반영되지 않은 AI 참고평가입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
                   }
                 </p>
               </>
+            ) : isQ2 ? (
+              /* q2 자료 설명: legacy 5항목 숨김, 자료 설명 전용 기준 표시 */
+              <>
+                <ul className="space-y-1.5 mb-4" data-testid="q2-criteria-list">
+                  {Q2_MATERIAL_CRITERIA.map((c) => (
+                    <li key={c} className="flex items-center gap-2 text-xs text-text-secondary">
+                      <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary-400" />
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+                <p
+                  className="text-xs text-text-muted italic bg-surface border border-border rounded-md p-3 mb-2"
+                  data-testid="q2-score-guidance"
+                >
+                  이 점수는 자료 설명 문항에 대한 AI 1차 참고값입니다. 최종 점수는 교수자 검토 후 확정됩니다.
+                </p>
+              </>
+            ) : isQ3 ? (
+              /* q3 듣고 답하기: legacy 5항목 숨김, 듣고 답하기 전용 기준 표시 */
+              <>
+                <ul className="space-y-1.5 mb-4" data-testid="q3-criteria-list">
+                  {Q3_LISTENING_CRITERIA.map((c) => (
+                    <li key={c} className="flex items-center gap-2 text-xs text-text-secondary">
+                      <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary-400" />
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+                <p
+                  className="text-xs text-text-muted italic bg-surface border border-border rounded-md p-3 mb-2"
+                  data-testid="q3-score-guidance"
+                >
+                  이 점수는 듣고 답하기 문항에 대한 AI 1차 참고값입니다. 최종 점수는 교수자 검토 후 확정됩니다.
+                </p>
+              </>
+            ) : isDialogueMission ? (
+              /* q4 대화 미션: 전용 평가 기준 표시 — legacy rubric 숨김 */
+              <>
+                <div className="flex items-center gap-3 mb-3 flex-wrap" data-testid="q4-mission-score">
+                  <span className="text-xs text-text-secondary">문항 AI 참고점수:</span>
+                  <span className="text-lg font-bold text-text-primary tabular-nums">{displayScore}/100</span>
+                  {totalMissionGoals > 0 && (
+                    <span
+                      className="text-xs text-text-secondary"
+                      data-testid="q4-mission-achieved"
+                    >
+                      미션 달성: {achievedMissionGoals}/{totalMissionGoals}
+                    </span>
+                  )}
+                </div>
+                <ul className="space-y-1.5 mb-4" data-testid="q4-dialogue-criteria-list">
+                  {[
+                    '메뉴판에 있는 품목을 주문함',
+                    '수량을 말함',
+                    '포장/매장 이용 여부를 말함',
+                    '결제 방법을 말함',
+                  ].map((c) => (
+                    <li key={c} className="flex items-center gap-2 text-xs text-text-secondary">
+                      <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary-400" />
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+                <p
+                  className="text-xs text-text-muted italic bg-surface border border-border rounded-md p-3 mb-2"
+                  data-testid="q4-score-guidance"
+                >
+                  이 점수는 대화 미션에 대한 AI 1차 참고값입니다. 최종 점수는 교수자 검토 후 확정됩니다.
+                </p>
+              </>
             ) : (
-              /* 말하기 문항: rubric-speaking-01 5개 항목 breakdown */
+              /* 기타 말하기 문항: rubric-speaking-01 5개 항목 breakdown */
               <>
                 {/* provider=etri: 발음 라벨을 "AI 발음 추정"으로 변경 — ETRI 원점수와 혼동 방지 */}
                 <ul className="space-y-3">
@@ -540,14 +643,57 @@ export default async function SpeakingResultPage({
               </div>
             ) : null}
 
-            {/* dialogue_mission 대화 요약 안내 */}
-            {question?.typeId === 'qt-dialogue-mission' && (
-              <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
-                <p className="text-xs font-semibold text-purple-800 mb-1">
-                  대화형 미션 평가
+            {/* q4 dialogue: goal-based 점수 피드백 */}
+            {isDialogueMission && goalResults.length > 0 && (
+              <div className="mt-4 space-y-3">
+                {goalResults.some((g) => g.achieved) && (
+                  <div>
+                    <p className="text-xs font-semibold text-success-700 uppercase tracking-wide mb-1.5" data-testid="q4-strengths-label">
+                      잘한 점
+                    </p>
+                    <ul className="space-y-1">
+                      {goalResults.filter((g) => g.achieved).map((g) => (
+                        <li key={g.goalIndex} className="flex items-center gap-2">
+                          <span className="text-success-600 font-bold text-sm shrink-0">✓</span>
+                          <span className="text-xs text-text-secondary">{g.labelKo}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {goalResults.some((g) => !g.achieved) && (
+                  <div>
+                    <p className="text-xs font-semibold text-warning-700 uppercase tracking-wide mb-1.5" data-testid="q4-improvements-label">
+                      보완할 점
+                    </p>
+                    <ul className="space-y-1">
+                      {goalResults.filter((g) => !g.achieved).map((g) => {
+                        const suggestions: Record<number, string> = {
+                          0: '메뉴판에 있는 음료나 디저트를 주문해 보세요.',
+                          1: '몇 잔(개) 주문할지 수량을 말해 보세요.',
+                          2: "'포장해 주세요' 또는 '매장에서 마실게요'라고 말해 보세요.",
+                          3: "'카드로 결제할게요' 또는 '현금으로 계산할게요'라고 말해 보세요.",
+                        }
+                        return (
+                          <li key={g.goalIndex} className="flex items-start gap-2">
+                            <span className="text-warning-500 font-bold text-sm shrink-0 mt-0.5">△</span>
+                            <span className="text-xs text-text-secondary">{suggestions[g.goalIndex] ?? `${g.labelKo}을(를) 말하지 않았습니다.`}</span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-xs text-text-muted leading-relaxed">
+                  대화 전체 내용은 아래 &ldquo;대화 기록&rdquo; 항목에서 확인하세요.
                 </p>
+              </div>
+            )}
+            {/* q4 dialogue: goalResults 없을 때 기본 안내 */}
+            {isDialogueMission && goalResults.length === 0 && (
+              <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
                 <p className="text-xs text-purple-700 leading-relaxed">
-                  AI와의 대화 전체 내용을 기반으로 평가되었습니다. 아래 &ldquo;음성 인식 결과&rdquo; 항목에서 전체 대화 내용을 확인하세요.
+                  AI와의 대화 전체 내용을 기반으로 평가되었습니다. 아래 &ldquo;대화 기록&rdquo; 항목에서 전체 대화 내용을 확인하세요.
                 </p>
               </div>
             )}
@@ -585,11 +731,15 @@ export default async function SpeakingResultPage({
           </CardBody>
         </Card>
 
-        {/* STT 전사 결과 */}
+        {/* STT 전사 결과 / q4: 대화 기록 */}
         <Card>
           <CardHeader
-            title="음성 인식 결과 (STT)"
-            description={`신뢰도 ${Math.round(sttResult.confidence * 100)}% · provider: ${sttResult.providerName}`}
+            title={isDialogueMission ? '대화 기록' : '음성 인식 결과 (STT)'}
+            description={
+              isDialogueMission
+                ? '이 문항은 대화 내용과 미션 달성 여부를 바탕으로 AI가 1차 평가했습니다.'
+                : `신뢰도 ${Math.round(sttResult.confidence * 100)}% · provider: ${sttResult.providerName}`
+            }
           />
           <CardBody>
             {/* 무음/짧은 녹음 감지 경고 */}
@@ -601,8 +751,16 @@ export default async function SpeakingResultPage({
                 </p>
               </div>
             )}
-            {/* mock fallback 경고 — STT 제공자 오류 시 임의 문장이 생성될 수 있음 */}
-            {sttResult.providerName === 'mock' && (
+            {/* q4 대화 미션: mock provider 안내 (소형, 학습자 친화적) */}
+            {isDialogueMission && sttResult.providerName === 'mock' && (
+              <div className="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-md" data-testid="q4-mock-provider-notice">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  현재는 테스트용 대화 provider로 평가되었습니다. 실제 LLM 연결 후 대화 품질은 추가 개선됩니다.
+                </p>
+              </div>
+            )}
+            {/* 비 q4: mock fallback 경고 */}
+            {!isDialogueMission && sttResult.providerName === 'mock' && (
               <div className="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-md">
                 <p className="text-xs text-slate-600 leading-relaxed">
                   음성 인식 서비스에 연결하지 못해 테스트용 텍스트로 평가되었습니다. 결과가 실제 발화와 다를 수 있습니다.
@@ -629,178 +787,208 @@ export default async function SpeakingResultPage({
           </CardBody>
         </Card>
 
-        {/* 발음 평가 결과 */}
-        <Card>
-          <CardHeader
-            title={pronunciationResult.providerName === 'etri' ? 'ETRI 발음평가 API 결과' : '발음 평가'}
-            description={`provider: ${pronunciationResult.providerName}${
-              pronunciationResult.providerName === 'etri'
-                ? pronunciationResult.rawScore !== undefined
-                  ? ` · 원점수 ${pronunciationResult.rawScore.toFixed(2)}/5 · 단순 환산 ${pronunciationResult.normalizedScore}/100`
-                  : pronunciationResult.fallbackReason
-                    ? ' · 원점수 확인 실패'
-                    : ''
-                : ''
-            }`}
-          />
-          <CardBody>
-            {/* Error state — ETRI 실패 또는 score 파싱 실패 */}
-            {pronunciationResult.fallbackReason && (
-              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                <p className="text-xs text-amber-700 leading-relaxed">
-                  <strong>
-                    {getEtriErrorMessage(pronunciationResult.fallbackReason ?? '')}
-                  </strong>
-                  {pronunciationResult.fallbackReason === 'etri_fetch_failed' ? (
-                    <> 현재 제출에는 ETRI 발음평가가 반영되지 않았습니다. AI 1차 참고평가만 표시됩니다.</>
-                  ) : pronunciationResult.rawScore === undefined ? (
-                    <> 점수를 표시할 수 없습니다. 다시 녹음해 주세요.</>
-                  ) : null}
-                </p>
-              </div>
-            )}
+        {/* 발음 평가 결과 — q1 낭독에만 전체 카드 표시; q2/q3는 안내; q4는 숨김 */}
+        {isReadingQuestion ? (
+          <Card>
+            <CardHeader
+              title={pronunciationResult.providerName === 'etri' ? 'ETRI 발음평가 API 결과' : '발음 평가'}
+              description={`provider: ${pronunciationResult.providerName}${
+                pronunciationResult.providerName === 'etri'
+                  ? pronunciationResult.rawScore !== undefined
+                    ? ` · 원점수 ${pronunciationResult.rawScore.toFixed(2)}/5 · 단순 환산 ${pronunciationResult.normalizedScore}/100`
+                    : pronunciationResult.fallbackReason
+                      ? ' · 원점수 확인 실패'
+                      : ''
+                  : ''
+              }`}
+            />
+            <CardBody>
+              {/* Error state — ETRI 실패 또는 score 파싱 실패 */}
+              {pronunciationResult.fallbackReason && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                  <p className="text-xs text-amber-700 leading-relaxed">
+                    <strong>
+                      {getEtriErrorMessage(pronunciationResult.fallbackReason ?? '')}
+                    </strong>
+                    {pronunciationResult.fallbackReason === 'etri_fetch_failed' ? (
+                      <> 현재 제출에는 ETRI 발음평가가 반영되지 않았습니다. 네트워크 또는 endpoint를 확인해 주세요. AI 1차 참고평가만 표시됩니다.</>
+                    ) : pronunciationResult.rawScore === undefined ? (
+                      <> 점수를 표시할 수 없습니다. 다시 녹음해 주세요.</>
+                    ) : null}
+                  </p>
+                </div>
+              )}
 
-            {/* ETRI 성공: rawScore가 실제 숫자일 때 표시 (spec: typeof rawScore === 'number' 기준) */}
-            {pronunciationResult.providerName === 'etri' && typeof pronunciationResult.rawScore === 'number' ? (
-              <div className="space-y-3 mb-4">
-                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
-                  <div>
-                    <span className="text-xs text-text-secondary block mb-0.5">ETRI 원점수</span>
-                    <span
-                      className="text-2xl font-bold text-text-primary tabular-nums"
-                      data-testid="etri-raw-score"
-                    >
-                      {pronunciationResult.rawScore.toFixed(2)}
-                    </span>
-                    <span className="text-sm text-text-muted ml-0.5">/ 5</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-text-secondary block mb-0.5">단순 환산 점수</span>
-                    <span
-                      className="text-2xl font-bold text-text-primary tabular-nums"
-                      data-testid="etri-normalized-score"
-                    >
-                      {pronunciationResult.normalizedScore}
-                    </span>
-                    <span className="text-sm text-text-muted ml-0.5">/ 100</span>
-                  </div>
-                  {pronunciationResult.calibratedScore !== undefined && (
+              {/* ETRI 성공: rawScore가 실제 숫자일 때 표시 (spec: typeof rawScore === 'number' 기준) */}
+              {pronunciationResult.providerName === 'etri' && typeof pronunciationResult.rawScore === 'number' ? (
+                <div className="space-y-3 mb-4">
+                  <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
                     <div>
-                      <span className="text-xs text-text-secondary block mb-0.5">
-                        보정 참고점수
-                        <Badge variant="warning" size="sm" className="ml-1">파일럿 보정용</Badge>
-                      </span>
+                      <span className="text-xs text-text-secondary block mb-0.5">ETRI 원점수</span>
                       <span
-                        className="text-2xl font-bold text-primary-700 tabular-nums"
-                        data-testid="etri-calibrated-score"
+                        className="text-2xl font-bold text-text-primary tabular-nums"
+                        data-testid="etri-raw-score"
                       >
-                        {pronunciationResult.calibratedScore}
+                        {pronunciationResult.rawScore.toFixed(2)}
+                      </span>
+                      <span className="text-sm text-text-muted ml-0.5">/ 5</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-text-secondary block mb-0.5">단순 환산 점수</span>
+                      <span
+                        className="text-2xl font-bold text-text-primary tabular-nums"
+                        data-testid="etri-normalized-score"
+                      >
+                        {pronunciationResult.normalizedScore}
                       </span>
                       <span className="text-sm text-text-muted ml-0.5">/ 100</span>
                     </div>
-                  )}
-                </div>
-
-                <div
-                  className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 leading-relaxed space-y-1"
-                  data-testid="etri-calibration-notice"
-                >
-                  <p>
-                    <strong>ETRI 원점수</strong>는 API가 반환한 원본 점수입니다.
-                  </p>
-                  <p>
-                    <strong>단순 환산 점수</strong>는 원점수 / 5 × 100 변환값이며,{' '}
-                    <strong>보정 참고점수</strong>는 파일럿 검증을 위한 임시 변환값입니다.
-                    최종 발음점수는 교수자 검토 후 확정됩니다.
-                  </p>
-                  <p className="text-amber-700">
-                    마이크 음량, 녹음 품질, 기준문장 일치 여부에 따라 점수가 달라질 수 있습니다.
-                  </p>
-                </div>
-
-                {pronunciationResult.wordScores.length === 0 && (
-                  <p
-                    className="text-xs text-text-muted italic"
-                    data-testid="etri-no-criteria-message"
-                  >
-                    ETRI 응답에 발음 정확도·유창성·억양 등 세부 항목별 점수는 포함되어 있지 않습니다.
-                  </p>
-                )}
-
-                <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3">
-                  {pronunciationResult.feedback}
-                </p>
-              </div>
-            ) : !pronunciationResult.fallbackReason ? (
-              /* mock / 기타 provider: 종합 점수 + 5개 세부 항목 막대 */
-              <>
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-3xl font-bold text-text-primary tabular-nums">
-                    {pronunciationResult.normalizedScore}
-                  </span>
-                  <span className="text-sm text-text-muted">/ 100</span>
-                  <Badge variant={getScoreVariant(pronunciationResult.normalizedScore)}>
-                    발음
-                  </Badge>
-                </div>
-
-                {/* 평가 기준별 세부 점수 (mock provider 파생값) */}
-                <ul className="space-y-2 mb-4">
-                  {normalizePronunciationDisplay(
-                    pronunciationResult.normalizedScore,
-                    pronunciationResult.wordScores,
-                  ).map((item) => (
-                    <li key={item.key} className="flex items-center gap-3">
-                      <span className="text-xs text-text-secondary w-20 shrink-0">
-                        {item.label}
-                      </span>
-                      <div className="flex-1">
-                        <ScoreBar score={item.score} maxScore={100} showLabel={false} />
+                    {pronunciationResult.calibratedScore !== undefined && (
+                      <div>
+                        <span className="text-xs text-text-secondary block mb-0.5">
+                          보정 참고점수
+                          <Badge variant="warning" size="sm" className="ml-1">파일럿 보정용</Badge>
+                        </span>
+                        <span
+                          className="text-2xl font-bold text-primary-700 tabular-nums"
+                          data-testid="etri-calibrated-score"
+                        >
+                          {pronunciationResult.calibratedScore}
+                        </span>
+                        <span className="text-sm text-text-muted ml-0.5">/ 100</span>
                       </div>
-                      <span className="text-xs tabular-nums text-text-secondary w-8 text-right shrink-0">
-                        {item.score}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                    )}
+                  </div>
 
+                  <div
+                    className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 leading-relaxed space-y-1"
+                    data-testid="etri-calibration-notice"
+                  >
+                    <p>
+                      <strong>ETRI 원점수</strong>는 API가 반환한 원본 점수입니다.
+                    </p>
+                    <p>
+                      <strong>단순 환산 점수</strong>는 원점수 / 5 × 100 변환값이며,{' '}
+                      <strong>보정 참고점수</strong>는 파일럿 검증을 위한 임시 변환값입니다.
+                      최종 발음점수는 교수자 검토 후 확정됩니다.
+                    </p>
+                    <p className="text-amber-700">
+                      마이크 음량, 녹음 품질, 기준문장 일치 여부에 따라 점수가 달라질 수 있습니다.
+                    </p>
+                  </div>
+
+                  {pronunciationResult.wordScores.length === 0 && (
+                    <p
+                      className="text-xs text-text-muted italic"
+                      data-testid="etri-no-criteria-message"
+                    >
+                      ETRI 응답에 발음 정확도·유창성·억양 등 세부 항목별 점수는 포함되어 있지 않습니다.
+                    </p>
+                  )}
+
+                  <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3">
+                    {pronunciationResult.feedback}
+                  </p>
+                </div>
+              ) : !pronunciationResult.fallbackReason ? (
+                /* mock / 기타 provider: 종합 점수 + 5개 세부 항목 막대 */
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-3xl font-bold text-text-primary tabular-nums">
+                      {pronunciationResult.normalizedScore}
+                    </span>
+                    <span className="text-sm text-text-muted">/ 100</span>
+                    <Badge variant={getScoreVariant(pronunciationResult.normalizedScore)}>
+                      발음
+                    </Badge>
+                  </div>
+
+                  {/* 평가 기준별 세부 점수 (mock provider 파생값) */}
+                  <ul className="space-y-2 mb-4">
+                    {normalizePronunciationDisplay(
+                      pronunciationResult.normalizedScore,
+                      pronunciationResult.wordScores,
+                    ).map((item) => (
+                      <li key={item.key} className="flex items-center gap-3">
+                        <span className="text-xs text-text-secondary w-20 shrink-0">
+                          {item.label}
+                        </span>
+                        <div className="flex-1">
+                          <ScoreBar score={item.score} maxScore={100} showLabel={false} />
+                        </div>
+                        <span className="text-xs tabular-nums text-text-secondary w-8 text-right shrink-0">
+                          {item.score}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3">
+                    {pronunciationResult.feedback}
+                  </p>
+                </>
+              ) : (
+                /* Error state — score 표시 불가 */
                 <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3">
                   {pronunciationResult.feedback}
                 </p>
-              </>
-            ) : (
-              /* Error state — score 표시 불가 */
-              <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3">
-                {pronunciationResult.feedback}
-              </p>
-            )}
+              )}
 
-            {/* 단어별 참고 — 학습자가 원할 때 펼쳐보는 보조 정보 (채점 기준 아님) */}
-            {pronunciationResult.wordScores.length > 0 && (
-              <details className="mt-3">
-                <summary className="text-xs text-text-muted cursor-pointer select-none hover:text-text-secondary transition-colors">
-                  발음 참고 단어 보기
-                </summary>
-                <div className="mt-2">
-                  <p className="text-[10px] text-text-muted italic mb-1.5">
-                    발음 엔진의 어절별 참고 데이터입니다. 채점 기준에는 포함되지 않습니다.
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {pronunciationResult.wordScores.map((ws, i) => (
-                      <span
-                        key={i}
-                        className="inline-flex items-center gap-1 text-xs bg-surface border border-border rounded px-1.5 py-0.5"
-                      >
-                        <span className="font-mono text-text-secondary">{ws.word}</span>
-                        <span className="text-text-muted opacity-70">({ws.score})</span>
-                      </span>
-                    ))}
+              {/* 단어별 참고 — 학습자가 원할 때 펼쳐보는 보조 정보 (채점 기준 아님) */}
+              {pronunciationResult.wordScores.length > 0 && (
+                <details className="mt-3">
+                  <summary className="text-xs text-text-muted cursor-pointer select-none hover:text-text-secondary transition-colors">
+                    발음 참고 단어 보기
+                  </summary>
+                  <div className="mt-2">
+                    <p className="text-[10px] text-text-muted italic mb-1.5">
+                      발음 엔진의 어절별 참고 데이터입니다. 채점 기준에는 포함되지 않습니다.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {pronunciationResult.wordScores.map((ws, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 text-xs bg-surface border border-border rounded px-1.5 py-0.5"
+                        >
+                          <span className="font-mono text-text-secondary">{ws.word}</span>
+                          <span className="text-text-muted opacity-70">({ws.score})</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </details>
-            )}
-          </CardBody>
-        </Card>
+                </details>
+              )}
+            </CardBody>
+          </Card>
+        ) : !isDialogueMission ? (
+          /* q2/q3: 학습자 친화적 평가 안내 */
+          <Card>
+            <CardBody>
+              <p
+                className="text-xs text-text-secondary"
+                data-testid="pronunciation-scope-notice"
+              >
+                {isQ2
+                  ? '이 문항은 사진의 상황과 핵심 정보를 설명하는 능력을 중심으로 평가됩니다.'
+                  : isQ3
+                    ? '이 문항은 들은 내용을 이해하고 질문에 맞게 답하는 능력을 중심으로 평가됩니다.'
+                    : '이 문항은 말하기 능력을 중심으로 평가됩니다.'
+                }
+              </p>
+              <p className="mt-1 text-xs text-text-muted italic">
+                발음 세부 평가는 교사 검토 시 함께 확인됩니다.
+              </p>
+              {isQ2 && (
+                <p
+                  className="mt-2 text-xs text-text-muted italic"
+                  data-testid="image-placeholder-result-notice"
+                >
+                  * 이 문항의 자료 이미지는 임시 placeholder이며 파일럿 전 교체 예정입니다.
+                </p>
+              )}
+            </CardBody>
+          </Card>
+        ) : null /* q4 dialogue: 발음 카드 숨김 */}
 
         {/* 다음 추천 활동 placeholder */}
         <Card>
@@ -848,10 +1036,17 @@ export default async function SpeakingResultPage({
             </Link>
             {nextQuestion && nextIsActive ? (
               <Link
-                href={`/student/speaking/${nextQuestion.id}?setId=${set?.id ?? ''}`}
+                href={`/student/speaking/${nextQuestion.id}?setId=${set?.id ?? ''}${attemptId ? `&attemptId=${attemptId}` : ''}`}
                 className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 w-full sm:w-auto"
               >
                 다음 문항으로 →
+              </Link>
+            ) : attemptId ? (
+              <Link
+                href={`/student/speaking/attempt/${attemptId}`}
+                className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 w-full sm:w-auto"
+              >
+                전체 평가 결과 보기 →
               </Link>
             ) : (
               <Link

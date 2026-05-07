@@ -328,14 +328,25 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
   const elementRatio = requiredElements.length > 0
     ? found.length / requiredElements.length
     : 1
-  const taskScore = Math.round(Math.min(85, base + 5) * elementRatio)
-  const overall = Math.round((taskScore + base) / 2)
+  let taskScore = Math.round(Math.min(85, base + 5) * elementRatio)
+  let overall = Math.round((taskScore + base) / 2)
 
   const qType = input.questionType ?? ''
   const isReading = qType === 'qt-reading'
   const isMaterialDesc = qType === 'qt-material-desc'
   const isListeningResp = qType === 'qt-listening-resp'
   const isDialogueMission = qType === 'qt-dialogue-mission'
+
+  // q2/q3: requiredElements 기반 최저점 보장 — STT 신뢰도/provider=mock이어도 과도하게 낮추지 않음
+  if ((isMaterialDesc || isListeningResp) && requiredElements.length > 0) {
+    if (elementRatio >= 1.0) {
+      taskScore = Math.max(taskScore, 80)
+      overall = Math.max(overall, 80)
+    } else if (elementRatio >= 0.66) {
+      taskScore = Math.max(taskScore, 70)
+      overall = Math.max(overall, 70)
+    }
+  }
 
   // Type-aware improvements — reading must NEVER suggest vocabulary variety or content expansion
   const typeImprovements: string[] = isReading
@@ -357,8 +368,8 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
     : isListeningResp
     ? [
         '들은 내용의 핵심 정보를 빠뜨리지 않도록 해 보세요.',
-        '시간, 장소, 해야 할 일을 정확히 말해 보세요.',
         '들은 내용을 너무 길게 말하기보다 핵심만 정리해 보세요.',
+        '문장을 더 자연스럽게 연결해 말해 보세요.',
       ]
     : isDialogueMission
     ? [
@@ -369,9 +380,13 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
       ]
     : ['더 다양한 어휘를 사용해 보세요.', '문법적 정확도를 높이면 좋겠습니다.']
 
+  // q3: missingElements가 없으면 일반 개선 피드백만 표시 — 포함된 요소를 보완점에 넣지 않음
+  const allElementsFound = missing.length === 0 && requiredElements.length > 0
   const improvements = missing.length > 0
     ? [`"${missing[0]}"을(를) 포함하면 더 좋겠습니다.`, typeImprovements[0] ?? typeImprovements[0]]
-    : [typeImprovements[0] ?? '더 많이 말해 보세요.', typeImprovements[1] ?? '']
+    : allElementsFound && (isMaterialDesc || isListeningResp)
+      ? ['핵심 정보를 잘 포함했습니다. 문장을 조금 더 자연스럽게 연결해 말하면 좋겠습니다.']
+      : [typeImprovements[0] ?? '더 많이 말해 보세요.', typeImprovements[1] ?? '']
 
   const readingCorrectedAnswer = isReading
     ? (MOCK_MODEL_ANSWERS[input.questionId ?? ''] ?? '이 문항은 정해진 지문을 자연스럽게 낭독하는 문항입니다. 지문을 빠뜨리지 않고 또박또박 읽고, 문장 끝에서 자연스럽게 끊어 읽는 것이 중요합니다.')

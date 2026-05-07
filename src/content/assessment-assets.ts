@@ -10,6 +10,9 @@ export type StudentVisibleAsset = {
   src: string
   alt?: string
   status: AssetStatus
+  /** TTS fallback script for audio assets when src is empty.
+   *  Used for browser/Azure TTS playback only — text is NOT displayed to the student. */
+  ttsScript?: string
 }
 
 type OfficialAsset = StudentVisibleAsset & {
@@ -66,9 +69,11 @@ const OFFICIAL_ASSETS: OfficialAsset[] = [
     displayTitle: '한국어 수업 안내',
     studentVisibleDescription: '한국어 수업에 대한 안내 방송입니다.',
     src: '',
+    // TTS fallback: played via browser/Azure TTS when src is empty. Text is NOT shown to student.
+    ttsScript: '여러분, 내일 한국어 수업은 오전 10시에 시작합니다. 수업은 2층 203호에서 합니다. 학생들은 교재와 필기구를 꼭 가져오세요.',
     status: 'placeholder',
     teacherOnlyNote:
-      '파일럿 전 실제 mp3 등록 필요. 경로: /public/audio/official/beginner-korean-class-announcement.mp3',
+      '파일럿 전 실제 mp3 등록 필요. 경로: /public/audio/official/beginner-korean-class-announcement.mp3. ttsScript는 실제 mp3 등록 시 제거 가능.',
     replacementRequiredBeforePilot: true,
   },
   // intermediate q3: 발표 수업 일정 변경 안내 음원 (placeholder)
@@ -79,6 +84,7 @@ const OFFICIAL_ASSETS: OfficialAsset[] = [
     displayTitle: '발표 수업 일정 변경 안내',
     studentVisibleDescription: '발표 수업 일정 변경에 대한 안내입니다.',
     src: '',
+    ttsScript: '다음 주 발표 수업 일정이 변경되었습니다. 원래 수요일에 진행될 예정이었지만, 금요일 오후 1시로 변경되었습니다. 장소는 본관 203호입니다. 학생들은 발표 자료를 목요일 오후 6시까지 이메일로 제출해야 합니다.',
     status: 'placeholder',
     teacherOnlyNote:
       '파일럿 전 실제 mp3 등록 필요. 경로: /public/audio/official/intermediate-presentation-class-change.mp3',
@@ -92,6 +98,7 @@ const OFFICIAL_ASSETS: OfficialAsset[] = [
     displayTitle: '혼합형 수업 장단점 설명',
     studentVisibleDescription: '혼합형 수업의 장단점에 대한 설명입니다.',
     src: '',
+    ttsScript: '최근 많은 교육기관에서 대면 수업과 온라인 수업을 함께 운영하는 혼합형 수업 방식을 도입하고 있습니다. 이 방식의 장점은 학습자가 시간과 장소의 제약을 줄일 수 있고, 온라인 자료를 반복해서 복습할 수 있다는 점입니다. 하지만 학습자의 자기 관리 능력이 부족하면 학습 효과가 떨어질 수 있습니다. 따라서 혼합형 수업을 운영할 때는 정기적인 피드백과 출석 관리가 함께 이루어져야 합니다.',
     status: 'placeholder',
     teacherOnlyNote:
       '파일럿 전 실제 mp3 등록 필요. 경로: /public/audio/official/advanced-hybrid-class-analysis.mp3',

@@ -27,10 +27,10 @@ export default async function SpeakingQuestionPage({
   searchParams,
 }: {
   params: Promise<{ questionId: string }>
-  searchParams: Promise<{ setId?: string }>
+  searchParams: Promise<{ setId?: string; attemptId?: string }>
 }) {
   const { questionId: rawQuestionId } = await params
-  const { setId } = await searchParams
+  const { setId, attemptId } = await searchParams
 
   const questionId = resolveQuestionId(rawQuestionId)
 
@@ -99,6 +99,7 @@ export default async function SpeakingQuestionPage({
         }}
         questionSetId={resolvedSet.id}
         setName={resolvedSet.name}
+        attemptId={attemptId}
       />
     </div>
   )

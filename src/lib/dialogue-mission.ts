@@ -22,26 +22,44 @@ function hasAny(text: string, keywords: string[]): boolean {
   return keywords.some((kw) => text.includes(kw))
 }
 
+// 메뉴판에 있는 유효한 품목 키워드 — invalid 품목만 말해도 달성하지 않음
+const VALID_MENU_KEYWORDS = ['아메리카노', '라테', '라떼', '주스', '팥빙수', '빙수', '케이크']
+
+// 수량 감지 패턴: 숫자+단위, 한/두/세/네+단위
+const QUANTITY_RE = /(\d+\s*(?:잔|개|컵|병)|한\s*(?:잔|개|컵)|두\s*(?:잔|개|컵)|세\s*(?:잔|개|컵)|네\s*(?:잔|개|컵))/
+
 function detectBeginnerCafe(missionGoals: string[], turns: DialogueTurn[]): MissionGoalResult[] {
   const all = missionStudentText(turns)
+
+  // 유효 메뉴 키워드가 있어야 품목 주문 목표 달성 (invalid 품목만으로는 불가)
+  const hasValidItem = VALID_MENU_KEYWORDS.some((kw) => all.includes(kw))
+  // 수량 감지: 숫자+단위 또는 한/두/세/네+단위
+  const hasQuantity = QUANTITY_RE.test(all)
+
   return [
     {
       goalIndex: 0,
-      labelKo: missionGoals[0] ?? '음료 주문',
-      achieved: hasAny(all, ['아메리카노', '라떼', '주스', '음료', '커피', '주문']),
+      labelKo: missionGoals[0] ?? '메뉴판에 있는 품목 주문하기',
+      achieved: hasValidItem,
     },
     {
       goalIndex: 1,
-      labelKo: missionGoals[1] ?? '차가운/따뜻한 음료 선택',
-      achieved: hasAny(all, ['아이스', '차가운', '따뜻한', '뜨거운', '핫', 'hot', 'ice', '따뜻하게', '아이스로']),
+      labelKo: missionGoals[1] ?? '수량 말하기',
+      achieved: hasQuantity,
     },
     {
       goalIndex: 2,
       labelKo: missionGoals[2] ?? '포장/매장 이용 여부 말하기',
       achieved: hasAny(all, ['포장', '테이크아웃', '매장', '여기서', '가져갈', '드시고', '먹고 갈']),
     },
+    {
+      goalIndex: 3,
+      labelKo: missionGoals[3] ?? '결제 방법 말하기',
+      achieved: hasAny(all, ['카드', '현금', '신용카드']),
+    },
   ]
 }
+
 
 function detectIntermediateAdmin(missionGoals: string[], turns: DialogueTurn[]): MissionGoalResult[] {
   const all = missionStudentText(turns)
