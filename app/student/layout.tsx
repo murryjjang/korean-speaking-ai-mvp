@@ -5,9 +5,9 @@ import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 const navItems: NavItem[] = [
   { label: "내 학습 현황", href: "/student" },
   { label: "말하기 평가", href: "/student/speaking" },
-  { label: "미션 대화", href: "/student/mission" },
-  { label: "대화연습 (생성형)", href: "/student/conversation-practice" },
-  { label: "말하기 대회 준비", href: "/student/contest", disabled: true },
+  { label: "읽기연습", href: "/student/reading-practice" },
+  { label: "발표연습", href: "/student/presentation-practice" },
+  { label: "대화연습 준비 중", href: "/student/conversation-practice", disabled: true },
 ];
 
 export default async function StudentLayout({ children }: { children: ReactNode }) {

@@ -6,6 +6,7 @@ import questionSetsJson from '@/src/content/question-sets.json'
 import questionTypesJson from '@/src/content/question-types.json'
 import rubricsJson from '@/src/content/rubrics.json'
 import { PageHeader, Card, CardHeader, CardBody, Badge, ScoreBar } from '@/src/components/ui'
+import type { AzureWordResult } from '@/src/types/providers'
 
 const rubric = rubricsJson.find((r) => r.id === 'rubric-speaking-01')!
 
@@ -35,13 +36,13 @@ const Q3_LISTENING_CRITERIA = [
   '불필요한 내용이 적음',
 ] as const
 
-// 발음 평가 기준 5개 — ETRI 연동 후 실제 데이터로 교체 예정
+// 발음 평가 기준 5개 — 시연용 fallback 표시용
 const PRONUNCIATION_CRITERIA = [
   { key: 'accuracy', label: '발음 정확도' },
   { key: 'fluency', label: '유창성' },
-  { key: 'intonation', label: '억양/강세' },
   { key: 'rhythm', label: '속도/리듬' },
   { key: 'clarity', label: '명료도' },
+  { key: 'completeness', label: '완성도' },
 ] as const
 
 // mock wordScores → 평가 기준 점수 정규화 헬퍼
@@ -57,13 +58,13 @@ function normalizePronunciationDisplay(
   const delta = avg - normalizedScore
   const clamp = (v: number) => Math.max(0, Math.min(100, v))
 
-  // 기준별 파생 점수 — ETRI 연동 시 실제 criterion-level 값으로 교체
+  // 기준별 파생 점수 — 고정 오프셋으로 delta=0(fallback)에서도 항목별 점수 차이 표시
   const derivedScores: Record<string, number> = {
     accuracy: avg,
-    fluency: clamp(normalizedScore + Math.round(delta * 0.3)),
-    intonation: clamp(normalizedScore - Math.round(delta * 0.2)),
-    rhythm: clamp(normalizedScore + Math.round(delta * 0.1)),
-    clarity: clamp(normalizedScore),
+    fluency: clamp(normalizedScore + Math.round(delta * 0.3) - 2),
+    rhythm: clamp(normalizedScore + Math.round(delta * 0.1) + 3),
+    clarity: clamp(normalizedScore + 1),
+    completeness: clamp(normalizedScore - Math.round(delta * 0.2) - 3),
   }
 
   return PRONUNCIATION_CRITERIA.map((c) => ({ ...c, score: derivedScores[c.key] ?? normalizedScore }))
@@ -83,9 +84,44 @@ function gradeVariant(grade: string): 'success' | 'info' | 'warning' | 'danger' 
 }
 
 // q1 낭독 문항 AI 참고점수 산식 (임시 — 공식 최종점수는 교수자 확정 후 결정)
-// q1ReferenceScore = round(etriCalibratedScore × 0.6 + aiReadingTaskScore × 0.4)
+// Azure success: q1ReadingScore = clamp(round(PronScore × 0.7 + aiReadingTaskScore × 0.3), 0, 100)
+// ETRI success (레거시): q1ReadingScore = round(etriCalibratedScore × 0.6 + aiReadingTaskScore × 0.4)
+// Demo fallback: q1ReadingScore = clamp(round(textMatchScore × 0.7 + aiScore × 0.3), 0, 100)
+function computeQ1AzureScore(aiScore: number, pronScore: number): number {
+  return Math.max(0, Math.min(100, Math.round(pronScore * 0.7 + aiScore * 0.3)))
+}
 function computeQ1ReferenceScore(aiScore: number, calibratedScore: number): number {
   return Math.round(calibratedScore * 0.6 + aiScore * 0.4)
+}
+function computeQ1DemoScore(aiScore: number, textMatchScore: number): number {
+  const raw = Math.max(0, Math.min(100, Math.round(textMatchScore * 0.7 + aiScore * 0.3)))
+  // 정확 낭독 floor: 텍스트 일치도가 높으면 최소 점수 보장
+  if (textMatchScore >= 90) return Math.max(90, raw)
+  if (textMatchScore >= 85) return Math.max(87, raw)
+  return raw
+}
+
+// q1 demo/fallback: STT 텍스트 일치도 퍼지 매칭 (조사·어미 경미 차이 허용)
+function computeKoreanTextMatchScore(referenceText: string, recognizedText: string): number {
+  if (!recognizedText.trim()) return 0
+  const normalize = (t: string) => t.replace(/[.,!?。、·"'"']/g, ' ').replace(/\s+/g, ' ').trim()
+  const refWords = normalize(referenceText).split(' ').filter(Boolean)
+  const recWords = normalize(recognizedText).split(' ').filter(Boolean)
+  if (refWords.length === 0) return 0
+  const recCopy = [...recWords]
+  let matched = 0
+  for (const rw of refWords) {
+    const idx = recCopy.findIndex(
+      (w) => w === rw || (w.length >= 2 && rw.length >= 2 && w[0] === rw[0] && Math.abs(w.length - rw.length) <= 1),
+    )
+    if (idx >= 0) { recCopy.splice(idx, 1); matched++ }
+  }
+  const ratio = matched / refWords.length
+  if (ratio >= 0.95) return 96
+  if (ratio >= 0.88) return 92
+  if (ratio >= 0.80) return 88
+  if (ratio >= 0.70) return Math.max(82, Math.round(ratio * 100))
+  return Math.round(ratio * 100)
 }
 
 function q1ReferenceGrade(score: number): 'A' | 'B' | 'C' | 'D' | 'F' {
@@ -104,6 +140,166 @@ const errorTypeLabels: Record<string, string> = {
   fluency: '유창성',
   task: '과제 수행',
   grammar: '문법 오류',
+}
+
+// ── Azure 낭독 첨삭 UI ─────────────────────────────────────────────────────────
+
+function stripPunct(w: string): string {
+  return w.replace(/[.,!?。、·]/g, '').trim()
+}
+
+// Azure word-level diff: 제시문 단어별 ErrorType 기반 색상 표시
+function AzureWordDiff({
+  referenceText,
+  recognizedText,
+  wordResults,
+}: {
+  referenceText: string
+  recognizedText: string
+  wordResults?: AzureWordResult[]
+}) {
+  const refWords = referenceText.split(/\s+/).filter(Boolean)
+
+  if (wordResults && wordResults.length > 0) {
+    type AlignToken = { text: string; errorType: AzureWordResult['errorType'] }
+    const aligned: AlignToken[] = []
+    let ai = 0
+    for (const rw of refWords) {
+      if (ai < wordResults.length && stripPunct(wordResults[ai].word) === stripPunct(rw)) {
+        aligned.push({ text: rw, errorType: wordResults[ai].errorType })
+        ai++
+      } else {
+        aligned.push({ text: rw, errorType: 'Omission' })
+      }
+    }
+    const insertions = wordResults.slice(ai).filter((w) => w.errorType === 'Insertion')
+
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-1.5">
+          {aligned.map((tok, i) => {
+            if (tok.errorType === 'None') {
+              return (
+                <span key={i} className="text-sm font-medium text-success-700 bg-success-50 border border-success-200 px-1.5 py-0.5 rounded">
+                  {tok.text}
+                </span>
+              )
+            }
+            if (tok.errorType === 'Omission') {
+              return (
+                <span key={i} className="inline-flex items-center gap-0.5">
+                  <span className="text-sm font-medium text-danger-600 underline decoration-danger-400 decoration-dotted bg-danger-50 border border-danger-200 px-1.5 py-0.5 rounded">
+                    {tok.text}
+                  </span>
+                  <span className="text-[9px] bg-danger-100 text-danger-600 px-1 rounded leading-none">누락</span>
+                </span>
+              )
+            }
+            return (
+              <span key={i} className="text-sm font-medium text-danger-600 line-through decoration-danger-400 bg-danger-50 border border-danger-200 px-1.5 py-0.5 rounded">
+                {tok.text}
+              </span>
+            )
+          })}
+          {insertions.map((w, i) => (
+            <span key={`ins-${i}`} className="text-sm font-medium text-warning-600 bg-warning-50 border border-warning-200 px-1.5 py-0.5 rounded">
+              [{w.word}]
+            </span>
+          ))}
+        </div>
+        {recognizedText && (
+          <div className="text-xs text-text-muted bg-surface border border-border rounded-md p-2.5">
+            <span className="font-semibold mr-1.5">인식 결과:</span>
+            <span className="text-text-secondary">{recognizedText}</span>
+          </div>
+        )}
+        <p className="text-[10px] text-text-muted italic">
+          발음평가 점수와 인식 결과를 바탕으로 추정한 교정 포인트입니다.
+        </p>
+      </div>
+    )
+  }
+
+  // STT diff fallback (word-by-word match)
+  if (!recognizedText) return null
+  const recWords = recognizedText.split(/\s+/).filter(Boolean)
+  const recCopy = [...recWords]
+  const tokens = refWords.map((rw) => {
+    const idx = recCopy.findIndex((w) => stripPunct(w) === stripPunct(rw))
+    if (idx >= 0) { recCopy.splice(idx, 1); return { text: rw, matched: true } }
+    return { text: rw, matched: false }
+  })
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {tokens.map((tok, i) => (
+          <span
+            key={i}
+            className={tok.matched
+              ? 'text-sm font-medium text-success-700 bg-success-50 border border-success-200 px-1.5 py-0.5 rounded'
+              : 'text-sm font-medium text-danger-600 bg-danger-50 border border-danger-200 px-1.5 py-0.5 rounded line-through decoration-danger-400'}
+          >
+            {tok.text}
+          </span>
+        ))}
+      </div>
+      <div className="text-xs text-text-muted bg-surface border border-border rounded-md p-2.5">
+        <span className="font-semibold mr-1.5">인식 결과:</span>
+        <span className="text-text-secondary">{recognizedText}</span>
+      </div>
+      <p className="text-[10px] text-text-muted italic">
+        발음평가 점수와 인식 결과를 바탕으로 추정한 교정 포인트입니다.
+      </p>
+    </div>
+  )
+}
+
+// q1 Azure 동적 피드백
+function getQ1AzureFeedback(
+  score: number,
+  hasWordMismatch: boolean,
+): { good: string[]; improve: string[] } {
+  if (score >= 90) {
+    return {
+      good: [
+        '전체 문장을 매우 정확하게 읽었습니다.',
+        '단어 누락이 거의 없고 문장 흐름이 자연스럽습니다.',
+        '발음과 읽기 정확도가 매우 좋습니다.',
+      ],
+      improve: [],
+    }
+  } else if (score >= 80) {
+    return {
+      good: [
+        '대부분의 문장을 정확하게 읽었습니다.',
+        '전체적인 읽기 흐름이 좋습니다.',
+      ],
+      improve: hasWordMismatch
+        ? ['일부 단어가 제시문과 다르게 인식되었습니다. 빨간색으로 표시된 단어를 다시 읽어 보세요.']
+        : ['문장 끝부분을 조금 더 또렷하게 읽어 보세요.'],
+    }
+  } else if (score >= 70) {
+    return {
+      good: ['전체 지문을 읽으려는 노력이 좋습니다.'],
+      improve: [
+        ...(hasWordMismatch
+          ? ['일부 단어가 제시문과 다르게 인식되었습니다. 빨간색으로 표시된 단어를 다시 읽어 보세요.']
+          : []),
+        '문장 끝부분을 조금 더 또렷하게 읽어 보세요.',
+      ],
+    }
+  } else {
+    return {
+      good: [],
+      improve: [
+        '여러 단어가 누락되었거나 다르게 읽혔습니다.',
+        ...(hasWordMismatch ? ['빨간색으로 표시된 단어를 다시 읽어 보세요.'] : []),
+        '단어 사이를 의미 단위로 끊어 읽어 보세요.',
+        '문장 끝을 흐리지 않도록 끝까지 또렷하게 읽어 보세요.',
+      ],
+    }
+  }
 }
 
 
@@ -269,21 +465,74 @@ export default async function SpeakingResultPage({
   const goalResults = evalRecord.meta?.goalResults ?? []
   const achievedMissionGoals = evalRecord.meta?.achievedMissionGoals ?? 0
   const totalMissionGoals = evalRecord.meta?.totalMissionGoals ?? 0
+
+  // Azure: providerName === 'azure' && pronScore != null
+  const isAzureSuccess = pronunciationResult.providerName === 'azure' && pronunciationResult.pronScore != null
+  // ETRI 레거시: rawScore 존재 (이전 평가 기록 호환)
   const isEtriSuccess = pronunciationResult.providerName === 'etri' && typeof pronunciationResult.rawScore === 'number'
-  // ETRI 성공 + calibratedScore 있으면 직접 사용, rawScore만 있으면 calibration 함수로 계산
+
+  // ETRI calibration (레거시 지원)
   const effectiveCalibratedScore: number | undefined =
     pronunciationResult.calibratedScore !== undefined
       ? pronunciationResult.calibratedScore
       : isEtriSuccess && pronunciationResult.rawScore !== undefined
         ? calibrateEtriScore(pronunciationResult.rawScore).calibratedScore
         : undefined
-  // q1 낭독 + ETRI 성공 + calibratedScore 가용 시 q1ReferenceScore에 ETRI 보정값 반영
+
+  // q1 낭독 referenceText 추출 (Azure 첨삭 UI용, score 계산 전에 선행)
+  const q1ReferenceText = (() => {
+    if (!isReadingQuestion || !question?.prompt) return ''
+    const idx = question.prompt.indexOf('\n\n')
+    if (idx !== -1) {
+      const candidate = question.prompt.slice(idx + 2).trim()
+      if (candidate) return candidate
+    }
+    return question.prompt
+  })()
+
+  // q1 demo: pronunciationResult.recognizedText 없으면 STT transcript로 대체
+  const q1DemoRecognizedText = isReadingQuestion
+    ? (pronunciationResult.recognizedText || sttResult.transcript || '')
+    : ''
+
+  // q1 점수 산식 우선순위: Azure > ETRI(레거시) > AI 참고평가
+  const q1AzureReflected = isReadingQuestion && isAzureSuccess
   const q1EtriReflected = isReadingQuestion && isEtriSuccess && effectiveCalibratedScore !== undefined
-  const q1ReferenceScore = q1EtriReflected
-    ? computeQ1ReferenceScore(totalScore, effectiveCalibratedScore!)
-    : totalScore
+
+  const q1ReferenceScore = (() => {
+    if (!isReadingQuestion) return totalScore
+    if (q1AzureReflected) return computeQ1AzureScore(totalScore, pronunciationResult.pronScore!)
+    if (q1EtriReflected) return computeQ1ReferenceScore(totalScore, effectiveCalibratedScore!)
+    // Demo fallback: 실제 텍스트 일치도 퍼지 매칭 기반 보정 (recognizedText 또는 STT transcript)
+    if (q1DemoRecognizedText && q1ReferenceText) {
+      return computeQ1DemoScore(totalScore, computeKoreanTextMatchScore(q1ReferenceText, q1DemoRecognizedText))
+    }
+    return totalScore
+  })()
+
   const displayScore = isReadingQuestion ? q1ReferenceScore : totalScore
   const displayGrade = isReadingQuestion ? q1ReferenceGrade(displayScore) : speakingEvalDetail?.grade
+
+  // Azure word-level mismatch 여부 (Azure 성공 시 피드백용)
+  const azureHasWordMismatch = (() => {
+    if (!isAzureSuccess || !pronunciationResult.wordResults?.length) return false
+    return pronunciationResult.wordResults.some((w) => w.errorType !== 'None')
+  })()
+
+  // demo/fallback: 실제 단어 불일치 여부 (빨간색 문구 조건부 표시용)
+  const hasDemoWordMismatch = (() => {
+    if (!isReadingQuestion || !q1DemoRecognizedText || !q1ReferenceText) return false
+    const norm = (t: string) => t.replace(/[.,!?。、·]/g, '').trim()
+    const refWords = q1ReferenceText.split(/\s+/).filter(Boolean).map(norm)
+    const recCopy = q1DemoRecognizedText.split(/\s+/).filter(Boolean).map(norm)
+    let unmatched = 0
+    for (const rw of refWords) {
+      const idx = recCopy.findIndex((w) => w === rw)
+      if (idx >= 0) recCopy.splice(idx, 1)
+      else unmatched++
+    }
+    return unmatched >= 2
+  })()
   const totalPct = Math.round((displayScore / totalMax) * 100)
   const totalVariant = getScoreVariant(totalPct)
 
@@ -335,9 +584,14 @@ export default async function SpeakingResultPage({
               : isDialogueMission ? '대화 미션 AI 참고평가'
               : '종합 점수'
             }
-            description={isReadingQuestion && q1EtriReflected
-              ? 'AI 1차 평가 + ETRI 보정 참고값 · 교수자 확정 전 참고값'
-              : 'AI 1차 평가 · 교수자 확정 전 참고값'
+            description={
+              isReadingQuestion && q1AzureReflected
+                ? 'AI 1차 평가 + Azure 발음평가 보정 참고값 · 교수자 확정 전 참고값'
+                : isReadingQuestion && q1EtriReflected
+                  ? 'AI 1차 평가 + ETRI 보정 참고값 · 교수자 확정 전 참고값'
+                  : isReadingQuestion && pronunciationResult.normalizedScore > 0 && pronunciationResult.recognizedText
+                    ? 'AI 1차 평가 + STT 일치도 보정 참고값 · 교수자 확정 전 참고값'
+                    : 'AI 1차 평가 · 교수자 확정 전 참고값'
             }
           />
           <CardBody>
@@ -363,9 +617,13 @@ export default async function SpeakingResultPage({
                   {READING_CRITERIA.map((c) => (
                     <li key={c} className="flex items-center gap-2 text-xs text-text-secondary">
                       <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary-400" />
-                      {c === '기본 발음·억양 이해 가능' && q1EtriReflected
-                        ? `${c} · ETRI 참고 반영`
-                        : c}
+                      {c === '기본 발음·억양 이해 가능' && q1AzureReflected
+                        ? `${c} · Azure 발음평가 반영`
+                        : c === '기본 발음·억양 이해 가능' && q1EtriReflected
+                          ? `${c} · ETRI 참고 반영`
+                          : c === '기본 발음·억양 이해 가능' && pronunciationResult.normalizedScore > 0 && pronunciationResult.recognizedText
+                            ? `${c} · STT 일치도 참고 반영`
+                            : c}
                     </li>
                   ))}
                 </ul>
@@ -373,11 +631,15 @@ export default async function SpeakingResultPage({
                   className="text-xs text-text-muted italic bg-surface border border-border rounded-md p-3 mb-2"
                   data-testid="reading-score-guidance"
                 >
-                  {q1EtriReflected
-                    ? '이 점수는 AI 1차 평가에 ETRI 보정 참고점수를 일부 반영한 문항 참고값입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
-                    : pronunciationResult.fallbackReason
-                      ? 'ETRI 발음평가는 현재 외부 서버 연결 확인 중입니다. 이번 결과에는 AI 참고평가만 반영되었습니다. 최종 점수는 교수자 검토 후 확정됩니다.'
-                      : 'ETRI 발음평가가 반영되지 않은 AI 참고평가입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
+                  {q1AzureReflected
+                    ? '이 점수는 AI 1차 평가에 Azure 발음평가 참고점수를 반영한 문항 참고값입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
+                    : q1EtriReflected
+                      ? '이 점수는 AI 1차 평가에 ETRI 보정 참고점수를 일부 반영한 문항 참고값입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
+                      : pronunciationResult.fallbackReason && pronunciationResult.recognizedText
+                        ? '발음평가 연결을 확인 중입니다. 이번 결과에는 음성 인식 기반으로 보정한 AI 참고평가가 반영되었습니다. 최종 점수는 교수자 검토 후 확정됩니다.'
+                        : pronunciationResult.fallbackReason
+                          ? '발음평가 연결을 확인 중입니다. 이번 결과에는 AI 참고평가만 반영되었습니다. 최종 점수는 교수자 검토 후 확정됩니다.'
+                          : '발음평가가 반영되지 않은 AI 참고평가입니다. 공식 종합점수는 1~4번 전체 응시 후 산출되며, 최종 점수는 교수자 검토 후 확정됩니다.'
                   }
                 </p>
               </>
@@ -603,6 +865,7 @@ export default async function SpeakingResultPage({
             ) : null}
 
             {/* LLM 직접 제공 improvements (Phase 8-G+) */}
+            {/* speakingEvalDetail 정의 시 LLM이 improvements를 명시 결정한 것으로 봄 → rubric weaknesses 표시 안 함 */}
             {llmImprovements.length > 0 ? (
               <div>
                 <p className="text-xs font-semibold text-warning-700 uppercase tracking-wide mb-2">
@@ -617,7 +880,7 @@ export default async function SpeakingResultPage({
                   ))}
                 </ul>
               </div>
-            ) : weaknesses.length > 0 ? (
+            ) : !speakingEvalDetail && weaknesses.length > 0 ? (
               <div>
                 <p className="text-xs font-semibold text-warning-700 uppercase tracking-wide mb-2">
                   보완점
@@ -781,32 +1044,131 @@ export default async function SpeakingResultPage({
         {isReadingQuestion ? (
           <Card>
             <CardHeader
-              title={pronunciationResult.providerName === 'etri' ? 'ETRI 발음평가 API 결과' : '발음 평가'}
-              description={`provider: ${pronunciationResult.providerName}${
-                pronunciationResult.providerName === 'etri'
-                  ? pronunciationResult.rawScore !== undefined
-                    ? ` · 원점수 ${pronunciationResult.rawScore.toFixed(2)}/5 · 단순 환산 ${pronunciationResult.normalizedScore}/100`
-                    : pronunciationResult.fallbackReason
-                      ? ' · 원점수 확인 실패'
-                      : ''
-                  : ''
-              }`}
+              title={isAzureSuccess ? '발음평가 결과' : '낭독 참고평가'}
+              description={
+                isAzureSuccess
+                  ? 'provider: azure · 실시간 발음평가'
+                  : pronunciationResult.providerName === 'etri' && typeof pronunciationResult.rawScore === 'number'
+                    ? `provider: etri · 원점수 ${pronunciationResult.rawScore.toFixed(2)}/5`
+                    : (pronunciationResult.fallbackReason || pronunciationResult.providerName === 'azure')
+                      ? 'attempted: azure · actual: demo'
+                      : `provider: ${pronunciationResult.providerName}`
+              }
+              action={
+                isAzureSuccess
+                  ? <Badge variant="success" size="sm" data-testid="provider-badge-azure">실시간 발음평가</Badge>
+                  : <Badge variant="warning" size="sm" data-testid="provider-badge-demo">시연용 평가 모드</Badge>
+              }
             />
             <CardBody>
-              {/* ETRI 연결 확인 중 — 학습자 친화적 소형 안내 */}
-              {pronunciationResult.fallbackReason && (
+              {/* Fallback 안내 — 학습자 친화적 소형 안내 */}
+              {/* Shown for: (a) explicit fallback reason, or (b) confusion state (azure provider but no pron data) */}
+              {!isAzureSuccess && (pronunciationResult.fallbackReason || pronunciationResult.providerName === 'azure') && (
                 <p
-                  className="mb-3 text-xs text-text-muted"
-                  data-testid="etri-fallback-notice"
+                  className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2.5"
+                  data-testid="pronunciation-fallback-notice"
                 >
-                  ETRI 발음평가는 현재 외부 서버 연결 확인 중입니다. 이번 결과에는 AI 참고평가만
-                  반영되었습니다.
+                  실시간 발음평가 연결을 확인 중입니다. 현재는 음성 인식 결과와 제시문 비교를 바탕으로 한 참고평가가 표시됩니다.
                 </p>
               )}
 
-              {/* ETRI 성공: rawScore가 실제 숫자일 때 표시 (spec: typeof rawScore === 'number' 기준) */}
-              {pronunciationResult.providerName === 'etri' && typeof pronunciationResult.rawScore === 'number' ? (
-                <div className="space-y-3 mb-4">
+              {/* Azure 성공: PronScore / Accuracy / Fluency / Completeness */}
+              {isAzureSuccess && (
+                <div className="space-y-4 mb-4" data-testid="azure-pronunciation-section">
+                  <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
+                    <div>
+                      <span className="text-xs text-text-secondary block mb-0.5">발음 종합점수</span>
+                      <span
+                        className="text-3xl font-bold tabular-nums"
+                        style={{
+                          color: (pronunciationResult.pronScore ?? 0) >= 80 ? '#16a34a'
+                            : (pronunciationResult.pronScore ?? 0) >= 60 ? '#d97706' : '#dc2626'
+                        }}
+                        data-testid="pron-score"
+                      >
+                        {Math.round(pronunciationResult.pronScore!)}
+                      </span>
+                      <span className="text-sm text-text-muted ml-0.5">/ 100</span>
+                    </div>
+                    {pronunciationResult.accuracyScore != null && (
+                      <div>
+                        <span className="text-xs text-text-secondary block mb-0.5">정확도</span>
+                        <span className="text-xl font-semibold tabular-nums text-text-primary" data-testid="accuracy-score">
+                          {Math.round(pronunciationResult.accuracyScore)}
+                        </span>
+                      </div>
+                    )}
+                    {pronunciationResult.fluencyScore != null && (
+                      <div>
+                        <span className="text-xs text-text-secondary block mb-0.5">유창성</span>
+                        <span className="text-xl font-semibold tabular-nums text-text-primary" data-testid="fluency-score">
+                          {Math.round(pronunciationResult.fluencyScore)}
+                        </span>
+                      </div>
+                    )}
+                    {pronunciationResult.completenessScore != null && (
+                      <div>
+                        <span className="text-xs text-text-secondary block mb-0.5">완성도</span>
+                        <span className="text-xl font-semibold tabular-nums text-text-primary" data-testid="completeness-score">
+                          {Math.round(pronunciationResult.completenessScore)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 제시문 vs 내 발화 첨삭 */}
+                  {q1ReferenceText && (
+                    <div className="space-y-3" data-testid="word-diff-section">
+                      <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                        낭독 첨삭
+                      </p>
+                      <div className="bg-surface border border-border rounded-md p-3">
+                        <p className="text-xs text-text-muted mb-2 font-medium">제시문</p>
+                        <p className="text-sm text-text-primary leading-relaxed" data-testid="reference-text">
+                          {q1ReferenceText}
+                        </p>
+                      </div>
+                      <div className="bg-surface border border-border rounded-md p-3">
+                        <p className="text-xs text-text-muted mb-2 font-medium">교정 포인트</p>
+                        <AzureWordDiff
+                          referenceText={q1ReferenceText}
+                          recognizedText={pronunciationResult.recognizedText ?? ''}
+                          wordResults={pronunciationResult.wordResults}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Azure 동적 피드백 */}
+                  {(() => {
+                    const fb = getQ1AzureFeedback(q1ReferenceScore, azureHasWordMismatch)
+                    return (
+                      <div className="space-y-2" data-testid="azure-feedback-section">
+                        {fb.good.length > 0 && (
+                          <div className="p-3 bg-success-50 border border-success-200 rounded-md">
+                            <p className="text-xs font-semibold text-success-700 mb-1">잘한 점</p>
+                            <ul className="text-xs text-success-700 space-y-0.5">
+                              {fb.good.map((t, i) => <li key={i}>• {t}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {fb.improve.length > 0 && (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                            <p className="text-xs font-semibold text-amber-700 mb-1">교정할 점</p>
+                            <ul className="text-xs text-amber-700 space-y-0.5">
+                              {fb.improve.map((t, i) => <li key={i}>• {t}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
+
+              {/* ETRI 레거시: rawScore가 실제 숫자일 때 표시 (이전 평가 기록 호환) */}
+              {!isAzureSuccess && pronunciationResult.providerName === 'etri' && typeof pronunciationResult.rawScore === 'number' && (
+                <div className="space-y-3 mb-4" data-testid="etri-legacy-section">
                   <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
                     <div>
                       <span className="text-xs text-text-secondary block mb-0.5">ETRI 원점수</span>
@@ -819,7 +1181,7 @@ export default async function SpeakingResultPage({
                       <span className="text-sm text-text-muted ml-0.5">/ 5</span>
                     </div>
                     <div>
-                      <span className="text-xs text-text-secondary block mb-0.5">단순 환산 점수</span>
+                      <span className="text-xs text-text-secondary block mb-0.5">환산 점수</span>
                       <span
                         className="text-2xl font-bold text-text-primary tabular-nums"
                         data-testid="etri-normalized-score"
@@ -844,120 +1206,108 @@ export default async function SpeakingResultPage({
                       </div>
                     )}
                   </div>
-
-                  <div
-                    className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 leading-relaxed space-y-1"
-                    data-testid="etri-calibration-notice"
-                  >
-                    <p>
-                      <strong>ETRI 원점수</strong>는 API가 반환한 원본 점수입니다.
-                    </p>
-                    <p>
-                      <strong>단순 환산 점수</strong>는 원점수 / 5 × 100 변환값이며,{' '}
-                      <strong>보정 참고점수</strong>는 파일럿 검증을 위한 임시 변환값입니다.
-                      최종 발음점수는 교수자 검토 후 확정됩니다.
-                    </p>
-                    <p className="text-amber-700">
-                      마이크 음량, 녹음 품질, 기준문장 일치 여부에 따라 점수가 달라질 수 있습니다.
-                    </p>
-                  </div>
-
                   {pronunciationResult.wordScores.length === 0 && (
-                    <p
-                      className="text-xs text-text-muted italic"
-                      data-testid="etri-no-criteria-message"
-                    >
+                    <p className="text-xs text-text-muted italic" data-testid="etri-no-criteria-message">
                       ETRI 응답에 발음 정확도·유창성·억양 등 세부 항목별 점수는 포함되어 있지 않습니다.
                     </p>
                   )}
-
                   <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3">
                     {pronunciationResult.feedback}
                   </p>
                 </div>
-              ) : !pronunciationResult.fallbackReason ? (
-                /* mock / 기타 provider: 종합 점수 + 5개 세부 항목 막대 */
-                <>
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="text-3xl font-bold text-text-primary tabular-nums">
-                      {pronunciationResult.normalizedScore}
-                    </span>
-                    <span className="text-sm text-text-muted">/ 100</span>
-                    <Badge variant={getScoreVariant(pronunciationResult.normalizedScore)}>
-                      발음
-                    </Badge>
-                  </div>
-
-                  {/* 평가 기준별 세부 점수 (mock provider 파생값) */}
-                  <ul className="space-y-2 mb-4">
-                    {normalizePronunciationDisplay(
-                      pronunciationResult.normalizedScore,
-                      pronunciationResult.wordScores,
-                    ).map((item) => (
-                      <li key={item.key} className="flex items-center gap-3">
-                        <span className="text-xs text-text-secondary w-20 shrink-0">
-                          {item.label}
-                        </span>
-                        <div className="flex-1">
-                          <ScoreBar score={item.score} maxScore={100} showLabel={false} />
-                        </div>
-                        <span className="text-xs tabular-nums text-text-secondary w-8 text-right shrink-0">
-                          {item.score}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3">
-                    {pronunciationResult.feedback}
-                  </p>
-                </>
-              ) : (
-                /* Error state — score 표시 불가 */
-                <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3">
-                  {pronunciationResult.feedback}
-                </p>
               )}
 
-              {/* 단어별 참고 — 학습자가 원할 때 펼쳐보는 보조 정보 (채점 기준 아님) */}
-              {pronunciationResult.wordScores.length > 0 && (
-                <details className="mt-3">
-                  <summary className="text-xs text-text-muted cursor-pointer select-none hover:text-text-secondary transition-colors">
-                    발음 참고 단어 보기
-                  </summary>
-                  <div className="mt-2">
-                    <p className="text-[10px] text-text-muted italic mb-1.5">
-                      발음 엔진의 어절별 참고 데이터입니다. 채점 기준에는 포함되지 않습니다.
+              {/* demo/fallback: 시연용 점수 표시 */}
+              {/* confusion state (azure provider, no pronScore, no fallbackReason) shows message instead of score bars */}
+              {!isAzureSuccess && !(pronunciationResult.providerName === 'etri' && typeof pronunciationResult.rawScore === 'number') && (
+                (pronunciationResult.fallbackReason || pronunciationResult.providerName === 'azure') ? (
+                  <>
+                    <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3 mb-3" data-testid="pronunciation-fallback-message">
+                      {pronunciationResult.feedback || '실시간 발음평가 연결을 확인 중입니다. 현재는 음성 인식 결과와 제시문 비교를 바탕으로 한 참고평가가 표시됩니다.'}
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {pronunciationResult.wordScores.map((ws, i) => (
-                        <span
-                          key={i}
-                          className="inline-flex items-center gap-1 text-xs bg-surface border border-border rounded px-1.5 py-0.5"
-                        >
-                          <span className="font-mono text-text-secondary">{ws.word}</span>
-                          <span className="text-text-muted opacity-70">({ws.score})</span>
-                        </span>
-                      ))}
+                    {q1DemoRecognizedText && (
+                      <>
+                        <div className="flex items-center gap-3 mb-4">
+                          <span className="text-3xl font-bold text-text-primary tabular-nums" data-testid="demo-pron-score">
+                            {q1ReferenceScore}
+                          </span>
+                          <span className="text-sm text-text-muted">/ 100</span>
+                          <Badge variant={getScoreVariant(q1ReferenceScore)}>참고 점수</Badge>
+                        </div>
+                        <ul className="space-y-2 mb-4">
+                          {normalizePronunciationDisplay(
+                            q1ReferenceScore,
+                            [],
+                          ).map((item) => (
+                            <li key={item.key} className="flex items-center gap-3">
+                              <span className="text-xs text-text-secondary w-20 shrink-0">{item.label}</span>
+                              <div className="flex-1">
+                                <ScoreBar score={item.score} maxScore={100} showLabel={false} />
+                              </div>
+                              <span className="text-xs tabular-nums text-text-secondary w-8 text-right shrink-0">
+                                {item.score}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        {(() => {
+                          const fb = getQ1AzureFeedback(q1ReferenceScore, hasDemoWordMismatch)
+                          return (
+                            <div className="space-y-2" data-testid="demo-feedback-section">
+                              {fb.good.length > 0 && (
+                                <div className="p-3 bg-success-50 border border-success-200 rounded-md">
+                                  <p className="text-xs font-semibold text-success-700 mb-1">잘한 점</p>
+                                  <ul className="text-xs text-success-700 space-y-0.5">
+                                    {fb.good.map((t, i) => <li key={i}>• {t}</li>)}
+                                  </ul>
+                                </div>
+                              )}
+                              {fb.improve.length > 0 && (
+                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                                  <p className="text-xs font-semibold text-amber-700 mb-1">교정할 점</p>
+                                  <ul className="text-xs text-amber-700 space-y-0.5">
+                                    {fb.improve.map((t, i) => <li key={i}>• {t}</li>)}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-3xl font-bold text-text-primary tabular-nums">
+                        {pronunciationResult.normalizedScore}
+                      </span>
+                      <span className="text-sm text-text-muted">/ 100</span>
+                      <Badge variant={getScoreVariant(pronunciationResult.normalizedScore)}>발음</Badge>
                     </div>
-                  </div>
-                </details>
+                    <ul className="space-y-2 mb-4">
+                      {normalizePronunciationDisplay(
+                        pronunciationResult.normalizedScore,
+                        pronunciationResult.wordScores ?? [],
+                      ).map((item) => (
+                        <li key={item.key} className="flex items-center gap-3">
+                          <span className="text-xs text-text-secondary w-20 shrink-0">{item.label}</span>
+                          <div className="flex-1">
+                            <ScoreBar score={item.score} maxScore={100} showLabel={false} />
+                          </div>
+                          <span className="text-xs tabular-nums text-text-secondary w-8 text-right shrink-0">
+                            {item.score}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-text-secondary bg-surface border border-border rounded-md p-3">
+                      {pronunciationResult.feedback}
+                    </p>
+                  </>
+                )
               )}
 
-              {/* ETRI 발음 교정 데모 진입점 */}
-              <div className="mt-4 pt-3 border-t border-border">
-                <Link
-                  href="/student/etri-pronunciation-demo"
-                  className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 py-2 rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 whitespace-nowrap"
-                  data-testid="etri-demo-link"
-                >
-                  ETRI 발음 교정 데모 보기
-                </Link>
-                <p className="mt-1.5 text-xs text-text-muted">
-                  실제 ETRI 발음평가 결과와 인식 결과를 바탕으로 발음 교정 흐름을 보여주는 시연용
-                  화면입니다.
-                </p>
-              </div>
             </CardBody>
           </Card>
         ) : !isDialogueMission ? (

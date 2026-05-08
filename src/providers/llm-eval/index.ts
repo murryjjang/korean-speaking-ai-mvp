@@ -337,26 +337,34 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
   const isListeningResp = qType === 'qt-listening-resp'
   const isDialogueMission = qType === 'qt-dialogue-mission'
 
-  // q2/q3: requiredElements 기반 최저점 보장 — STT 신뢰도/provider=mock이어도 과도하게 낮추지 않음
-  // q2: 5개 중 4개(≥0.8) → 80, 3개(≥0.5) → 70, 2개(≥0.33) → 60
-  // q3: 3개 중 3개(=1.0) → 80, 2개(≥0.5) → 70, 1개(≥0.33) → 60
-  if ((isMaterialDesc || isListeningResp) && requiredElements.length > 0) {
-    if (elementRatio >= 0.8) {
-      taskScore = Math.max(taskScore, 80)
-      overall = Math.max(overall, 80)
+  // q2: requiredElements 기반 최저점 — 전요소 충족 시 90+
+  if (isMaterialDesc && requiredElements.length > 0) {
+    if (elementRatio >= 1.0) {
+      taskScore = Math.max(taskScore, 90); overall = Math.max(overall, 90)
+    } else if (elementRatio >= 0.8) {
+      taskScore = Math.max(taskScore, 85); overall = Math.max(overall, 85)
     } else if (elementRatio >= 0.5) {
-      taskScore = Math.max(taskScore, 70)
-      overall = Math.max(overall, 70)
+      taskScore = Math.max(taskScore, 75); overall = Math.max(overall, 75)
     } else if (elementRatio >= 0.33) {
-      taskScore = Math.max(taskScore, 60)
-      overall = Math.max(overall, 60)
+      taskScore = Math.max(taskScore, 65); overall = Math.max(overall, 65)
     }
   }
 
-  // q1: 모든 필수 요소를 포함하고 충분히 읽었으면 과도한 감점 방지
+  // q3: requiredElements 기반 최저점 — 전요소 충족 시 90+ (핵심 정보 완전 포함)
+  if (isListeningResp && requiredElements.length > 0) {
+    if (elementRatio >= 1.0) {
+      taskScore = Math.max(taskScore, 90); overall = Math.max(overall, 90)
+    } else if (elementRatio >= 0.67) {
+      taskScore = Math.max(taskScore, 80); overall = Math.max(overall, 80)
+    } else if (elementRatio >= 0.33) {
+      taskScore = Math.max(taskScore, 65); overall = Math.max(overall, 65)
+    }
+  }
+
+  // q1: 전요소 포함 + 충분히 읽었으면 감점 방지
   if (isReading && elementRatio >= 1.0 && wordCount >= 15) {
-    taskScore = Math.max(taskScore, 78)
-    overall = Math.max(overall, 75)
+    taskScore = Math.max(taskScore, 85)
+    overall = Math.max(overall, 85)
   }
 
   // Type-aware improvements — reading must NEVER suggest vocabulary variety or content expansion

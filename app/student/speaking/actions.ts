@@ -35,6 +35,13 @@ export type ClientPronunciationResult = {
   calibrationVersion?: string
   calibrationStatus?: string
   calibrationNote?: string
+  /** Azure Pronunciation Assessment 전용 */
+  pronScore?: number | null
+  accuracyScore?: number | null
+  fluencyScore?: number | null
+  completenessScore?: number | null
+  recognizedText?: string
+  wordResults?: Array<{ word: string; accuracyScore: number; errorType: string }>
 }
 
 export interface SpeakingSubmitMeta {
@@ -153,6 +160,13 @@ export async function submitSpeaking(
       calibrationVersion: p.calibrationVersion,
       calibrationStatus: p.calibrationStatus as PronunciationResult['calibrationStatus'],
       calibrationNote: p.calibrationNote,
+      // Azure-specific
+      pronScore: p.pronScore ?? undefined,
+      accuracyScore: p.accuracyScore ?? undefined,
+      fluencyScore: p.fluencyScore ?? undefined,
+      completenessScore: p.completenessScore ?? undefined,
+      recognizedText: p.recognizedText,
+      wordResults: p.wordResults as PronunciationResult['wordResults'],
     }
   }
 
@@ -279,6 +293,7 @@ export async function submitSpeaking(
   }
 
   // Always save to mock store — result page reads from here.
+  // Policy: stored results are never automatically re-scored. Re-scoring only happens on a new submission.
   saveSpeakingEval(record)
 
   if (meta?.attemptId) {

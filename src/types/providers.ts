@@ -1,4 +1,4 @@
-export type ProviderName = 'mock' | 'etri' | 'whisper' | 'azure' | 'browser' | 'claude' | 'openai' | 'no-speech'
+export type ProviderName = 'mock' | 'etri' | 'whisper' | 'azure' | 'browser' | 'claude' | 'openai' | 'no-speech' | 'demo'
 
 export type ProviderMeta = {
   providerName: ProviderName
@@ -32,19 +32,32 @@ export type PronunciationWordScore = {
   phonemes?: string[]
 }
 
+export type AzureWordResult = {
+  word: string
+  accuracyScore: number
+  errorType: 'None' | 'Omission' | 'Insertion' | 'Mispronunciation'
+}
+
 export type PronunciationResult = ProviderMeta & {
   normalizedScore: number
   wordScores: PronunciationWordScore[]
   feedback: string
   /** ETRI 원점수 (1~5). PRONUNCIATION_PROVIDER=etri 시만 설정됨. */
   rawScore?: number
-  /** etri fallback일 때 사유 */
+  /** etri/azure fallback일 때 사유 */
   fallbackReason?: string
   /** 파일럿 보정 참고점수. 최종점수 아님 — 교수자 검토 후 확정. */
   calibratedScore?: number
   calibrationVersion?: string
   calibrationStatus?: 'uncalibrated' | 'provisional' | 'validated'
   calibrationNote?: string
+  /** Azure Pronunciation Assessment 전용 — PRONUNCIATION_PROVIDER=azure 시 설정. */
+  pronScore?: number | null
+  accuracyScore?: number | null
+  fluencyScore?: number | null
+  completenessScore?: number | null
+  recognizedText?: string
+  wordResults?: AzureWordResult[]
 }
 
 export type LLMEvalScore = {

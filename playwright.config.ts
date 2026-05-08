@@ -22,7 +22,7 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: ['**/mobile-speaking.spec.ts', '**/auth-routes.spec.ts'],
+      testMatch: ['**/mobile-speaking.spec.ts', '**/auth-routes.spec.ts', '**/reading-practice.spec.ts', '**/presentation-practice.spec.ts', '**/analytics-dashboard.spec.ts'],
     },
   ],
 

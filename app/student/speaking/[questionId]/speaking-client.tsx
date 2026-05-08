@@ -305,8 +305,9 @@ export function SpeakingClient({
               // Storage upload failure is non-blocking — submit proceeds without audio_url
             }
           })(),
-          // Pronunciation evaluation via /api/pronunciation — qt-reading only.
-          // q2/q3/q4 free-speech questions skip ETRI entirely; submitSpeaking uses mock fallback.
+          // Pronunciation evaluation via /api/pronunciation-azure — qt-reading only.
+          // q2/q3/q4 free-speech questions skip pronunciation API entirely; submitSpeaking uses demo fallback.
+          // Azure Pronunciation Assessment: referenceText 기반 scripted 낭독 평가.
           (async () => {
             if (question.typeId !== 'qt-reading') return
             try {
@@ -321,29 +322,33 @@ export function SpeakingClient({
 
               const fd = new FormData()
               fd.append('audio', blob, 'recording.webm')
-              fd.append('questionId', question.id)
               fd.append('referenceText', referenceText)
-              const res = await fetch('/api/pronunciation', { method: 'POST', body: fd })
+              const res = await fetch('/api/pronunciation-azure', { method: 'POST', body: fd })
               if (res.ok) {
                 const data = await res.json()
                 if (typeof data?.normalizedScore === 'number') {
                   pronunciationResult = {
                     normalizedScore: data.normalizedScore,
-                    rawScore: typeof data.rawScore === 'number' ? data.rawScore : undefined,
-                    wordScores: Array.isArray(data.wordScores) ? data.wordScores : [],
-                    feedback: typeof data.feedback === 'string' ? data.feedback : '',
-                    providerName: typeof data.providerName === 'string' ? data.providerName : 'mock',
+                    rawScore: undefined,
+                    wordScores: [],
+                    feedback: data.fallbackReason
+                      ? '실시간 발음평가 연결을 확인 중입니다. 현재는 음성 인식 결과와 제시문 비교를 바탕으로 한 참고평가가 표시됩니다.'
+                      : '발음평가 결과입니다.',
+                    providerName: typeof data.providerName === 'string' ? data.providerName : 'demo',
                     latencyMs: typeof data.latencyMs === 'number' ? data.latencyMs : 0,
                     fallbackReason: typeof data.fallbackReason === 'string' ? data.fallbackReason : undefined,
-                    calibratedScore: typeof data.calibratedScore === 'number' ? data.calibratedScore : undefined,
-                    calibrationVersion: typeof data.calibrationVersion === 'string' ? data.calibrationVersion : undefined,
-                    calibrationStatus: typeof data.calibrationStatus === 'string' ? data.calibrationStatus as ClientPronunciationResult['calibrationStatus'] : undefined,
-                    calibrationNote: typeof data.calibrationNote === 'string' ? data.calibrationNote : undefined,
+                    // Azure-specific
+                    pronScore: typeof data.pronScore === 'number' ? data.pronScore : null,
+                    accuracyScore: typeof data.accuracyScore === 'number' ? data.accuracyScore : null,
+                    fluencyScore: typeof data.fluencyScore === 'number' ? data.fluencyScore : null,
+                    completenessScore: typeof data.completenessScore === 'number' ? data.completenessScore : null,
+                    recognizedText: typeof data.recognizedText === 'string' ? data.recognizedText : undefined,
+                    wordResults: Array.isArray(data.wordResults) ? data.wordResults : undefined,
                   }
                 }
               }
             } catch {
-              // Pronunciation failure is non-blocking — submitSpeaking uses mock fallback
+              // Pronunciation failure is non-blocking — submitSpeaking uses demo fallback
             }
           })(),
         ])

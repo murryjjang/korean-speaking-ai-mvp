@@ -28,8 +28,9 @@ export class AzureTTSProvider implements TTSProvider {
     options?: { voice?: string; rate?: number; lang?: string },
   ): Promise<TTSResult> {
     const startMs = Date.now()
-    const key = process.env.AZURE_SPEECH_KEY
-    const region = process.env.AZURE_SPEECH_REGION
+    // AZURE_TTS_KEY/REGION override > AZURE_SPEECH_KEY/REGION common key
+    const key = process.env.AZURE_TTS_KEY || process.env.AZURE_SPEECH_KEY
+    const region = process.env.AZURE_TTS_REGION || process.env.AZURE_SPEECH_REGION
 
     if (!key || !region) {
       throw new Error('azure_tts_no_credentials')

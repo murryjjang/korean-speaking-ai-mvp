@@ -183,20 +183,24 @@ describe('상단 breakdown 발음 라벨 — provider별 분기', () => {
   })
 })
 
-// ── ETRI 카드 제목 ─────────────────────────────────────────────────────────────
+// ── 발음 평가 카드 제목 (Phase 10-E-7-D: 항상 "발음평가 결과") ────────────────────
 
-// Mirrors result/page.tsx: CardHeader title 분기 로직
-function getPronunciationCardTitle(providerName: string): string {
-  return providerName === 'etri' ? 'ETRI 발음평가 API 결과' : '발음 평가'
+// Mirrors result/page.tsx: CardHeader title — Azure 전환 후 항상 "발음평가 결과"
+function getPronunciationCardTitle(): string {
+  return '발음평가 결과'
 }
 
 describe('발음 평가 카드 제목', () => {
-  it('provider=etri → "ETRI 발음평가 API 결과"', () => {
-    expect(getPronunciationCardTitle('etri')).toBe('ETRI 발음평가 API 결과')
+  it('항상 "발음평가 결과" (Azure 전환 후 통일)', () => {
+    expect(getPronunciationCardTitle()).toBe('발음평가 결과')
   })
 
-  it('provider=mock → "발음 평가" (기존 유지)', () => {
-    expect(getPronunciationCardTitle('mock')).toBe('발음 평가')
+  it('"ETRI 발음평가 API 결과" 문구는 더 이상 사용하지 않음', () => {
+    expect(getPronunciationCardTitle()).not.toBe('ETRI 발음평가 API 결과')
+  })
+
+  it('"발음 평가" 문구는 더 이상 기본 제목이 아님', () => {
+    expect(getPronunciationCardTitle()).not.toBe('발음 평가')
   })
 })
 
@@ -671,5 +675,96 @@ describe('result/page.tsx amber 박스 secondary 메시지 — etri_fetch_failed
     const fetchFailed = resolveAmberBoxSecondaryText('etri_fetch_failed', undefined)
     const scoreMissing = resolveAmberBoxSecondaryText('etri_score_missing', undefined)
     expect(fetchFailed).not.toBe(scoreMissing)
+  })
+})
+
+// ── Azure 발음평가 표시 정책 (Phase 10-E-7-D) ────────────────────────────────────
+
+type AzurePronResult = {
+  providerName: string
+  normalizedScore: number
+  pronScore?: number | null
+  accuracyScore?: number | null
+  fluencyScore?: number | null
+  completenessScore?: number | null
+  recognizedText?: string
+  fallbackReason?: string
+}
+
+function isAzureSuccessDisplay(p: AzurePronResult): boolean {
+  return p.providerName === 'azure' && p.pronScore != null
+}
+
+function getAzureCardDescription(p: AzurePronResult): string {
+  if (isAzureSuccessDisplay(p)) return 'provider: azure · 실시간 발음평가'
+  if (p.fallbackReason) return 'provider: demo · 시연용 평가 결과'
+  return `provider: ${p.providerName}`
+}
+
+describe('Azure 발음평가 표시 정책', () => {
+  const azureOk: AzurePronResult = {
+    providerName: 'azure',
+    normalizedScore: 87,
+    pronScore: 87,
+    accuracyScore: 90,
+    fluencyScore: 82,
+    completenessScore: 95,
+    recognizedText: '안녕하세요 저는 오늘 오후에 병원에 갑니다',
+  }
+
+  const azureFallback: AzurePronResult = {
+    providerName: 'demo',
+    normalizedScore: 72,
+    pronScore: null,
+    fallbackReason: 'azure_fetch_failed',
+  }
+
+  it('Azure success → isAzureSuccessDisplay = true', () => {
+    expect(isAzureSuccessDisplay(azureOk)).toBe(true)
+  })
+
+  it('Azure fallback → isAzureSuccessDisplay = false', () => {
+    expect(isAzureSuccessDisplay(azureFallback)).toBe(false)
+  })
+
+  it('Azure success → card description에 "실시간 발음평가" 포함', () => {
+    expect(getAzureCardDescription(azureOk)).toContain('실시간 발음평가')
+  })
+
+  it('Azure fallback → card description에 "시연용 평가 결과" 포함', () => {
+    expect(getAzureCardDescription(azureFallback)).toContain('시연용 평가 결과')
+  })
+
+  it('Azure success → pronScore 표시 가능 (null 아님)', () => {
+    expect(azureOk.pronScore).not.toBeNull()
+    expect(azureOk.pronScore).toBeGreaterThan(0)
+  })
+
+  it('Azure success → accuracyScore 표시 가능', () => {
+    expect(azureOk.accuracyScore).toBe(90)
+  })
+
+  it('Azure success → fluencyScore 표시 가능', () => {
+    expect(azureOk.fluencyScore).toBe(82)
+  })
+
+  it('Azure success → completenessScore 표시 가능', () => {
+    expect(azureOk.completenessScore).toBe(95)
+  })
+
+  it('Azure success → recognizedText 존재', () => {
+    expect(azureOk.recognizedText).toBeTruthy()
+  })
+
+  it('Azure fallback → fallbackReason 존재', () => {
+    expect(azureFallback.fallbackReason).toBeTruthy()
+  })
+
+  it('Azure success → ETRI 브랜치 표시 안 함 (providerName !== etri)', () => {
+    expect(shouldShowEtriBranch({ providerName: 'azure', normalizedScore: 87, wordScores: [] })).toBe(false)
+  })
+
+  it('Azure fallback (providerName=demo) → ETRI 브랜치 표시 안 함', () => {
+    expect(shouldShowEtriBranch({ providerName: 'demo', normalizedScore: 72, wordScores: [] })).toBe(false)
   })
 })

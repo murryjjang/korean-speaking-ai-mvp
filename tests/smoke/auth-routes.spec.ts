@@ -66,8 +66,7 @@ test.describe('인증 우회 — Supabase 미설정 환경', () => {
     // 데스크톱 사이드바 기준 (default Playwright viewport > md breakpoint)
     await expect(page.getByRole('link', { name: '말하기 평가' })).toBeVisible()
     await expect(page.getByRole('link', { name: '미션 대화' })).toBeVisible()
-    // 대회 준비는 disabled span — desktop sidebar와 mobile nav에 모두 존재하므로 first() 사용
-    await expect(page.getByText('말하기 대회 준비').first()).toBeVisible()
+    await expect(page.getByRole('link', { name: '발표연습' }).first()).toBeVisible()
   })
 
   test('/teacher는 Supabase 미설정 시 접근 가능 + 채점 관리 헤더 표시', async ({ page }) => {
@@ -1154,7 +1153,7 @@ test.describe('ETRI 발음 교정 데모 — /student/etri-pronunciation-demo', 
   test('데모 페이지 제목이 표시됨', async ({ page }) => {
     await page.goto('/student/etri-pronunciation-demo')
     if (!page.url().includes('/student')) return
-    await expect(page.getByRole('heading', { name: 'ETRI 발음 교정 데모' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'ETRI 발음교정 데모' })).toBeVisible()
   })
 
   test('시연용 데모 배너가 표시됨', async ({ page }) => {

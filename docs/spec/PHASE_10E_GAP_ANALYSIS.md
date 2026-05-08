@@ -3,7 +3,7 @@
 **Korean Speaking AI MVP — 평가 설계 정렬 분석**  
 **작성일**: 2026-05-05  
 **분석자**: Claude (Phase 10-E-0)  
-**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05) / 정식 문항 콘텐츠 입력 완료 (10-E-3 콘텐츠, 2026-05-05) / reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정, 2026-05-06) / asset 구조·listenLimit UI·student-safe rendering 완료 (10-E-4, 2026-05-06) / dialogue_mission 단발 녹음→제출 UI 비표시 완료 (10-E-4 추가 수정, 2026-05-06) / q2 제출 오류 수정 완료 (10-E-6-B, 2026-05-07) / 제출 지연 완화·ETRI fallback·q3 TTS·q4 복수 품목 처리 완료 (10-E-6-C, 2026-05-07) / q2/q3 평가 표시·q4 메뉴판·점수 환산 수정 완료 (10-E-6-D/E, 2026-05-07) / q2/q3 안내문구·q4 결제·총액·결과화면·STT 카드명·피드백 완료 (10-E-6-F, 2026-05-07) / q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H, 2026-05-07) / q2 SVG 이미지 등록·중급/고급 반영 범위 조사 완료 (10-E-6-I, 2026-05-07) / ETRI 발음 교정 데모 화면 추가·q1 오류 표시 완화 완료 (10-E-6-K, 2026-05-07) / **q1~q4 채점 안정화·q4 흐름 안정화·q2 SVG 개선 완료 (10-E-6-L 보강, 2026-05-07)**
+**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05) / 정식 문항 콘텐츠 입력 완료 (10-E-3 콘텐츠, 2026-05-05) / reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정, 2026-05-06) / asset 구조·listenLimit UI·student-safe rendering 완료 (10-E-4, 2026-05-06) / dialogue_mission 단발 녹음→제출 UI 비표시 완료 (10-E-4 추가 수정, 2026-05-06) / q2 제출 오류 수정 완료 (10-E-6-B, 2026-05-07) / 제출 지연 완화·ETRI fallback·q3 TTS·q4 복수 품목 처리 완료 (10-E-6-C, 2026-05-07) / q2/q3 평가 표시·q4 메뉴판·점수 환산 수정 완료 (10-E-6-D/E, 2026-05-07) / q2/q3 안내문구·q4 결제·총액·결과화면·STT 카드명·피드백 완료 (10-E-6-F, 2026-05-07) / q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H, 2026-05-07) / q2 SVG 이미지 등록·중급/고급 반영 범위 조사 완료 (10-E-6-I, 2026-05-07) / ETRI 발음 교정 데모 화면 추가·q1 오류 표시 완화 완료 (10-E-6-K, 2026-05-07) / q1~q4 채점 안정화·q4 흐름 안정화·q2 SVG 개선 완료 (10-E-6-L 보강, 2026-05-07) / q1 낭독 평가 Azure Pronunciation Assessment 전환 완료 (10-E-7-D, 2026-05-08) / **1차 시연 최종 안정화 완료 (10-E-8-FINAL, 2026-05-08) — 기능 동결**
 
 **10-E-6-L 보강 처리 결과 (2026-05-07):**
 - ✅ q2 elementRatio floor 확대: `≥0.8(4/5+)→80`, `≥0.5(3/5)→70`, `≥0.33(2/5)→60`
@@ -29,6 +29,46 @@
 - q2 이미지: 파일럿용 내부 SVG — 2차 시연 전 고품질 사진 교체 권장.
 - q3 실제 mp3: 2차 시연 전 품질 보강 필요.
 - q4: 실제 LLM provider 연결 후 대화 품질 추가 개선 필요.
+
+**10-E-7-A/B/C 처리 결과 (2026-05-08):**
+- ✅ 읽기연습 Azure Pronunciation Assessment 우선 전환 (`/api/pronunciation-azure/route.ts`)
+- ✅ Azure TTS + Pronunciation Assessment 공통 key/region 정책 (AZURE_SPEECH_KEY/REGION)
+- ✅ 선택적 override: AZURE_TTS_KEY/REGION, AZURE_PRONUNCIATION_KEY/REGION
+- ✅ TTS override: `src/providers/tts/azure.ts`, `/api/tts/route.ts` 반영
+- ✅ Pronunciation override: `/api/pronunciation-azure/route.ts` 반영
+- ✅ `.env.local.example` Azure 정책 문서화
+- ✅ 읽기연습 provider 표시: Azure 성공 → "실시간 발음평가", fallback → "데모 평가 모드"
+- ✅ fallback 안내 문구 학습자 친화적 ("실시간 발음평가 연결을 확인 중입니다. 현재는 시연용 평가 결과가 표시됩니다.")
+- ✅ 발표연습 흐름 안내 배너 추가 (설정 → 원고 교정 → 섀도잉 → 타이머 발표 → 피드백)
+- ✅ demo fallback 정확 낭독 점수 90+ 검증 smoke test 추가
+- ✅ lint: 0 errors / tsc: 0 errors / build: success / smoke: 229 passed
+
+**Known Issues (10-E-7-C 기준):**
+- Azure SPEECH_KEY/REGION 미설정 환경에서는 발음평가 demo fallback, TTS browser fallback.
+- 한국어 phoneme/prosody 세부 정보 Azure 제한 → word-level + STT diff 중심.
+- ETRI는 q1 데모 화면 유지 및 후속 검토 항목.
+- 발표연습 LLM 원고 교정·정밀 발표평가는 후속 단계.
+- 발표연습 섀도잉 음성 파일 저장은 후속 단계.
+
+**10-E-8-FINAL 처리 결과 (2026-05-08) — 1차 시연 기능 동결:**
+- ✅ q1 demo fallback 발음 카드 제목: "발음평가 결과" → "낭독 참고평가" (dynamic)
+- ✅ demo fallback 안내 문구: "음성 인식 결과와 제시문 비교를 바탕으로 한 참고평가"
+- ✅ 읽기연습 fallback 카드 제목: "읽기 정확도 참고평가", 배지: "음성 인식 기반 참고평가"
+- ✅ 발표연습 발음 안내: "발음 세부 평가는 Azure 연동 안정화 후 고도화 예정"
+- ✅ `/admin/analytics` 1차 시연용 샘플 데이터 분석 화면 신규 생성
+- ✅ `/teacher/dashboard` 교수자 학습 현황 대시보드 신규 생성
+- ✅ admin nav: "데이터 분석" 메뉴 추가. teacher nav: "교수자 현황" 메뉴 추가
+- ✅ 학습자 nav 정리: 읽기연습/발표연습 강조, 대화연습 "준비 중" disabled
+- ✅ Azure fallbackReason 분류 체계 유지 (서버 로그/개발자 전용)
+- ✅ unit tests: 598 passed (9 files). lint/tsc/build: 0 errors
+- ✅ 커밋/푸시 없음. 수동 확인 후 시연 동결 예정.
+
+**Known Issues (10-E-8-FINAL 기준):**
+- 분석 화면은 1차 시연용 샘플 데이터 — 실제 Supabase 평가 결과와 연결 예정
+- 학습자 식별자 익명화 완료 (S001~S006 형식). 실제 운영 시 DB 기반 익명화 필요
+- 국가별/어권별 분석은 실제 누적 데이터 확보 후 보정 필요
+- Azure PA actual:demo fallback 가능성 있음 → 후속 안정화 필요
+- 교수자 대시보드는 최종 판단 지원용이며 자동 확정 평가 아님
 
 **10-E-6-G/H 처리 결과 (2026-05-07):**
 - ✅ q2/q3 `elementRatio ≥ 1.0` → 최저 80점 보장 (`llm-eval/index.ts`)

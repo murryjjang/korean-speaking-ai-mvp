@@ -52,8 +52,13 @@ export async function proxy(request: NextRequest) {
   }
 
   // Teacher and admin routes additionally require the matching role.
+  // Exception: demo analytics routes are accessible to all authenticated users (1차 시연용).
+  const DEMO_ANALYTICS_ROUTES = ['/teacher/dashboard', '/admin/analytics']
   if (pathname.startsWith('/teacher') || pathname.startsWith('/admin')) {
-    if (profile.role !== 'teacher' && profile.role !== 'admin') {
+    const isDemoRoute = DEMO_ANALYTICS_ROUTES.some(
+      (r) => pathname === r || pathname.startsWith(`${r}/`),
+    )
+    if (!isDemoRoute && profile.role !== 'teacher' && profile.role !== 'admin') {
       return NextResponse.redirect(new URL('/student', request.url))
     }
   }

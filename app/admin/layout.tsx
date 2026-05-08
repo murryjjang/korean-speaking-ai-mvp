@@ -4,10 +4,10 @@ import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 
 const navItems: NavItem[] = [
   { label: "시스템 현황", href: "/admin" },
+  { label: "데이터 분석", href: "/admin/analytics" },
   { label: "반 관리", href: "/admin/classes", disabled: true },
   { label: "학생 관리", href: "/admin/students", disabled: true },
   { label: "콘텐츠 관리", href: "/admin/content", disabled: true },
-  { label: "분석 리포트", href: "/admin/reports", disabled: true },
 ];
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {

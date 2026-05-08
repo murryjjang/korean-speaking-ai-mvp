@@ -4,6 +4,103 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-8-FINAL: 1차 시연 전 최종 안정화 (2026-05-08)
+
+### 배경
+
+1차 시연 전 기능 동결을 위한 마지막 작업. q1/읽기연습 demo fallback 표현 과장 제거, 관리자 분석 대시보드 및 교수자 현황 화면 신규 구현, 메뉴 연결.
+
+### 주요 변경 사항
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/student/speaking/[questionId]/result/page.tsx` | demo fallback 시 발음 카드 제목을 "발음평가 결과"→"낭독 참고평가"로 동적 변경. fallback 안내 문구 → "음성 인식 결과와 제시문 비교를 바탕으로 한 참고평가" |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | fallback 피드백 문구 동일하게 업데이트 |
+| `app/student/reading-practice/reading-practice-client.tsx` | fallback 시 카드 제목→"읽기 정확도 참고평가", 배지→"음성 인식 기반 참고평가". 설명 문구 추가. |
+| `app/student/presentation-practice/presentation-practice-client.tsx` | 발음 안내 → "발음 세부 평가는 Azure 연동 안정화 후 고도화 예정입니다." |
+| `src/providers/pronunciation/index.ts` | AzureDemoFallbackProvider 피드백 문구 업데이트 |
+| `app/admin/analytics/page.tsx` | 신규 생성. 1차 시연용 샘플 데이터 기반 분석 화면. 국가별/어권별/과정별/문항별 카드. |
+| `app/teacher/dashboard/page.tsx` | 신규 생성. 교수자 학습 현황 대시보드. 익명 학습자 목록, 취약점 Top 5, 재학습 추천, 검토 대기. |
+| `app/admin/layout.tsx` | nav에 "데이터 분석" → `/admin/analytics` 추가 |
+| `app/teacher/layout.tsx` | nav에 "교수자 현황" → `/teacher/dashboard` 추가 |
+| `app/student/layout.tsx` | 학습자 nav 정리: 읽기연습/발표연습 강조, 대화연습 "준비 중" |
+| `tests/unit/phase-10e8-display-policy.test.ts` | 신규 생성. Azure/demo 표시 정책 7개 그룹 28개 테스트 |
+| `tests/smoke/analytics-dashboard.spec.ts` | 신규 생성. 관리자/교수자 화면 + 회귀 smoke 테스트 20건 |
+| `tests/unit/q1-azure-pronunciation-policy.test.ts` | 테스트 24번: 발음 카드 제목 Azure/demo 분기 테스트 추가 |
+
+### Azure 진단 결과
+
+- Azure route(`/api/pronunciation-azure`) 호출 여부: qt-reading 문항 제출 시 **클라이언트에서 직접 호출됨**
+- env 인식: `AZURE_SPEECH_KEY`/`AZURE_SPEECH_REGION` 존재 여부 boolean — route 진입 시 확인
+- audio 변환: `convertToWavForEtri` (16kHz mono 16-bit PCM WAV) 적용됨
+- fallbackReason 분류: `azure_not_configured` / `audio_conversion_failed` / `azure_http_error` / `azure_fetch_failed` / `azure_no_recognition` / `azure_no_pron_data`
+- fallbackReason은 서버 로그 및 개발자 전용 — 학습자 화면에 미노출
+- 실제 Azure 성공 여부: demo fallback 발생 가능성 있음 → 후속 안정화 필요
+
+### 표시 정책 요약
+
+| 상태 | q1 결과 제목 | q1 배지 | 읽기연습 제목 | 읽기연습 배지 |
+|---|---|---|---|---|
+| actual: azure | 발음평가 결과 | 실시간 발음평가 | 발음 평가 결과 | 실시간 발음평가 |
+| actual: demo | 낭독 참고평가 | 시연용 평가 모드 | 읽기 정확도 참고평가 | 음성 인식 기반 참고평가 |
+
+### Known Issues
+
+- 관리자/교수자 화면은 1차 시연용 샘플 데이터 — 실제 Supabase 연결 예정
+- 학습자 식별자 익명화 완료 (S001~S006 형식)
+- Azure PA actual: demo fallback 가능성 있음 — 후속 안정화 필요
+- 국가별/어권별 분석은 실제 누적 데이터 확보 후 보정 필요
+- 교수자 대시보드는 최종 판단 지원용이며 자동 확정 평가 아님
+
+### 검증 결과
+
+- npm run lint: 에러 0
+- npx tsc --noEmit: 에러 0
+- npm run build: 성공 (/admin/analytics, /teacher/dashboard 포함)
+- npx vitest run: 598/598 통과 (9개 파일)
+- 커밋/푸시: 없음
+
+---
+
+## Phase 10-E-7-D: q1 낭독 평가 Azure Pronunciation Assessment 전환 (2026-05-08)
+
+### 배경
+
+`.env.local` 정리 완료 후 `PRONUNCIATION_PROVIDER=azure`로 전환. q1 낭독 문항을 ETRI 중심에서 Azure Pronunciation Assessment 중심으로 이관. 읽기연습(`/student/reading-practice`)은 이미 `/api/pronunciation-azure` 직접 호출 구조로 구현됨. 말하기평가 q1도 동일 구조로 정렬.
+
+### 주요 변경 사항
+
+| 파일 | 변경 내용 |
+|---|---|
+| `src/types/providers.ts` | `ProviderName`에 `'demo'` 추가. `PronunciationResult`에 Azure 전용 필드 추가: `pronScore`, `accuracyScore`, `fluencyScore`, `completenessScore`, `recognizedText`, `wordResults`, `AzureWordResult` 타입 추출. |
+| `src/providers/pronunciation/index.ts` | `case 'azure'` 추가: `AzureDemoFallbackProvider` 반환 (서버사이드 fallback). 실제 Azure 평가는 클라이언트가 `/api/pronunciation-azure` 직접 호출. |
+| `app/student/speaking/actions.ts` | `ClientPronunciationResult`에 Azure 필드 추가. `buildClientPronunciation()`에서 Azure 필드 pass-through. |
+| `app/student/speaking/[questionId]/speaking-client.tsx` | qt-reading 발음평가 엔드포인트: `/api/pronunciation` → `/api/pronunciation-azure`. pronScore/accuracyScore/fluencyScore/completenessScore/recognizedText/wordResults 파싱. |
+| `app/student/speaking/[questionId]/result/page.tsx` | 발음평가 카드 전면 재작성. 카드 제목 → "발음평가 결과". Azure success 시 세부 점수 + 낭독 첨삭 + 동적 피드백 표시. 점수 산식: `clamp(round(PronScore×0.7 + aiScore×0.3), 0, 100)`. ETRI 레거시 호환 유지. `AzureWordDiff` 컴포넌트 추가. ETRI 데모 링크 "ETRI 비교 데모 보기"로 변경. |
+| `app/student/etri-pronunciation-demo/page.tsx` | Azure 전환 완료 안내 배너 추가. 제목 → "ETRI 발음교정 데모". |
+| `tests/unit/q1-azure-pronunciation-policy.test.ts` | 신규 생성. Azure 발음평가 정책 67개 단위 테스트. |
+| `tests/unit/pronunciation-display-policy.test.ts` | 카드 제목 테스트 업데이트("발음평가 결과"). Azure display policy 12개 테스트 추가. |
+
+### 정책 요약
+
+- **Azure 성공**: `q1ReadingScore = clamp(round(PronScore×0.7 + aiReadingTaskScore×0.3), 0, 100)`
+- **Azure 실패**: AI 참고평가 그대로. 감점 없음. "데모 평가 모드" 배지.
+- **ETRI 레거시**: `q1ReadingScore = round(calibratedScore×0.6 + aiReadingTaskScore×0.4)` (이전 평가 기록 호환)
+- **q2/q3/q4**: 기존 AI/룰 기반 평가 유지. Azure 전환 영향 없음.
+- **ETRI**: q1 공식 provider에서 제외. `/student/etri-pronunciation-demo`에서 비교 데모로 유지.
+- **읽기연습**: 이미 Azure 구조 완성. fallback 시 "데모 평가 모드" 배지 + 안내 문구.
+- **발표연습**: provider 구조 영향 없음. 기존 흐름 유지.
+
+### 테스트 결과
+
+- TypeScript: 오류 없음
+- ESLint: 오류 없음
+- Next.js build: 성공 (경고 1건)
+- Unit tests: 524/524 통과
+- Smoke tests: 229/229 통과
+
+---
+
 ## Phase 10-E-6-L (보강): q1~q4 채점 안정화 · q4 흐름 안정화 · q2 SVG 개선 (2026-05-07)
 
 ### 배경
@@ -45,6 +142,46 @@ Phase별 작업 내역을 기록합니다.
 - q2 이미지는 파일럿용 내부 SVG이며, 2차 시연 전 고품질 사진으로 교체 권장.
 - q3 실제 mp3는 2차 시연 전 품질 보강 필요.
 - q4 실제 LLM provider 연결 후 대화 품질 추가 개선 필요.
+
+---
+
+## Phase 10-E-7-A/B 통합 보강: 읽기연습 Azure Pronunciation Assessment 전환 + 발표연습 구현 (2026-05-08)
+
+### 배경
+
+읽기연습 발음평가 변별력 부족(원어민 vs 어눌한 발화 점수 차이 없음) 해결 및 1차 시연용 Azure Pronunciation Assessment 우선 전환. 발표연습(/student/presentation-practice) 신규 구현.
+
+### 수정/추가 파일
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/api/pronunciation-azure/route.ts` | 신규. Azure Speech Pronunciation Assessment REST API 연동. WAV 변환→Azure 호출→PronScore/Accuracy/Fluency/Completeness/Word ErrorType 파싱. 실패 시 demo fallback. |
+| `app/student/reading-practice/reading-practice-client.tsx` | 전면 재작성. Azure 우선 발음평가, 전체 듣기 중 줄별 자동 스크롤/강조, 개선된 LineDiff(누락 배지/초록/빨간), 점수 변별력 개선(정확 낭독 90+, 어눌 60 이하 가능), 동적 피드백 생성. |
+| `app/student/presentation-practice/page.tsx` | 신규. 발표연습 서버 컴포넌트 wrapper. |
+| `app/student/presentation-practice/presentation-practice-client.tsx` | 신규. 발표 설정/원고 입력/AI 교정(데모)/섀도잉/타이머(카운트다운+스톱워치+30초·10초·종료 알림)/피드백 구현. |
+| `app/student/layout.tsx` | "말하기 대회 준비(disabled)" → "발표연습" (/student/presentation-practice) 으로 교체. |
+| `tests/smoke/reading-practice.spec.ts` | Azure fallback 안내 확인, 점수 범위 검증 테스트 추가. |
+| `tests/smoke/presentation-practice.spec.ts` | 신규. 발표연습 전 기능 smoke test. |
+| `tests/smoke/auth-routes.spec.ts` | "말하기 대회 준비" → "발표연습" 메뉴 확인으로 수정. |
+| `playwright.config.ts` | presentation-practice.spec.ts 추가. |
+
+### 점수 변별력 개선 요약
+
+- Azure PronScore 성공 시: pronScore×0.5 + accuracy×0.2 + fluency×0.15 + completeness×0.15
+- Azure 실패 시: STT 단어 일치율 기반 산식 (95%+ → 90~100, 80%+ → 80~90, 60%+ → 70~80, 40%+ → 60~70, 40% 미만 → 30~60)
+
+### 검증 결과
+- npm run lint: 에러 0
+- npx tsc --noEmit: 에러 0
+- npm run build: 성공 (/student/presentation-practice, /api/pronunciation-azure 포함)
+- npm run test:smoke: 227 passed
+
+### Known Issues
+- 읽기연습 발음평가: Azure key/region 설정 및 네트워크 확인 필요.
+- 한국어 prosody/phoneme 세부 정보 제한 → word-level + STT diff 중심 표시.
+- ETRI는 q1 데모 화면 유지. 후속 단계 별도 확인.
+- 발표연습 원고 교정: 샘플 기반. LLM 연동은 후속 단계.
+- 발표 정밀 평가: 파일럿 데이터 수집 후 보정 필요.
 
 ---
 

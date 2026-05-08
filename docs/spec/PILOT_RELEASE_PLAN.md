@@ -25,7 +25,7 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 | **D+3** — 최소기능 시연판 | 2026-05-07 | Supabase 연결 + 핵심 경로 저장 확인 | ✅ 완료 (Phase 6-B1~B2) |
 | **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 | ✅ 완료 (Phase 6-B2~B5) |
 | **D+10** — 로그인/역할 분기 | 2026-05-14 | Supabase Auth 기반 로그인 + 역할별 route 보호 | ✅ 완료 (Phase 9-A) |
-| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | P0 처리 완료 (10-E-1), P1-1~P1-4 처리 완료 (10-E-2), 정식 문항 콘텐츠 입력 완료 (10-E-3), reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정), asset 구조·listenLimit·student-safe rendering 완료 (10-E-4), dialogue_mission 단발 녹음 UI 비표시·준비 중 상태 표시 완료 (10-E-4 추가 수정), dialogue_mission 실제 AI 대화 UI + TTS 재생 완료 (10-E-5-A), 교수자 채점 official rubric 강화 완료 (10-E-5-B), assessment/practice 정책 분리·페르소나 구조·Azure TTS provider 준비 완료 (10-E-5-C/D), q2 제출 오류(ETRI 빈 blob crash) 수정 완료 (10-E-6-B), ETRI timeout 단축·q3 TTS fallback 명확화·q4 복수 품목 처리 완료 (10-E-6-C), q2/q3 평가 표시 정리·q4 메뉴판·점수 환산·조사 처리 수정 완료 (10-E-6-D/E), q2/q3 안내문구·q4 결제 goal·총액·결과화면·STT 카드명·goalResults 피드백 완료 (10-E-6-F), q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H), q2 SVG 이미지·중급/고급 범위 조사 완료 (10-E-6-I), ETRI 발음 교정 데모 화면·q1 오류 표시 완화 완료 (10-E-6-K), **q1~q4 채점 안정화·q4 흐름 안정화·q2 SVG 개선·STT timeout·목표달성 피드백 일관화 완료 (10-E-6-L 보강)**, Known issues: 실제 식당 사진·음원 mp3 교체 필요, q2/q3/q4 점수 산식 파일럿 보정 필요, q4 실제 LLM provider 연결 후 대화 품질 추가 개선 필요, ETRI 실시간 network 안정성 1차 시연 후 별도 확인 필요 |
+| **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | **1차 시연 최종 안정화 완료 (10-E-8-FINAL, 2026-05-08)**. 관리자 분석 대시보드(`/admin/analytics`), 교수자 현황(`/teacher/dashboard`) 신규 구현. Azure/demo 표시 정책 최종 정리. Known issues: Azure PA actual:demo fallback 가능성 있음(후속 안정화 필요), 분석 화면은 샘플 데이터(실제 Supabase 연결 예정), 발표연습 정밀 평가는 후속 단계 |
 
 ---
 
@@ -77,7 +77,10 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 
 ---
 
-## ETRI 발음평가 Calibration Checklist (파일럿 전 완료 권장)
+## ETRI 발음평가 Calibration Checklist (참고 보존용 — q1은 Azure로 전환됨)
+
+> **[10-E-7-D, 2026-05-08] q1 낭독 평가는 Azure Pronunciation Assessment로 전환되었습니다.**  
+> 이 체크리스트는 ETRI 후속 비교·검토용으로 보존됩니다. 파일럿 기간 q1 발음 점수는 Azure 기준으로 운용합니다.
 
 파일럿에서 ETRI 발음 점수를 참고값 이상으로 활용하기 전에 다음 항목을 확인한다.
 
@@ -124,27 +127,34 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 - rmsApprox < 100인 샘플 다수 → 마이크/녹음 환경 개선 필요
 - recognizedStringPrefix와 script 불일치 → WAV 변환 또는 script 문제 의심
 
-**파일럿 기간 발음 점수 정책 (calibration 완료 전, Phase 10-E-7 추가 수정 이후):**
-- ETRI endpoint: `ETRI_PRONUNCIATION_ENDPOINT` env로 재정의 가능. 기본값 `http://epretx.etri.re.kr:8000/api/WiseASR_PronunciationKor`
-- ETRI API 오류 시 세분화된 안내 메시지 표시: fetch 실패 / HTTP 오류 / API 오류 각각 구분
-- q1 낭독 문항(qt-reading): 종합점수 카드 "문항 AI 참고평가", rubric-speaking-01 breakdown 숨김, 낭독 기준 4개 표시
-- **q1 AI 참고점수에 ETRI 보정 참고값 일부 반영** (Phase 10-E-7 추가 수정):
-  - ETRI 성공 시: `q1ReferenceScore = round(calibratedScore × 0.6 + aiScore × 0.4)` 산식 적용 (임시)
-  - ETRI 실패 시: 기존 AI 참고점수 유지, "ETRI 발음평가가 반영되지 않은 AI 참고평가" 안내
-  - q1 카드 부제: ETRI 성공 시 "AI 1차 평가 + ETRI 보정 참고값 · 교수자 확정 전 참고값"
-  - q1ReferenceScore는 최종점수가 아님 — 교수자 검토 후 확정
-  - q1ReferenceScore는 1~4번 세트 공식 종합점수에 자동 반영하지 않음
-  - 0.6/0.4 반영 비율은 파일럿 calibration 샘플 수집 후 재조정 필요
-- q2/q3/q4 문항: 기존 rubric-speaking-01 5개 항목 breakdown 유지 (변경 없음)
-- 상단 종합점수 카드의 발음 항목: provider=etri이면 "AI 발음 추정 X/20" (ETRI 원점수 아님, AI aggregate 파생값)
-- ETRI 발음평가 카드 3단계 표시: 원점수(rawScore) / 단순 환산(normalizedScore) / 보정 참고점수(calibratedScore)
-- calibratedScore는 "파일럿 보정용 참고값" (calibrationStatus="provisional") — teacher final score 자동 확정 없음
-- 교수자가 최종 발음 점수를 직접 확정
-- calibration 완료(calibrationStatus="validated") 후 종합점수 반영 비율 재설정
+**파일럿 기간 발음 점수 정책 (Phase 10-E-7-D 이후 — Azure 전환 기준):**
+
+> **[10-E-7-D, 2026-05-08] q1 낭독 평가 공식 발음평가: ETRI → Azure Pronunciation Assessment 전환 완료**
+
+- **환경 변수**: `PRONUNCIATION_PROVIDER=azure` (`.env.local` 정리 완료 기준)
+  - `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` — TTS와 발음평가 공통 사용 가능
+  - Azure key/region 미설정 시 demo fallback 자동 적용 (시연 흐름 유지)
+- **q1 낭독 문항(qt-reading)**: 클라이언트가 `/api/pronunciation-azure` 직접 호출 (referenceText 기반 scripted assessment)
+  - Azure 성공 시: `q1ReferenceScore = clamp(round(PronScore × 0.7 + aiScore × 0.3), 0, 100)` 산식 적용
+  - Azure 실패/demo fallback 시: 기존 AI 참고점수 유지
+  - q1 결과 카드: 항상 "발음평가 결과" 타이틀, provider=azure 시 PronScore·Accuracy·Fluency·Completeness + word-level diff 표시
+  - 한국어 phoneme/prosody 세부 점수는 제한될 수 있으므로 word-level + STT diff 중심으로 첨삭
+- **읽기연습(`/student/reading-practice`)**: Azure 발음평가 동일하게 적용 (10-E-7-A 이후 유지)
+- **q2/q3/q4 문항**: 자유응답·내용평가 포함이므로 기존 AI/룰 기반 평가 유지 (변경 없음)
+- **발표연습(`/student/presentation-practice`)**: Azure 발음평가 표시 (provider 표기만, 점수 체계 별도)
+- **ETRI**: q1 공식 평가에서 제외. `/student/etri-pronunciation-demo` 비교 데모 및 후속 검토용으로 유지
+- q1ReferenceScore는 최종점수가 아님 — 교수자 검토 후 확정
+- q1ReferenceScore는 1~4번 세트 공식 종합점수에 자동 반영하지 않음
+
+**[Legacy] ETRI 기반 발음 점수 정책 (10-E-7-D 이전 기록, 참고용):**
+- ETRI endpoint: `ETRI_PRONUNCIATION_ENDPOINT` env로 재정의 가능
+- ETRI 성공 시: `q1ReferenceScore = round(calibratedScore × 0.6 + aiScore × 0.4)` (구 산식)
+- ETRI 실패 시: 기존 AI 참고점수 유지
+- calibratedScore "파일럿 보정용 참고값" (calibrationStatus="provisional") — 현재 Azure 전환으로 ETRI 참조 불필요
 
 **종합점수 반영 정책:**
-- 현재: ETRI calibratedScore는 공식 종합점수에 자동 반영하지 않음
-- q1 문항 AI 참고평가: calibratedScore 일부 반영 (provisional 산식 — 참고값만)
+- 현재: Azure PronScore는 q1ReferenceScore에만 반영 (공식 종합점수 자동 반영 없음)
+- q1 문항 AI 참고평가: Azure 성공 시 `PronScore×0.7 + aiScore×0.3` 산식 반영 (provisional)
 - 파일럿: 교수자가 발음 점수를 직접 결정 (teacher final review workflow 유지)
 - 후속: 공식 세트(q1~q4) 전체 응시 흐름 완성 후 반영 비율 확정
 

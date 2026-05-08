@@ -31,7 +31,9 @@ export async function POST(request: Request) {
 
   // Fast path: not a real provider or missing credentials → return fallback immediately
   const isOpenAI = configuredProvider === 'openai' && !!process.env.OPENAI_API_KEY
-  const isAzure = configuredProvider === 'azure' && !!process.env.AZURE_SPEECH_KEY && !!process.env.AZURE_SPEECH_REGION
+  const azureTtsKey = process.env.AZURE_TTS_KEY || process.env.AZURE_SPEECH_KEY
+  const azureTtsRegion = process.env.AZURE_TTS_REGION || process.env.AZURE_SPEECH_REGION
+  const isAzure = configuredProvider === 'azure' && !!azureTtsKey && !!azureTtsRegion
   if (!isOpenAI && !isAzure) {
     await logProviderEvent({
       provider: 'mock',

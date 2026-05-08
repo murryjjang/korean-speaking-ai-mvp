@@ -234,11 +234,32 @@ export default function EtriPronunciationDemoPage() {
       </div>
 
       <PageHeader
-        title="ETRI 발음 교정 데모"
-        description="발음평가 연동 방식과 교정 흐름 시연용 화면"
+        title="ETRI 발음교정 데모"
+        description="ETRI 연동 방식 비교 및 후속 검토용 · 현재 q1 공식 낭독 평가는 Azure 발음평가 중심으로 전환되었습니다."
       />
 
       <div className="max-w-2xl mx-auto space-y-6">
+        {/* Azure 전환 안내 */}
+        <Card>
+          <CardBody>
+            <div
+              className="flex items-start gap-3"
+              data-testid="azure-transition-notice"
+            >
+              <Badge variant="info">Azure 전환 완료</Badge>
+              <div>
+                <p className="text-sm font-medium text-text-primary mb-1">
+                  현재 q1 공식 낭독 평가는 Azure 발음평가 중심으로 전환되었습니다.
+                </p>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  이 화면은 ETRI 발음교정 연동 방식 비교 및 후속 검토용으로 유지됩니다.
+                  실제 q1 평가 결과는 말하기 평가 결과 화면에서 확인하세요.
+                </p>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
         {/* 상단 안내 */}
         <Card>
           <CardBody>
