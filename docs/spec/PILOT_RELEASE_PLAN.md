@@ -26,6 +26,63 @@ Korean Speaking AI MVP — 소규모 파일럿 출시 로드맵.
 | **D+5** — Supabase 저장 연동 보완판 | 2026-05-09 | 모든 저장 경로 DB 연동 완료 | ✅ 완료 (Phase 6-B2~B5) |
 | **D+10** — 로그인/역할 분기 | 2026-05-14 | Supabase Auth 기반 로그인 + 역할별 route 보호 | ✅ 완료 (Phase 9-A) |
 | **D+15** — 소규모 파일럿 출시판 | 2026-05-19 | 배포 완료 + 파일럿 가이드 | **1차 시연 최종 안정화 완료 (10-E-8-FINAL, 2026-05-08)**. 관리자 분석 대시보드(`/admin/analytics`), 교수자 현황(`/teacher/dashboard`) 신규 구현. Azure/demo 표시 정책 최종 정리. Known issues: Azure PA actual:demo fallback 가능성 있음(후속 안정화 필요), 분석 화면은 샘플 데이터(실제 Supabase 연결 예정), 발표연습 정밀 평가는 후속 단계 |
+| **2차 시연** — Azure PA 실제 연동 | 2026-05-19 이후 | Azure Pronunciation Assessment 실제 연결 + 정밀 발음평가 데이터화 | **목표**: "정밀 발음평가 실제 연결 + 교수자 검토 가능 데이터화" |
+
+---
+
+## 2차 시연 핵심 목표: Azure Pronunciation Assessment 실제 연동
+
+**목표**: "정밀 발음평가 실제 연결 + 교수자 검토 가능 데이터화"
+
+### Azure 발음평가 표시 정책 (2차 시연 기준)
+
+| 상태 | `actual` | 배지 | 표시 데이터 |
+|---|---|---|---|
+| Azure 성공 | `azure` | "실시간 발음평가" | PronScore, AccuracyScore, FluencyScore, CompletenessScore, recognizedText |
+| Azure 실패 | `demo` | "시연용 참고평가" | fallback 결과 (학습 흐름 유지) |
+
+### 2차 시연 전 Azure 연동 점검 항목
+
+| 항목 | 확인 방법 | 기대 결과 |
+|---|---|---|
+| key/region 일치 | `.env.local` 확인 | AZURE_SPEECH_KEY/REGION 유효값 설정 |
+| Azure Speech 리소스 권한 | Azure Portal 확인 | Pronunciation Assessment 기능 사용 가능 |
+| `/api/pronunciation-azure` 호출 | 서버 로그 확인 | 실제 route 진입 및 응답 |
+| audio format | 변환 로직 확인 | 16kHz mono 16-bit PCM WAV |
+| timeout 조정 | route 설정 확인 | 10초 → 필요 시 조정 |
+| SDK cancellation reason 로깅 | 서버 로그 확인 | cancellationReason / errorDetails 출력 |
+| PronScore 파싱 | 응답 JSON 확인 | PronScore/AccuracyScore/FluencyScore/CompletenessScore 수치 확인 |
+
+### 2차 시연 전 calibration 계획
+
+- 실제 녹음 샘플 5개 이상으로 점수 calibration 수행
+- 원어민 샘플: PronScore 80+ 기대
+- 초급 학습자 샘플: PronScore 55~70 기대
+- 결과 이상 시 audio format/timeout/key 재점검
+
+### 2차 시연 Azure 연동 진단 화면 (검토 예정)
+
+경로 예: `/student/azure-pronunciation-check`
+
+표시 항목:
+- `actual`: `azure` 또는 `demo`
+- `PronScore`, `AccuracyScore`, `FluencyScore`, `CompletenessScore`
+- `recognizedText`
+- `fallbackReason`
+
+### 발표연습 2차 시연 고도화 목표
+
+- 실제 발표 녹음 기반 STT 결과 Supabase 저장
+- 교정문-발화 비교 결과 저장
+- Azure 발음평가 결과 저장
+- 교수자 대시보드에서 발표 피드백 확인
+- 개인별/어권별 발표 취약점 분석
+
+### q2/q3/q4 발음-내용 분리 평가 (2차 시연 목표)
+
+- 발음 평가: Azure Pronunciation Assessment
+- 내용/과제수행 평가: AI·룰 기반 (기존 로직 유지)
+- q1~q4 평가 산식 변경 없음. 발음 점수만 Azure 실결과로 교체.
 
 ---
 

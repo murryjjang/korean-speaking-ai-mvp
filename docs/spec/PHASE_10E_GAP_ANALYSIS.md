@@ -3,7 +3,7 @@
 **Korean Speaking AI MVP — 평가 설계 정렬 분석**  
 **작성일**: 2026-05-05  
 **분석자**: Claude (Phase 10-E-0)  
-**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05) / 정식 문항 콘텐츠 입력 완료 (10-E-3 콘텐츠, 2026-05-05) / reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정, 2026-05-06) / asset 구조·listenLimit UI·student-safe rendering 완료 (10-E-4, 2026-05-06) / dialogue_mission 단발 녹음→제출 UI 비표시 완료 (10-E-4 추가 수정, 2026-05-06) / q2 제출 오류 수정 완료 (10-E-6-B, 2026-05-07) / 제출 지연 완화·ETRI fallback·q3 TTS·q4 복수 품목 처리 완료 (10-E-6-C, 2026-05-07) / q2/q3 평가 표시·q4 메뉴판·점수 환산 수정 완료 (10-E-6-D/E, 2026-05-07) / q2/q3 안내문구·q4 결제·총액·결과화면·STT 카드명·피드백 완료 (10-E-6-F, 2026-05-07) / q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H, 2026-05-07) / q2 SVG 이미지 등록·중급/고급 반영 범위 조사 완료 (10-E-6-I, 2026-05-07) / ETRI 발음 교정 데모 화면 추가·q1 오류 표시 완화 완료 (10-E-6-K, 2026-05-07) / q1~q4 채점 안정화·q4 흐름 안정화·q2 SVG 개선 완료 (10-E-6-L 보강, 2026-05-07) / q1 낭독 평가 Azure Pronunciation Assessment 전환 완료 (10-E-7-D, 2026-05-08) / **1차 시연 최종 안정화 완료 (10-E-8-FINAL, 2026-05-08) — 기능 동결**
+**상태**: 분석 완료 (10-E-0) / P0 처리 완료 (10-E-1, 2026-05-05) / P1-1~P1-4 처리 완료 (10-E-2, 2026-05-05) / 정식 문항 콘텐츠 입력 완료 (10-E-3 콘텐츠, 2026-05-05) / reading 피드백·404·dialogue_mission 재정의 완료 (10-E-3 추가 수정, 2026-05-06) / asset 구조·listenLimit UI·student-safe rendering 완료 (10-E-4, 2026-05-06) / dialogue_mission 단발 녹음→제출 UI 비표시 완료 (10-E-4 추가 수정, 2026-05-06) / q2 제출 오류 수정 완료 (10-E-6-B, 2026-05-07) / 제출 지연 완화·ETRI fallback·q3 TTS·q4 복수 품목 처리 완료 (10-E-6-C, 2026-05-07) / q2/q3 평가 표시·q4 메뉴판·점수 환산 수정 완료 (10-E-6-D/E, 2026-05-07) / q2/q3 안내문구·q4 결제·총액·결과화면·STT 카드명·피드백 완료 (10-E-6-F, 2026-05-07) / q2/q3 저점 보정·q3 피드백 오류·q4 분리주문·수량 goal·UI 레이블·mock 안내 완료 (10-E-6-G/H, 2026-05-07) / q2 SVG 이미지 등록·중급/고급 반영 범위 조사 완료 (10-E-6-I, 2026-05-07) / ETRI 발음 교정 데모 화면 추가·q1 오류 표시 완화 완료 (10-E-6-K, 2026-05-07) / q1~q4 채점 안정화·q4 흐름 안정화·q2 SVG 개선 완료 (10-E-6-L 보강, 2026-05-07) / q1 낭독 평가 Azure Pronunciation Assessment 전환 완료 (10-E-7-D, 2026-05-08) / **1차 시연 최종 안정화 완료 (10-E-8-FINAL, 2026-05-08) — 기능 동결** / **발표연습 시연 보강·2차 시연 Azure 목표 문서화 완료 (10-E-9, 2026-05-08)**
 
 **10-E-6-L 보강 처리 결과 (2026-05-07):**
 - ✅ q2 elementRatio floor 확대: `≥0.8(4/5+)→80`, `≥0.5(3/5)→70`, `≥0.33(2/5)→60`
@@ -69,6 +69,57 @@
 - 국가별/어권별 분석은 실제 누적 데이터 확보 후 보정 필요
 - Azure PA actual:demo fallback 가능성 있음 → 후속 안정화 필요
 - 교수자 대시보드는 최종 판단 지원용이며 자동 확정 평가 아님
+
+---
+
+**10-E-9 처리 결과 (2026-05-08) — 발표연습 시연 보강 + 2차 시연 문서화:**
+- ✅ 발표연습 기본 예문 "지난 주말에 한 일"로 교체. 주제·원고 pre-fill.
+- ✅ 수준 선택(초급/중급/고급) 추가. 기본값 초급.
+- ✅ "AI 원고 교정하기" 버튼 텍스트 변경 + 교정문·한국어 설명·베트남어 설명 신규 예문.
+- ✅ 섀도잉 카드 "교정문 섀도잉" 리라벨. "교정문 듣기/천천히 듣기/보통 속도로 듣기" 버튼.
+- ✅ TTS 실패 시 화면 깨지지 않고 안내 메시지 표시. "정밀 발음평가" 유사 표현 제거.
+- ✅ 발표 녹음 카드 신규. MediaRecorder → STT → 실패 시 demo transcript fallback.
+- ✅ "내 발표 내용" 카드, "교정문-발화 비교" 카드 신규 (포함/빠진/다른 내용).
+- ✅ 피드백 점수 그리드 제거 → 한국어+베트남어 bullet 피드백.
+- ✅ 금지 표현 완전 제거 ("정밀 발음평가", "실시간 발음평가", "Azure 발음평가 결과" 등).
+- ✅ 연습 흐름 6단계 (발표 녹음 추가).
+- ✅ smoke test 21건 추가. 회귀 검증 포함.
+- ✅ WORK_LOG, PHASE_10E_GAP_ANALYSIS, PILOT_RELEASE_PLAN 문서화.
+- ✅ 커밋/푸시 없음.
+
+**2차 시연 Azure Pronunciation Assessment 연동 목표:**
+
+| 항목 | 내용 |
+|---|---|
+| 최우선 과제 | Azure Pronunciation Assessment 실제 연결 |
+| 적용 대상 | q1 낭독, 읽기연습, 발표연습 |
+| Azure 성공 시 | `actual: azure`, 배지 "실시간 발음평가", PronScore/AccuracyScore/FluencyScore/CompletenessScore/recognizedText 표시 |
+| Azure 실패 시 | `actual: demo`, "시연용 참고평가" fallback 유지. 학습 흐름 중단 없음. |
+| q2/q3/q4 | 발음(Azure) + 내용/과제수행(AI·룰 기반) 분리 평가 |
+| calibration | 2차 시연 전 실제 녹음 샘플 5개 이상으로 점수 보정 |
+| 진단 화면 | `/student/azure-pronunciation-check` (actual/PronScore/fallbackReason 표시) 검토 |
+
+**Azure 연동 점검 항목 (2차 시연 전):**
+- AZURE_SPEECH_KEY/REGION 일치 확인
+- Azure Speech 리소스 권한 확인
+- `/api/pronunciation-azure` route 실제 호출 확인
+- audio format 변환 확인 (16kHz mono 16-bit PCM WAV)
+- timeout 조정 (현재 10초)
+- SDK cancellation/error reason 로깅
+- PronScore, AccuracyScore, FluencyScore, CompletenessScore 파싱
+
+**발표연습 2차 시연 고도화 목표:**
+- 실제 발표 녹음 기반 STT 결과 Supabase 저장
+- 교정문-발화 비교 결과 저장
+- Azure 발음평가 결과 저장
+- 교수자 대시보드에서 발표 피드백 확인
+- 개인별/어권별 발표 취약점 분석
+
+**Known Issues (10-E-9 기준):**
+- 발표연습 실제 LLM 교정 미연결 (demo correction 고정값)
+- 교정문-발화 비교는 demo 데이터 기준 (실제 STT 결과 반영 예정)
+- MediaRecorder 실제 녹음 STT: 시연 환경에서 mic 권한 필요
+- Azure PA actual:demo fallback → 2차 시연에서 실제 연동 목표
 
 **10-E-6-G/H 처리 결과 (2026-05-07):**
 - ✅ q2/q3 `elementRatio ≥ 1.0` → 최저 80점 보장 (`llm-eval/index.ts`)

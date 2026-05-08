@@ -4,6 +4,42 @@ Phase별 작업 내역을 기록합니다.
 
 ---
 
+## Phase 10-E-9-PRESENTATION-DEMO-AND-ROADMAP: 발표연습 시연 보강 + 2차 시연 문서화 (2026-05-08)
+
+### 배경
+
+1차 시연 후 발표연습 화면을 시연 효과가 높은 형태로 보강하고, 2차 시연 Azure 발음평가 실제 연동 목표를 문서화. q1~q4 평가 산식, Supabase 저장, 인증/role guard, teacher review workflow 변경 없음.
+
+### 주요 변경 사항
+
+| 파일 | 변경 내용 |
+|---|---|
+| `app/student/presentation-practice/presentation-practice-client.tsx` | 기본 예문 "지난 주말에 한 일"로 교체 (주제·원고 pre-fill). 수준 선택(초급/중급/고급) 추가. "AI 원고 교정하기" 버튼 텍스트 변경. 교정문·한국어 설명·베트남어 설명 신규 예문 반영. 섀도잉 카드 → "교정문 섀도잉" 리라벨 + "교정문 듣기/천천히 듣기/보통 속도로 듣기" 버튼 추가. TTS 실패 시 화면 깨지지 않고 안내 메시지 표시. 발표 녹음 카드 신규 추가 (MediaRecorder → STT). STT 실패 시 demo transcript fallback. "내 발표 내용" 카드 신규. "교정문-발화 비교" 카드 신규 (포함/빠진/다른 내용). 발표 피드백 점수 그리드 제거 → 한국어+베트남어 bullet 피드백으로 교체. 금지 표현 제거 ("정밀 발음평가", "실시간 발음평가", "Azure 발음평가 결과" 등). 연습 흐름 6단계로 확장 (발표 녹음 추가). |
+| `tests/smoke/presentation-practice.spec.ts` | Phase 10-E-9 신규 테스트 21건 추가. `btn-play-script` → `btn-play-corrected` 업데이트. 회귀 검증 (q1~q4, 읽기연습, admin/analytics, teacher/dashboard) 추가. |
+| `docs/spec/WORK_LOG.md` | Phase 10-E-9 작업 내역 기록 (이 항목) |
+| `docs/spec/PHASE_10E_GAP_ANALYSIS.md` | 2차 시연 Azure 발음평가 실제 연동 목표 반영 |
+| `docs/spec/PILOT_RELEASE_PLAN.md` | 2차 시연 Azure 연동 계획 + 발표연습 고도화 목표 반영 |
+
+### 표시 정책 (발표연습)
+
+| 상태 | 섀도잉 카드 | 피드백 카드 | 배지 |
+|---|---|---|---|
+| actual: demo | "교정문 섀도잉" + TTS 안내 | 한국어+모국어 bullet 피드백 | "시연용 참고 피드백" |
+| STT 실패 | demo transcript 표시 | 비교 카드 표시 (demo 데이터) | "음성 인식 기반 참고평가" |
+
+### Known Issues
+
+- 발표연습 실제 LLM 교정 미연결 (demo correction 고정값 사용)
+- Azure TTS 미연결 시 browser speechSynthesis fallback → 둘 다 실패 시 안내 메시지 표시
+- MediaRecorder 실제 녹음 STT: 시연 환경에서 mic 권한 필요. 미허가 시 demo transcript 자동 표시.
+- 교정문-발화 비교는 demo 데이터 기준 (실제 STT 결과와 무관한 고정 비교값)
+
+### 검증 결과
+
+- 커밋/푸시: 없음
+
+---
+
 ## Phase 10-E-8-FINAL: 1차 시연 전 최종 안정화 (2026-05-08)
 
 ### 배경
