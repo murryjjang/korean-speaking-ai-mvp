@@ -116,9 +116,9 @@ function generateKoreanFeedback(
   if (score >= 90) {
     return {
       good: [
-        '전체 문장을 매우 정확하게 읽었습니다.',
-        '단어 누락이 거의 없고 문장 흐름이 자연스럽습니다.',
-        '현재 수준에서는 발음과 읽기 정확도가 매우 좋습니다.',
+        '제시문을 매우 정확하게 읽었습니다.',
+        '대부분의 핵심 단어가 정확히 인식되었습니다.',
+        '현재 수준에서는 읽기 정확도가 좋습니다.',
       ],
       improve: [],
       reread: null,
@@ -130,8 +130,8 @@ function generateKoreanFeedback(
         '전체적인 읽기 흐름이 좋습니다.',
       ],
       improve: hasMismatch
-        ? ['일부 단어의 발음을 조금 더 명확하게 해 보세요.']
-        : ['문장 끝을 조금 더 또렷하게 읽어 보세요.'],
+        ? ['대부분 잘 읽었으나 일부 단어가 다르게 인식되었습니다.', '문장 끝을 조금 더 또렷하게 읽으면 좋습니다.']
+        : ['문장 끝을 조금 더 또렷하게 읽으면 좋습니다.'],
       reread: REFERENCE_LINES[2],
     }
   } else if (score >= 70) {
@@ -140,7 +140,7 @@ function generateKoreanFeedback(
       improve: [
         '일부 단어가 누락되었거나 다르게 읽혔습니다.',
         '문장 끝부분을 조금 더 또렷하게 읽어 보세요.',
-        '빨간색으로 표시된 단어를 다시 읽어 보세요.',
+        ...(hasMismatch ? ['빨간색으로 표시된 단어를 다시 읽어 보세요.'] : []),
       ],
       reread: REFERENCE_LINES[2],
     }
@@ -148,10 +148,10 @@ function generateKoreanFeedback(
     return {
       good: [],
       improve: [
-        '여러 단어가 누락되었거나 다르게 읽혔습니다.',
-        '빨간색으로 표시된 단어를 다시 읽어 보세요.',
+        '일부 문장이 빠지거나 다르게 인식되었습니다.',
+        'AI 음성을 다시 듣고 한 문장씩 따라 읽어 보세요.',
+        ...(hasMismatch ? ['빨간색으로 표시된 단어를 다시 읽어 보세요.'] : []),
         '단어 사이를 의미 단위로 끊어 읽어 보세요.',
-        '문장 끝을 흐리지 않도록 끝까지 또렷하게 읽어 보세요.',
       ],
       reread: REFERENCE_LINES[2],
     }
@@ -214,6 +214,7 @@ function LineDiff({
     }
     // Remaining azure words as insertions
     const insertions = azureWords.slice(ai).filter(w => w.errorType === 'Insertion')
+    const hasErrors = aligned.some(tok => tok.errorType !== 'None') || insertions.length > 0
 
     return (
       <div className="mt-2 space-y-2">
@@ -244,9 +245,14 @@ function LineDiff({
             <span className="text-slate-300">{recognized}</span>
           </div>
         )}
-        <p className="text-[10px] text-slate-500 italic">
-          발음평가 점수와 STT 인식 결과를 바탕으로 추정한 교정 포인트입니다.
-        </p>
+        {!hasErrors && (
+          <p className="text-xs text-emerald-500 italic">제시문과 발화가 대부분 일치합니다.</p>
+        )}
+        {hasErrors && (
+          <p className="text-[10px] text-slate-500 italic">
+            음성 인식 결과와 제시문을 비교한 교정 포인트입니다.
+          </p>
+        )}
       </div>
     )
   }
@@ -284,9 +290,12 @@ function LineDiff({
           <span className="text-slate-500 italic text-xs">인식 결과 없음</span>
         )}
       </div>
+      {!hasAnyMismatch && (
+        <p className="text-xs text-emerald-500 italic">제시문과 발화가 대부분 일치합니다.</p>
+      )}
       {hasAnyMismatch && (
         <p className="text-[10px] text-slate-500 italic">
-          발음평가 점수와 STT 인식 결과를 바탕으로 추정한 교정 포인트입니다.
+          음성 인식 결과와 제시문을 비교한 교정 포인트입니다.
         </p>
       )}
     </div>
@@ -489,7 +498,7 @@ export function ReadingPracticeClient() {
     const score = computeWordMatchScore(REFERENCE_LINES.join(' '), lines.join(' '))
     setFinalScore(score)
     setAzureResult(null)
-    setProviderNote('실시간 발음평가 연결을 확인 중입니다. 현재는 음성 인식 결과와 제시문 비교를 바탕으로 한 참고평가가 표시됩니다.')
+    setProviderNote('현재는 음성 인식 기반 참고평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화 예정입니다.')
     setPhase('result')
   }
 
@@ -502,7 +511,7 @@ export function ReadingPracticeClient() {
       const data = await res.json() as AzureResult
 
       if (data.fallbackReason) {
-        setProviderNote('실시간 발음평가 연결을 확인 중입니다. 현재는 음성 인식 결과와 제시문 비교를 바탕으로 한 참고평가가 표시됩니다.')
+        setProviderNote('현재는 음성 인식 기반 참고평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화 예정입니다.')
         setAzureResult(null)
         const score = computeWordMatchScore(referenceText, sttLinesCurrent.join(' '))
         setFinalScore(score)
@@ -517,7 +526,7 @@ export function ReadingPracticeClient() {
         }
       }
     } catch {
-      setProviderNote('실시간 발음평가 연결을 확인 중입니다. 현재는 음성 인식 결과와 제시문 비교를 바탕으로 한 참고평가가 표시됩니다.')
+      setProviderNote('현재는 음성 인식 기반 참고평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화 예정입니다.')
       setAzureResult(null)
       const score = computeWordMatchScore(referenceText, sttLinesCurrent.join(' '))
       setFinalScore(score)
@@ -565,10 +574,30 @@ export function ReadingPracticeClient() {
             <Badge variant="warning" size="sm">시연용 데모</Badge>
           </div>
           <p className="text-sm text-text-secondary">
-            AI 음성을 듣고 따라 읽은 뒤, 발음과 읽기 정확도를 확인해 보세요.
-            읽기연습은 제공된 지문을 정확히 읽는 연습입니다.
+            AI 음성을 듣고 따라 읽은 뒤, 음성 인식 결과와 제시문을 비교해 읽기 정확도를 확인합니다.
           </p>
         </div>
+      </div>
+
+      {/* 4단계 학습 흐름 */}
+      <div className="flex items-center gap-0 overflow-x-auto pb-1" data-testid="reading-flow-steps">
+        {[
+          { step: '1', label: '듣기', sub: 'AI 음성 청취' },
+          { step: '2', label: '따라 읽기', sub: '지문 낭독' },
+          { step: '3', label: '제시문-발화 비교', sub: '인식 결과 확인' },
+          { step: '4', label: '한국어+모국어 피드백', sub: '결과 분석' },
+        ].map((s, i) => (
+          <div key={s.step} className="flex items-center shrink-0">
+            <div className="flex flex-col items-center px-3 py-2 text-center" data-testid={`reading-step-${s.step}`}>
+              <span className="w-7 h-7 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center mb-1">
+                {s.step}
+              </span>
+              <span className="text-xs font-semibold text-text-primary whitespace-nowrap">{s.label}</span>
+              <span className="text-[10px] text-text-muted whitespace-nowrap">{s.sub}</span>
+            </div>
+            {i < 3 && <span className="text-slate-300 text-sm mx-0.5">›</span>}
+          </div>
+        ))}
       </div>
 
       {/* ── setup 단계 ── */}
@@ -728,6 +757,12 @@ export function ReadingPracticeClient() {
             </button>
           </div>
 
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg" data-testid="demo-mode-notice">
+            <p className="text-xs text-amber-800">
+              현재는 음성 인식 기반 참고평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화 예정입니다.
+            </p>
+          </div>
+
           {/* TTS 컨트롤 */}
           <Card>
             <CardHeader
@@ -864,7 +899,7 @@ export function ReadingPracticeClient() {
                   </>
                 )}
                 {recorderState === 'stopped' && (
-                  <span className="text-sm text-text-muted animate-pulse">발음 분석 중…</span>
+                  <span className="text-sm text-text-muted animate-pulse">음성 인식 분석 중…</span>
                 )}
               </div>
               <p className="mt-3 text-xs text-text-muted">
@@ -911,7 +946,7 @@ export function ReadingPracticeClient() {
             <CardBody>
               <div className="flex flex-wrap gap-8 mb-4">
                 <div>
-                  <span className="text-xs text-text-muted block mb-0.5">종합 점수</span>
+                  <span className="text-xs text-text-muted block mb-0.5">읽기 정확도 참고점수</span>
                   <div className="flex items-baseline gap-1">
                     <span
                       className="text-5xl font-bold tabular-nums"
@@ -922,6 +957,11 @@ export function ReadingPracticeClient() {
                     </span>
                     <span className="text-sm text-text-muted">/ 100</span>
                   </div>
+                  {!azureResult && (
+                    <p className="text-xs text-text-muted mt-1 max-w-xs leading-snug">
+                      이 점수는 음성 인식 결과와 제시문 비교를 바탕으로 한 참고값입니다. 실제 수업에서는 교수자 확인과 함께 활용됩니다.
+                    </p>
+                  )}
                 </div>
 
                 {azureResult && (
@@ -966,10 +1006,10 @@ export function ReadingPracticeClient() {
                 finalScore >= 70 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                 'bg-red-50 text-red-700 border border-red-200'
               }`}>
-                {finalScore >= 90 && '매우 정확하게 읽었습니다. 원어민 수준에 가까운 정확도입니다.'}
-                {finalScore >= 80 && finalScore < 90 && '대부분의 문장을 정확하게 읽었습니다. 조금 더 연습하면 더욱 좋아질 것입니다.'}
-                {finalScore >= 70 && finalScore < 80 && '전반적으로 무난하게 읽었습니다. 빨간색 표시 단어를 다시 읽어 보세요.'}
-                {finalScore < 70 && '연습이 더 필요합니다. 빨간색으로 표시된 부분을 집중적으로 연습해 보세요.'}
+                {finalScore >= 90 && '제시문을 매우 정확하게 읽었습니다. 대부분의 핵심 단어가 정확히 인식되었습니다.'}
+                {finalScore >= 80 && finalScore < 90 && '대부분 잘 읽었으나 일부 단어가 다르게 인식되었습니다. 문장 끝을 조금 더 또렷하게 읽으면 좋습니다.'}
+                {finalScore >= 70 && finalScore < 80 && '일부 단어가 다르게 인식되었습니다. AI 음성을 다시 듣고 따라 읽어 보세요.'}
+                {finalScore < 70 && '일부 문장이 빠지거나 다르게 인식되었습니다. AI 음성을 다시 듣고 한 문장씩 따라 읽어 보세요.'}
               </div>
             </CardBody>
           </Card>
@@ -977,8 +1017,8 @@ export function ReadingPracticeClient() {
           {/* 줄별 첨삭 */}
           <Card className="bg-slate-900 border-slate-700" data-testid="line-diff-panel">
             <CardHeader
-              title="줄별 읽기 첨삭"
-              description="초록색: 정확한 단어 · 빨간색: 다르게 읽힌 단어 · 누락: 빠진 단어"
+              title="제시문-발화 비교"
+              description="초록색: 제시문과 일치 · 빨간색: 다르게 인식된 부분 · 누락: 빠진 단어"
             />
             <CardBody className="space-y-4">
               {REFERENCE_LINES.map((refLine, i) => {
@@ -1074,6 +1114,13 @@ export function ReadingPracticeClient() {
             >
               처음으로
             </button>
+          </div>
+
+          {/* 시연자 설명 박스 */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg" data-testid="demo-info-box">
+            <p className="text-sm text-blue-800">
+              이 기능은 초급 학습자가 혼자서도 듣고, 따라 읽고, 자신의 발화를 확인하며 반복 연습할 수 있도록 설계되었습니다.
+            </p>
           </div>
         </>
       )}

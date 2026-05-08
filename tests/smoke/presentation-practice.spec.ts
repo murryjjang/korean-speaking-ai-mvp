@@ -84,6 +84,45 @@ test.describe('발표연습 데모 화면', () => {
     })
   })
 
+  // ── Phase 10-E-8-POLISH 추가 테스트 ──────────────────────────────────────────
+
+  test.describe('Phase 10-E-8-POLISH 발표연습 화면 보강', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/student/presentation-practice')
+      if (!page.url().includes('/presentation-practice')) test.skip()
+    })
+
+    test('발표연습 흐름에 설정/원고 교정/설명/섀도잉/타이머 발표 단계가 표시된다', async ({ page }) => {
+      await expect(page.getByTestId('practice-flow')).toBeVisible()
+      await expect(page.getByTestId('practice-step-1')).toBeVisible()
+      await expect(page.getByTestId('practice-step-3')).toBeVisible()
+      await expect(page.getByTestId('practice-step-4')).toBeVisible()
+      await expect(page.getByTestId('practice-step-5')).toBeVisible()
+      // 3단계 label이 "설명"인지 확인
+      const step3Text = await page.getByTestId('practice-step-3').textContent()
+      expect(step3Text).toContain('설명')
+      // 4단계 label이 "섀도잉"인지 확인
+      const step4Text = await page.getByTestId('practice-step-4').textContent()
+      expect(step4Text).toContain('섀도잉')
+      // 5단계 label이 "타이머 발표"인지 확인
+      const step5Text = await page.getByTestId('practice-step-5').textContent()
+      expect(step5Text).toContain('타이머 발표')
+    })
+
+    test('발표 피드백 카드에 "시연용 샘플 피드백" 배지가 표시된다', async ({ page }) => {
+      await expect(page.getByTestId('sample-feedback-badge')).toBeVisible()
+      const badgeText = await page.getByTestId('sample-feedback-badge').textContent()
+      expect(badgeText).toContain('시연용')
+    })
+
+    test('발표연습 화면에서 "실시간 발음평가", "정밀 발음분석" 문구가 표시되지 않는다', async ({ page }) => {
+      const bodyText = await page.locator('body').textContent()
+      expect(bodyText).not.toContain('실시간 발음평가')
+      expect(bodyText).not.toContain('정밀 발음분석')
+      expect(bodyText).not.toContain('Azure 발음평가 결과')
+    })
+  })
+
   test('기존 q1~q4 말하기 평가 라우트가 깨지지 않는다', async ({ page }) => {
     await page.goto('/student/speaking')
     const url = page.url()

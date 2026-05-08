@@ -236,8 +236,7 @@ export function PresentationPracticeClient() {
           <Badge variant="warning" size="sm">시연용 데모</Badge>
         </div>
         <p className="text-sm text-text-secondary">
-          발표 원고를 교정하고, AI 음성을 들으며 섀도잉한 뒤, 제한 시간에 맞춰 발표를 연습합니다.
-          발표연습은 자신이 쓴 원고를 교정하고 전달력을 높이는 연습입니다.
+          발표 원고를 입력하면 AI가 표현을 다듬고, 학습자 모국어와 한국어로 설명한 뒤 섀도잉과 타이머 발표 연습을 지원합니다.
         </p>
       </div>
 
@@ -246,12 +245,12 @@ export function PresentationPracticeClient() {
         {[
           { step: '1', label: '설정', sub: '주제·언어·시간' },
           { step: '2', label: '원고 교정', sub: 'AI가 다듬어 줘요' },
-          { step: '3', label: '섀도잉', sub: 'AI 음성 듣기' },
-          { step: '4', label: '타이머 발표', sub: '시간 맞춰 읽기' },
-          { step: '5', label: '피드백', sub: '결과 확인' },
+          { step: '3', label: '설명', sub: '한국어+모국어' },
+          { step: '4', label: '섀도잉', sub: 'AI 음성 듣기' },
+          { step: '5', label: '타이머 발표', sub: '시간 맞춰 읽기' },
         ].map((s, i) => (
           <div key={s.step} className="flex items-center shrink-0">
-            <div className="flex flex-col items-center px-3 py-2 text-center">
+            <div className="flex flex-col items-center px-3 py-2 text-center" data-testid={`practice-step-${s.step}`}>
               <span className="w-7 h-7 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center mb-1">
                 {s.step}
               </span>
@@ -590,7 +589,7 @@ export function PresentationPracticeClient() {
       <Card data-testid="feedback-panel">
         <CardHeader
           title="발표 피드백"
-          action={<Badge variant="warning" size="sm">시연용 샘플</Badge>}
+          action={<Badge variant="warning" size="sm" data-testid="sample-feedback-badge">시연용 샘플 피드백</Badge>}
         />
         <CardBody className="space-y-4">
           {/* 점수 그리드 */}
@@ -651,8 +650,20 @@ export function PresentationPracticeClient() {
           <p className="text-xs text-text-muted italic" data-testid="pronunciation-upgrade-notice">
             ※ 발음 세부 평가는 Azure 연동 안정화 후 고도화 예정입니다. 위 점수는 시연용 샘플 피드백입니다.
           </p>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg" data-testid="demo-feedback-notice">
+            <p className="text-xs text-amber-800">
+              현재 발표 피드백은 시연용 샘플 피드백입니다. 실제 운영 시 발표 녹음과 교수자 검토 데이터를 바탕으로 고도화할 예정입니다.
+            </p>
+          </div>
         </CardBody>
       </Card>
+
+      {/* 시연자 설명 박스 */}
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg" data-testid="demo-info-box">
+        <p className="text-sm text-blue-800">
+          이 기능은 발표 원고 작성 부담을 줄이고, 교수자가 발표 내용과 전달력을 지도하는 데 필요한 기초 자료를 제공합니다.
+        </p>
+      </div>
     </div>
   )
 }

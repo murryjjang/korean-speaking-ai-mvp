@@ -106,7 +106,7 @@ test.describe('읽기연습 데모 화면', () => {
     test('Azure/발음평가 실패 시 큰 오류 대신 안내가 표시된다', async ({ page }) => {
       await expect(page.getByTestId('etri-fallback-notice')).toBeVisible()
       const text = await page.getByTestId('etri-fallback-notice').textContent()
-      expect(text).toContain('시연용')
+      expect(text).toContain('참고평가')
     })
 
     test('한국어 피드백과 학습자 모국어 피드백이 함께 표시된다', async ({ page }) => {
@@ -140,6 +140,49 @@ test.describe('읽기연습 데모 화면', () => {
       const score = parseInt(text ?? '0', 10)
       expect(score).toBeGreaterThanOrEqual(90)
     })
+  })
+
+  // ── Phase 10-E-8-POLISH 추가 테스트 ──────────────────────────────────────────
+
+  test('읽기연습 화면에 4단계 학습 흐름이 표시된다', async ({ page }) => {
+    await page.goto('/student/reading-practice')
+    if (!page.url().includes('/reading-practice')) return
+    await expect(page.getByTestId('reading-flow-steps')).toBeVisible()
+    await expect(page.getByTestId('reading-step-1')).toBeVisible()
+    await expect(page.getByTestId('reading-step-2')).toBeVisible()
+    await expect(page.getByTestId('reading-step-3')).toBeVisible()
+    await expect(page.getByTestId('reading-step-4')).toBeVisible()
+  })
+
+  test('result 단계에 "읽기 정확도 참고평가" 문구가 표시된다', async ({ page }) => {
+    await page.goto('/student/reading-practice')
+    if (!page.url().includes('/reading-practice')) return
+    await page.getByTestId('start-easy-reading').click()
+    await page.getByTestId('btn-demo-fallback').click()
+    await expect(page.getByTestId('pronunciation-score-card')).toBeVisible()
+    const cardText = await page.getByTestId('pronunciation-score-card').textContent()
+    expect(cardText).toContain('참고')
+  })
+
+  test('demo fallback 상태에서 "실시간 발음평가" 문구가 표시되지 않는다', async ({ page }) => {
+    await page.goto('/student/reading-practice')
+    if (!page.url().includes('/reading-practice')) return
+    await page.getByTestId('start-easy-reading').click()
+    await page.getByTestId('btn-demo-fallback').click()
+    await expect(page.getByTestId('pronunciation-score-card')).toBeVisible()
+    // provider-badge-azure가 없으면 실시간 발음평가 배지가 표시되지 않음
+    await expect(page.getByTestId('provider-badge-azure')).not.toBeVisible()
+  })
+
+  test('demo fallback 시 빨간색 diff가 없으면 "빨간색 단어" 안내 문구가 표시되지 않는다', async ({ page }) => {
+    await page.goto('/student/reading-practice')
+    if (!page.url().includes('/reading-practice')) return
+    await page.getByTestId('start-easy-reading').click()
+    await page.getByTestId('btn-demo-fallback').click()
+    await expect(page.getByTestId('feedback-panel')).toBeVisible()
+    // DEMO_STT_ACCURATE = REFERENCE_LINES → 차이 없음 → "빨간색" 안내 미표시
+    const feedbackText = await page.getByTestId('feedback-panel').textContent()
+    expect(feedbackText).not.toContain('빨간색으로 표시된 단어를 다시 읽어 보세요')
   })
 
   test('기존 말하기 평가 라우트가 여전히 접근 가능하다', async ({ page }) => {
