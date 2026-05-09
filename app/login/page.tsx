@@ -14,14 +14,16 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center gap-4 mb-8">
-          <Image
-            src="/images/kdli-logo.jpg"
-            alt="KDLI - Korea Defense Language Institute"
-            width={240}
-            height={72}
-            priority
-            className="h-16 w-auto"
-          />
+          <div className="inline-flex items-center justify-center bg-white rounded-2xl px-6 py-4 shadow-sm">
+            <Image
+              src="/images/kdli-logo.jpg"
+              alt="KDLI - Korea Defense Language Institute"
+              width={240}
+              height={72}
+              priority
+              className="h-14 w-auto"
+            />
+          </div>
           <h1 className="text-2xl font-semibold text-text-primary tracking-tight">
             AI 한국어 말하기 훈련·평가
           </h1>
