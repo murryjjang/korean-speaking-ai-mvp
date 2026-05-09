@@ -20,6 +20,21 @@ export type SpeakingEvalRecord = {
     achievedMissionGoals?: number
     totalMissionGoals?: number
     goalResults?: Array<{ goalIndex: number; labelKo: string; achieved: boolean }>
+    /** q4 LLM 하이브리드 평가 — LLM 미션 판정 + 정성 평가 합산 점수. null이면 규칙 기반 폴백. */
+    dialogueHybridScore?: {
+      total: number
+      quantitativeRaw: number
+      quantitativeMax: number
+      quantitativeScore: number
+      qualitativeScore: number
+      qualitativeBreakdown: {
+        naturalness: number
+        koreanAccuracy: number
+        responsiveness: number
+      }
+    }
+    /** q4 평가 출처 — 'llm'이면 하이브리드 점수 사용, 'rule'이면 기존 규칙 기반. */
+    dialogueEvalSource?: 'llm' | 'rule'
   }
 }
 

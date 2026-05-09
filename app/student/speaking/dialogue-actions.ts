@@ -9,6 +9,7 @@ import questionsJson from '@/src/content/questions.json'
 import type { ProviderName, PronunciationResult } from '@/src/types/providers'
 import type { DialogueTurn, MissionGoalResult } from '@/src/types/dialogue'
 import { generateAggregatedTranscript } from '@/src/lib/dialogue-mission'
+import { evaluateDialogueMissionHybrid } from '@/src/lib/dialogue-mission-llm'
 
 export interface DialogueSubmitMeta {
   turns: DialogueTurn[]
@@ -22,7 +23,7 @@ export async function submitDialogue(
   questionSetId: string,
   meta: DialogueSubmitMeta,
 ): Promise<{ submissionId: string }> {
-  const { turns, goalResults, attemptId } = meta
+  const { turns, goalResults: clientGoalResults, attemptId } = meta
 
   // Guard: must have at least one valid student turn
   const studentTurns = turns.filter((t) => t.role === 'student' && t.status === 'completed')
@@ -45,6 +46,13 @@ export async function submitDialogue(
     providerVersion: '1.0.0',
     latencyMs: 0,
   }
+
+  // q4 하이브리드 평가 — CONVERSATION_PROVIDER=openai일 때 LLM이 자연 발화 변형까지 판정.
+  // 실패하거나 mock 모드면 client에서 보낸 규칙 기반 결과를 그대로 사용.
+  const missionGoals = clientGoalResults.map((g) => g.labelKo)
+  const hybridResult = await evaluateDialogueMissionHybrid(questionId, missionGoals, turns)
+  const goalResults: MissionGoalResult[] =
+    hybridResult.source === 'llm' ? hybridResult.results : clientGoalResults
 
   // Compute mission achievement for LLM context (cap at totalGoals for safety)
   const totalGoals = goalResults.length
@@ -170,6 +178,24 @@ export async function submitDialogue(
     }
   }
 
+  // 하이브리드 점수가 있으면 전체 점수를 LLM 정량 60 + 정성 40으로 덮어쓴다 (rule-based floor보다 우선).
+  if (hybridResult.hybridScore && hybridResult.qualitative) {
+    const h = hybridResult.hybridScore
+    llmDetail.overall_score = h.total
+    // task_completion_score는 미션 달성도(정량) 비율을 100점 스케일로 표시
+    llmDetail.task_completion_score =
+      h.quantitativeMax > 0 ? Math.round((h.quantitativeRaw / h.quantitativeMax) * 100) : 0
+    llmDetail.fluency_score = hybridResult.qualitative.naturalness
+    llmDetail.grammar_score = hybridResult.qualitative.koreanAccuracy
+    // grade 재산출
+    const s = llmDetail.overall_score
+    llmDetail.grade = s >= 90 ? 'A' : s >= 80 ? 'B' : s >= 70 ? 'C' : s >= 60 ? 'D' : 'F'
+    if (hybridResult.qualitative.feedback) {
+      llmDetail.learner_feedback_ko = hybridResult.qualitative.feedback
+    }
+    llmDetail.teacher_note = `${llmDetail.teacher_note ?? ''}\n[하이브리드 점수] 정량 ${h.quantitativeScore}/60 + 정성 ${h.qualitativeScore}/40 = ${h.total}/100\n자연스러움 ${h.qualitativeBreakdown.naturalness} · 정확성 ${h.qualitativeBreakdown.koreanAccuracy} · 응답성 ${h.qualitativeBreakdown.responsiveness}`
+  }
+
   const llmEvalResult = detailToLLMEvalResult(
     llmDetail,
     llmEvalRaw.providerName,
@@ -199,6 +225,8 @@ export async function submitDialogue(
         labelKo: g.labelKo,
         achieved: g.achieved,
       })),
+      dialogueHybridScore: hybridResult.hybridScore ?? undefined,
+      dialogueEvalSource: hybridResult.source,
     },
   }
 
