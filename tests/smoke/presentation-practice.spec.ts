@@ -67,8 +67,10 @@ test.describe('발표연습 데모 화면', () => {
       expect(initial).not.toBe(after)
     })
 
-    test('발표 피드백 카드가 표시된다', async ({ page }) => {
-      await expect(page.getByTestId('feedback-panel')).toBeVisible()
+    test('발표 피드백 카드가 녹음 종료 후 표시된다', async ({ page }) => {
+      await expect(page.getByTestId('feedback-panel')).not.toBeVisible()
+      await page.getByTestId('btn-start-recording').click()
+      await expect(page.getByTestId('feedback-panel')).toBeVisible({ timeout: 3000 })
       await expect(page.getByTestId('feedback-korean')).toBeVisible()
       await expect(page.getByTestId('feedback-native')).toBeVisible()
     })
@@ -108,8 +110,9 @@ test.describe('발표연습 데모 화면', () => {
       expect(step5Text).toContain('타이머 발표')
     })
 
-    test('발표 피드백 카드에 "시연용" 배지가 표시된다', async ({ page }) => {
-      await expect(page.getByTestId('sample-feedback-badge')).toBeVisible()
+    test('발표 피드백 카드에 "시연용" 배지가 녹음 종료 후 표시된다', async ({ page }) => {
+      await page.getByTestId('btn-start-recording').click()
+      await expect(page.getByTestId('sample-feedback-badge')).toBeVisible({ timeout: 3000 })
       const badgeText = await page.getByTestId('sample-feedback-badge').textContent()
       expect(badgeText).toContain('시연용')
     })
@@ -232,13 +235,15 @@ test.describe('발표연습 데모 화면', () => {
     })
 
     test('한국어 피드백에 발표 주제 관련 내용이 있다', async ({ page }) => {
-      await expect(page.getByTestId('feedback-korean')).toBeVisible()
+      await page.getByTestId('btn-start-recording').click()
+      await expect(page.getByTestId('feedback-korean')).toBeVisible({ timeout: 3000 })
       const koText = await page.getByTestId('feedback-korean').textContent()
       expect(koText).toContain('발표 주제')
     })
 
     test('모국어(베트남어) 피드백이 표시된다', async ({ page }) => {
-      await expect(page.getByTestId('feedback-native')).toBeVisible()
+      await page.getByTestId('btn-start-recording').click()
+      await expect(page.getByTestId('feedback-native')).toBeVisible({ timeout: 3000 })
       const viText = await page.getByTestId('feedback-native').textContent()
       expect(viText).toContain('Chủ đề')
     })

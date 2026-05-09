@@ -12,6 +12,7 @@ const REFERENCE_LINES = [
   '저는 친구와 함께 도서관에 갑니다.',
   '도서관에서 책을 읽고 한국어 숙제를 할 예정입니다.',
   '공부가 끝나면 친구와 함께 집에 돌아갑니다.',
+  '이렇게 친구와 함께 공부하면 한국어 실력이 더욱 빨리 늘 것 같아서 정말 기대가 됩니다.',
 ]
 
 // ── 언어 ────────────────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ const DEMO_STT_ACCURATE: string[] = [
   '저는 친구와 함께 도서관에 갑니다.',
   '도서관에서 책을 읽고 한국어 숙제를 할 예정입니다.',
   '공부가 끝나면 친구와 함께 집에 돌아갑니다.',
+  '이렇게 친구와 함께 공부하면 한국어 실력이 더욱 빨리 늘 것 같아서 정말 기대가 됩니다.',
 ]
 
 // ── Azure 단어 결과 타입 ──────────────────────────────────────────────────────
@@ -275,15 +277,40 @@ function ReadingTimeGuide({
 }
 
 // ── ResultPassage: 단일 흐르는 본문 + 단어별 첨삭 색상 ─────────────────────
+// 'NotRecognized' is a UX-layer state — STT cut off the tail of the audio,
+// distinct from a real Omission where the learner skipped a word.
+type ResultErrorType = AzureWordResult['errorType'] | 'NotRecognized'
+
 interface ResultPassageWord {
   text: string
   lineIdx: number
   wordIdxInLine: number
   globalIdx: number
-  errorType: AzureWordResult['errorType']
+  errorType: ResultErrorType
   accuracyScore?: number
   offsetMs?: number
   durationMs?: number
+}
+
+// At least 2 unrecognized trailing ref words are needed to assume STT cut-off,
+// so a single missed word at the end is still treated as a real omission.
+const TRAILING_NOT_RECOGNIZED_MIN = 2
+
+function reclassifyTrailingNotRecognized(words: ResultPassageWord[]): void {
+  let lastRecognized = -1
+  for (let i = words.length - 1; i >= 0; i--) {
+    const w = words[i]
+    if (w.errorType === 'None' || typeof w.accuracyScore === 'number') {
+      lastRecognized = i
+      break
+    }
+  }
+  const trailing = words.length - 1 - lastRecognized
+  if (trailing >= TRAILING_NOT_RECOGNIZED_MIN) {
+    for (let i = lastRecognized + 1; i < words.length; i++) {
+      words[i] = { ...words[i], errorType: 'NotRecognized' }
+    }
+  }
 }
 
 function alignAzureWordsToReference(azureWords: AzureWordResult[] | null, sttRecognized: string): {
@@ -338,11 +365,26 @@ function alignAzureWordsToReference(azureWords: AzureWordResult[] | null, sttRec
       })
     }
   }
+  reclassifyTrailingNotRecognized(out)
   return { words: out, insertions }
+}
+
+function hasTrailingNotRecognized(azureWords: AzureWordResult[] | null, sttRecognized: string): boolean {
+  return alignAzureWordsToReference(azureWords, sttRecognized).words.some(w => w.errorType === 'NotRecognized')
 }
 
 function getResultWordStyle(w: ResultPassageWord): CSSProperties {
   // ErrorType priority over score
+  if (w.errorType === 'NotRecognized') {
+    return {
+      color: '#888780',
+      backgroundColor: '#F5F5F5',
+      textDecoration: 'underline',
+      textDecorationStyle: 'dotted',
+      textDecorationColor: '#888780',
+      textDecorationThickness: '2px',
+    }
+  }
   if (w.errorType === 'Omission') {
     return {
       color: '#C8543C',
@@ -377,6 +419,7 @@ function getResultWordStyle(w: ResultPassageWord): CSSProperties {
 }
 
 function getResultWordTitle(w: ResultPassageWord): string | undefined {
+  if (w.errorType === 'NotRecognized') return '음성 인식이 끝까지 닿지 않았습니다'
   if (w.errorType === 'Omission') return '이 단어를 안 읽었습니다'
   if (w.errorType === 'Mispronunciation') {
     return typeof w.accuracyScore === 'number'
@@ -1178,6 +1221,19 @@ export function ReadingPracticeClient() {
       {/* ── result 단계 ── */}
       {phase === 'result' && sttLines && (
         <>
+          {/* 끝부분 STT 미인식 안내 — 마지막 부분이 회색 점선으로 표시될 때만 노출 */}
+          {hasTrailingNotRecognized(azureResult?.wordResults ?? null, sttLines.join(' ')) && (
+            <div
+              className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg"
+              data-testid="trailing-not-recognized-notice"
+            >
+              <Badge variant="warning" size="sm">끝 부분 인식 안 됨</Badge>
+              <p className="text-xs text-amber-800">
+                끝 부분이 인식되지 않았습니다. 마이크 가까이서 또렷하게 발화해 보세요. 회색 점선 단어는 빠뜨린 것이 아니라 인식 한계입니다.
+              </p>
+            </div>
+          )}
+
           {/* 발음평가 상태 안내 */}
           {providerNote && (
             <div
@@ -1322,6 +1378,19 @@ export function ReadingPracticeClient() {
                     fontWeight: 600,
                   }}>가나다</span>
                   <span className="text-text-muted">추가됨 (제시문 외)</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <span style={{
+                    color: '#888780',
+                    backgroundColor: '#F5F5F5',
+                    padding: '2px 4px',
+                    borderRadius: 4,
+                    textDecoration: 'underline',
+                    textDecorationStyle: 'dotted',
+                    textDecorationColor: '#888780',
+                    textDecorationThickness: '2px',
+                  }}>가나다</span>
+                  <span className="text-text-muted">인식 못 함</span>
                 </span>
               </div>
               {recordedAudioUrl && (

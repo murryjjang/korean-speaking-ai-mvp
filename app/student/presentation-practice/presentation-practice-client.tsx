@@ -194,6 +194,26 @@ function getTimerFeedback(elapsed: number, target: number): string {
 
 type RecordingState = 'idle' | 'recording' | 'processing' | 'done'
 
+// Mirrors PresentationScriptDisplay's azureMap reclassification: returns true
+// when the trailing run of unrecognized ref words is long enough to attribute
+// to STT cut-off rather than a deliberate omission by the speaker.
+function hasTrailingNotRecognizedPresentation(
+  azureWords: AzureWordResult[] | null,
+  refWords: string[],
+): boolean {
+  if (!azureWords || azureWords.length === 0) return false
+  const strip = (w: string) => w.replace(/[.,!?。、·]/g, '').trim()
+  let ai = 0
+  let lastRecognized = -1
+  for (let i = 0; i < refWords.length; i++) {
+    if (ai < azureWords.length && strip(azureWords[ai].word) === strip(refWords[i])) {
+      ai++
+      lastRecognized = i
+    }
+  }
+  return refWords.length - 1 - lastRecognized >= 2
+}
+
 // ── 발표 스크립트 표시 (카라오케 + Azure 동기화 통합) ─────────────────────────
 function PresentationScriptDisplay({
   words,
@@ -215,8 +235,10 @@ function PresentationScriptDisplay({
   onWordSeek?: (offsetMs: number) => void
 }) {
   // Map Azure word results to reference words by sequential alignment.
+  // 'NotRecognized' is a UX-layer state for the trailing block STT cut off.
+  type PresErrorType = AzureWordResult['errorType'] | 'NotRecognized'
   type AzureMap = {
-    errorType?: AzureWordResult['errorType']
+    errorType?: PresErrorType
     accuracyScore?: number
     offsetMs?: number
     durationMs?: number
@@ -225,7 +247,7 @@ function PresentationScriptDisplay({
     if (!azureWords || azureWords.length === 0) return words.map(() => ({}))
     const strip = (w: string) => w.replace(/[.,!?。、·]/g, '').trim()
     let ai = 0
-    return words.map(w => {
+    const map: AzureMap[] = words.map(w => {
       if (ai < azureWords.length && strip(azureWords[ai].word) === strip(w)) {
         const a = azureWords[ai]
         ai++
@@ -238,6 +260,22 @@ function PresentationScriptDisplay({
       }
       return { errorType: 'Omission' as const }
     })
+    // Reclassify trailing run of unrecognized words (≥ 2) as NotRecognized so
+    // the user sees a softer "STT cut off" cue instead of harsh omission red.
+    let lastRecognized = -1
+    for (let i = map.length - 1; i >= 0; i--) {
+      const m = map[i]
+      if ((m.errorType && m.errorType !== 'Omission') || typeof m.accuracyScore === 'number') {
+        lastRecognized = i
+        break
+      }
+    }
+    if (map.length - 1 - lastRecognized >= 2) {
+      for (let i = lastRecognized + 1; i < map.length; i++) {
+        map[i] = { ...map[i], errorType: 'NotRecognized' }
+      }
+    }
+    return map
   }, [azureWords, words])
 
   // Currently playing word index from audio currentTime.
@@ -285,7 +323,16 @@ function PresentationScriptDisplay({
 
           let baseStyle: CSSProperties = { color: '#888780' }
           if (azureWords && azureWords.length > 0) {
-            if (a.errorType === 'Omission') {
+            if (a.errorType === 'NotRecognized') {
+              baseStyle = {
+                color: '#888780',
+                backgroundColor: '#F5F5F5',
+                textDecoration: 'underline',
+                textDecorationStyle: 'dotted',
+                textDecorationColor: '#888780',
+                textDecorationThickness: '2px',
+              }
+            } else if (a.errorType === 'Omission') {
               baseStyle = {
                 color: '#C8543C',
                 backgroundColor: '#FFEEEE',
@@ -314,11 +361,13 @@ function PresentationScriptDisplay({
             baseStyle = { ...baseStyle, backgroundColor: '#FDE68A', color: '#1F2D3D' }
           }
 
-          const tooltip = a.errorType === 'Omission'
-            ? '이 단어를 안 읽었습니다'
-            : a.errorType === 'Mispronunciation'
-              ? (typeof a.accuracyScore === 'number' ? `발음 점수 ${Math.round(a.accuracyScore)}/100` : '발음이 정확하지 않습니다')
-              : (typeof a.accuracyScore === 'number' && a.accuracyScore < 80 ? `발음 점수 ${Math.round(a.accuracyScore)}/100` : undefined)
+          const tooltip = a.errorType === 'NotRecognized'
+            ? '음성 인식이 끝까지 닿지 않았습니다'
+            : a.errorType === 'Omission'
+              ? '이 단어를 안 읽었습니다'
+              : a.errorType === 'Mispronunciation'
+                ? (typeof a.accuracyScore === 'number' ? `발음 점수 ${Math.round(a.accuracyScore)}/100` : '발음이 정확하지 않습니다')
+                : (typeof a.accuracyScore === 'number' && a.accuracyScore < 80 ? `발음 점수 ${Math.round(a.accuracyScore)}/100` : undefined)
           const title = seekable ? (tooltip ? `${tooltip} · 클릭하면 이 단어부터 다시 듣기` : '이 단어부터 다시 듣기') : tooltip
 
           return (
@@ -380,7 +429,7 @@ export function PresentationPracticeClient() {
   const [script, setScript] = useState(DEFAULT_SCRIPT)
   const [speed, setSpeed] = useState<SpeedOption>(1.0)
   const [showCorrection, setShowCorrection] = useState(false)
-  const [targetSec, setTargetSec] = useState(180)
+  const [targetSec, setTargetSec] = useState(60)
   // Feedback source mirrors q4's dialogueEvalSource pattern: 'llm' when a real
   // LLM response is shown, 'mock' for the demo/fallback content. Today the
   // presentation feedback is always mock; the badge below stays informative
@@ -1114,6 +1163,19 @@ export function PresentationPracticeClient() {
         </div>
       )}
 
+      {/* 끝부분 STT 미인식 안내 — 회색 점선 단어가 연속으로 나올 때만 노출 */}
+      {recordingState === 'done' && hasTrailingNotRecognizedPresentation(azureResult?.wordResults ?? null, referenceWords) && (
+        <div
+          className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg"
+          data-testid="trailing-not-recognized-notice"
+        >
+          <Badge variant="warning" size="sm">끝 부분 인식 안 됨</Badge>
+          <p className="text-xs text-amber-800">
+            끝 부분이 인식되지 않았습니다. 마이크 가까이서 또렷하게 발화해 보세요. 회색 점선 단어는 빠뜨린 것이 아니라 인식 한계입니다.
+          </p>
+        </div>
+      )}
+
       {/* 녹음 재생 — Azure 단어 동기화 */}
       {recordingState === 'done' && recordedAudioUrl && (
         <Card data-testid="recorded-playback-card">
@@ -1218,7 +1280,8 @@ export function PresentationPracticeClient() {
         </Card>
       )}
 
-      {/* 발표 피드백 */}
+      {/* 발표 피드백 — 녹음 완료 + STT 결과 도착 후에만 표시 */}
+      {recordingState === 'done' && transcript !== null && (
       <Card data-testid="feedback-panel">
         <CardHeader
           title="발표 피드백"
@@ -1303,6 +1366,7 @@ export function PresentationPracticeClient() {
           </div>
         </CardBody>
       </Card>
+      )}
 
       {/* 하단 안내 */}
       <div
