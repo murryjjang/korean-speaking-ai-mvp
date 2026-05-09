@@ -126,3 +126,22 @@
   - 카드 헤더 배지: source='llm'이면 "AI 교정", 'mock'이면 "시연용 샘플".
 - 시연 안전 가드: LLM 호출 자체가 실패해도 mock 폴백을 항상 보여주므로 카드는 반드시 표시됨.
 - 확인 필요: 회원님이 OpenAI 키 설정된 환경에서 실제 LLM 응답이 자연스러운지 검증.
+
+### Phase 24 — 생성형 대화 모드
+
+- 신규 페이지 클라이언트 `app/student/conversation-practice/free-conversation-client.tsx`. 기존 placeholder(`page.tsx`의 페르소나 카드 mock)를 자유 회화 흐름으로 교체. 라우트는 그대로 `/student/conversation-practice` 사용 (메뉴 링크 유지, 깨진 링크 없음).
+- 좌측 메뉴 라벨: "대화연습 준비 중" → "생성형 대화", `disabled: true` 제거 (`app/student/layout.tsx`).
+- Stage 머신: `start` (추천 주제 5개 + 자유 입력) → `chat` (대화) → `end` (요약 + 다국어 피드백).
+- 신규 API 라우트:
+  - `/api/conversation/free/respond`: NPC 응답 + 매 턴 학습자 발화 자연 표현 교정. q4 OpenAI 인프라 패턴 그대로.
+  - `/api/conversation/free/summary`: 대화 종료 시 한·베·영 동시 요약 + 잘한 점/개선할 점.
+  - 둘 다 `OPENAI_API_KEY` 미설정·호출 실패 시 mock 폴백 → 시연 안전.
+  - 모델 우선순위: 각각 `OPENAI_FREE_CONVERSATION_MODEL` / `OPENAI_FREE_CONVERSATION_SUMMARY_MODEL` → `OPENAI_DIALOGUE_MODEL` → `OPENAI_EVAL_MODEL` → `gpt-4o-mini`.
+- 추천 주제 5개: `weekend-place`(⭐ 시연), `korean-food`, `movies`, `korea-trip`, `family`. 시연 카드에 별 배지.
+- 첫 메시지: 클라이언트가 정적 opener("'{topic}'이라는 주제로 이야기해볼까요? 어떻게 시작할까요?") 생성 → LLM 호출 없이 즉시 화면 진입.
+- 타이머: 10분 (`TOTAL_SECONDS=600`), 8분 도달 시 "남은 시간 2분" 안내, 10분 도달 시 입력 비활성화 + "시간 종료" 안내.
+- **확인 필요 — 자동 종료 미구현**: 시간 도달 시 endConversation을 자동 호출하는 패턴은 React 19의 `react-hooks/refs` + `react-hooks/set-state-in-effect` lint 규칙과 충돌. setInterval에서 refs를 갱신/사용하거나 useEffect 안에서 setState를 호출하는 방식이 모두 거부됨. 안전하게 구현 가능한 패턴이 없어 "시간 종료 시 자동" → "시간 종료 시 사용자가 종료 버튼 클릭"으로 fallback. 학습자 입장에서 큰 차이는 없음 (입력은 비활성, 안내 명확).
+- 학습자 입력: 텍스트 only (Enter 전송 / Shift+Enter 줄바꿈). 한 메시지 1000자 제한. 음성 입력은 향후 명세에서 추가 검토.
+- 매 턴 교정 표시: `learner_correction.corrected !== original`이면 ✏️ 줄긋기 + 화살표 + 이유. 같으면 ✓ + 칭찬.
+- 종료 화면: source 배지 (AI 요약 / 시연용 샘플), 한·베·영 stacked 요약, 잘한 점/개선할 점 3언어, 대화 히스토리 (스크롤), "다시 대화하기" 버튼 (시작 화면 복귀).
+- 회귀 영향: smoke test `/student/conversation-practice 페이지 정상 렌더링` + `persona card에 dialectHint` 두 개는 placeholder 페이지 기준이라 새 화면에 맞춰 update. q4/q1/q3/읽기/발표 mock conversation provider는 변경 없음 (가드 5 준수).

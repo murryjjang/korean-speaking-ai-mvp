@@ -7,7 +7,7 @@ const navItems: NavItem[] = [
   { label: "말하기 평가", href: "/student/speaking" },
   { label: "읽기연습", href: "/student/reading-practice" },
   { label: "발표연습", href: "/student/presentation-practice" },
-  { label: "대화연습 준비 중", href: "/student/conversation-practice", disabled: true },
+  { label: "생성형 대화", href: "/student/conversation-practice" },
 ];
 
 export default async function StudentLayout({ children }: { children: ReactNode }) {

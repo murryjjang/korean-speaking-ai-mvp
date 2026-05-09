@@ -811,19 +811,23 @@ test.describe('Phase 10-E-5-C/D: 대화 정책 분리, 페르소나, Azure TTS',
     expect(res.status()).toBe(200)
   })
 
-  test('/student/conversation-practice 페이지 정상 렌더링 및 페르소나 카드 표시', async ({ page }) => {
+  test('/student/conversation-practice 페이지 정상 렌더링 및 시작 화면 표시', async ({ page }) => {
     await page.goto('/student/conversation-practice')
-    await expect(page.getByRole('heading', { name: '생성형 대화연습' })).toBeVisible()
-    // practice mode personas: korean_teacher_coach, friend_casual
-    await expect(page.locator('[data-testid="persona-card-korean_teacher_coach"]')).toBeVisible()
-    await expect(page.locator('[data-testid="persona-card-friend_casual"]')).toBeVisible()
+    // 명세 24: 페르소나 placeholder → 생성형 자유 대화 시작 화면
+    await expect(page.getByRole('heading', { name: '생성형 대화 연습' })).toBeVisible()
+    await expect(page.getByTestId('topic-cards')).toBeVisible()
+    await expect(page.getByTestId('topic-card-weekend-place')).toBeVisible()
+    await expect(page.getByTestId('custom-topic-input')).toBeVisible()
   })
 
-  test('persona card에 dialectHint 기반 필드가 존재 (dialect 지원 구조 확인)', async ({ page }) => {
+  test('자유 대화 시작 화면에서 추천 주제 카드 5개 + 자유 입력이 보인다', async ({ page }) => {
     await page.goto('/student/conversation-practice')
-    // 준비 중 배지 확인 (persona card 렌더링됨)
-    const preparingBadges = page.getByText('준비 중')
-    await expect(preparingBadges.first()).toBeVisible()
+    await expect(page.getByTestId('topic-card-weekend-place')).toBeVisible()
+    await expect(page.getByTestId('topic-card-korean-food')).toBeVisible()
+    await expect(page.getByTestId('topic-card-movies')).toBeVisible()
+    await expect(page.getByTestId('topic-card-korea-trip')).toBeVisible()
+    await expect(page.getByTestId('topic-card-family')).toBeVisible()
+    await expect(page.getByTestId('btn-start-custom')).toBeVisible()
   })
 
   // ── Azure TTS provider ────────────────────────────────────────────────────
