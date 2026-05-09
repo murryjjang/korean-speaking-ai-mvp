@@ -1,30 +1,38 @@
 import { convertToWavForEtri } from '@/src/lib/audio/convert-for-etri'
 
+type AzureErrorType = 'None' | 'Omission' | 'Insertion' | 'Mispronunciation'
+
+// Azure REST v1 PA returns word-level scores either flat on the word object,
+// or nested under PronunciationAssessment depending on doc/version. Accept both.
 interface AzurePronWord {
   Word: string
+  AccuracyScore?: number
+  ErrorType?: AzureErrorType
   PronunciationAssessment?: {
     AccuracyScore: number
-    ErrorType: 'None' | 'Omission' | 'Insertion' | 'Mispronunciation'
+    ErrorType: AzureErrorType
   }
   Offset?: number
   Duration?: number
 }
 
+interface AzurePronScores {
+  AccuracyScore?: number
+  FluencyScore?: number
+  CompletenessScore?: number
+  PronScore?: number
+}
+
 interface AzurePronResult {
   RecognitionStatus: string
   DisplayText?: string
-  NBest?: Array<{
+  NBest?: Array<AzurePronScores & {
     Confidence: number
     Lexical: string
     ITN: string
     MaskedITN: string
     Display: string
-    PronunciationAssessment?: {
-      AccuracyScore: number
-      FluencyScore: number
-      CompletenessScore: number
-      PronScore: number
-    }
+    PronunciationAssessment?: AzurePronScores
     Words?: AzurePronWord[]
   }>
 }
@@ -116,11 +124,14 @@ export async function POST(request: Request) {
     return buildDemoFallback('audio_conversion_failed')
   }
 
-  // Pronunciation-Assessment header (base64 encoded JSON)
+  // Pronunciation-Assessment header (base64 encoded JSON).
+  // Dimension=Comprehensive is required to receive PronScore/FluencyScore/CompletenessScore;
+  // default Basic returns AccuracyScore only.
   const assessmentConfig = {
     ReferenceText: referenceText,
     GradingSystem: 'HundredMark',
     Granularity: 'Word',
+    Dimension: 'Comprehensive',
     EnableMiscue: true,
   }
   const assessmentHeader = Buffer.from(JSON.stringify(assessmentConfig)).toString('base64')
@@ -135,7 +146,8 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: {
         'Ocp-Apim-Subscription-Key': key,
-        'Content-Type': 'audio/wav',
+        'Accept': 'application/json;text/xml',
+        'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
         'Pronunciation-Assessment': assessmentHeader,
       },
       body: new Uint8Array(wavBuffer),
@@ -162,32 +174,42 @@ export async function POST(request: Request) {
   }
 
   const best = azureData.NBest[0]
-  const pron = best.PronunciationAssessment
+  // Azure REST v1 returns PA scores in two possible shapes depending on dimension/version:
+  //   nested:  NBest[0].PronunciationAssessment.{AccuracyScore,FluencyScore,...}
+  //   flat:    NBest[0].{AccuracyScore,FluencyScore,...}
+  // Read both so a future shape flip does not silently break us.
+  const nested = best.PronunciationAssessment
+  const pronScore = nested?.PronScore ?? best.PronScore
+  const accuracyScore = nested?.AccuracyScore ?? best.AccuracyScore
+  const fluencyScore = nested?.FluencyScore ?? best.FluencyScore
+  const completenessScore = nested?.CompletenessScore ?? best.CompletenessScore
+  const hasPron = pronScore != null || accuracyScore != null || fluencyScore != null || completenessScore != null
+
   const words = best.Words ?? []
 
-  // Azure recognized speech but returned no PronunciationAssessment.
-  // Common cause: region does not support PA (e.g. koreacentral is not in the PA-supported region list).
-  // Return demo fallback with a diff-based score so results are not all identical 72.
-  if (!pron) {
+  if (!hasPron) {
     const recognizedText = best.Display ?? best.Lexical ?? ''
     const demoScore = computeTextMatchScore(referenceText, recognizedText)
-    console.warn('[pronunciation-azure] Azure recognition succeeded but PronunciationAssessment absent — region may not support PA', { region, latencyMs })
+    console.warn('[pronunciation-azure] Azure recognition succeeded but PronunciationAssessment absent', { region, latencyMs })
     return buildDemoFallback('azure_no_pron_data', demoScore, recognizedText)
   }
 
   const wordResults = words.map(w => ({
     word: w.Word,
-    accuracyScore: w.PronunciationAssessment?.AccuracyScore ?? 100,
-    errorType: w.PronunciationAssessment?.ErrorType ?? 'None',
+    accuracyScore: w.PronunciationAssessment?.AccuracyScore ?? w.AccuracyScore ?? 100,
+    errorType: w.PronunciationAssessment?.ErrorType ?? w.ErrorType ?? 'None',
   }))
+
+  // Fallback chain: PronScore (overall) → AccuracyScore → 72 floor.
+  const normalized = Math.round(pronScore ?? accuracyScore ?? 72)
 
   return Response.json({
     providerName: 'azure',
-    normalizedScore: Math.round(pron?.PronScore ?? 72),
-    pronScore: pron?.PronScore ?? null,
-    accuracyScore: pron?.AccuracyScore ?? null,
-    fluencyScore: pron?.FluencyScore ?? null,
-    completenessScore: pron?.CompletenessScore ?? null,
+    normalizedScore: normalized,
+    pronScore: pronScore ?? null,
+    accuracyScore: accuracyScore ?? null,
+    fluencyScore: fluencyScore ?? null,
+    completenessScore: completenessScore ?? null,
     recognizedText: best.Display ?? best.Lexical ?? '',
     wordResults,
     latencyMs,
