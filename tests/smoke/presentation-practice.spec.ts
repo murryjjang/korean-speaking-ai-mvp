@@ -110,11 +110,18 @@ test.describe('발표연습 데모 화면', () => {
       expect(step5Text).toContain('타이머 발표')
     })
 
-    test('발표 피드백 카드에 "시연용" 배지가 녹음 종료 후 표시된다', async ({ page }) => {
+    test('발표 피드백 카드에 "참고 피드백" 배지가 녹음 종료 후 표시된다 (mock fallback)', async ({
+      page,
+    }) => {
       await page.getByTestId('btn-start-recording').click()
-      await expect(page.getByTestId('sample-feedback-badge')).toBeVisible({ timeout: 3000 })
-      const badgeText = await page.getByTestId('sample-feedback-badge').textContent()
-      expect(badgeText).toContain('시연용')
+      // mock 폴백 시 sample-feedback-badge, LLM 성공 시 ai-feedback-badge 중 하나가 노출됨
+      const sampleBadge = page.getByTestId('sample-feedback-badge')
+      const aiBadge = page.getByTestId('ai-feedback-badge')
+      await expect(sampleBadge.or(aiBadge)).toBeVisible({ timeout: 3000 })
+      if (await sampleBadge.isVisible()) {
+        const badgeText = await sampleBadge.textContent()
+        expect(badgeText).toContain('참고 피드백')
+      }
     })
 
     test('발표연습 화면에서 "실시간 발음평가", "정밀 발음분석" 문구가 표시되지 않는다', async ({

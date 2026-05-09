@@ -92,10 +92,12 @@ export function FreeConversationClient() {
   const [ttsAutoPlay, setTtsAutoPlay] = useState(true)
   const [speakingTurnIdx, setSpeakingTurnIdx] = useState<number | null>(null)
 
-  // 명세 23-b 1-C: 음성 입력 후 3초 카운트다운 자동 전송 (취소 가능)
+  // 명세 23-b 1-C / 23-d Phase C: 음성 입력 후 3초 카운트다운 자동 전송 (취소 가능).
+  // - autoSendTimerRef: 실제 전송 setTimeout (클로저로 text 캡처 → stale 안 됨).
+  // - visualTimerRef: 카운트다운 시각 표시 setInterval (전송 로직과 분리).
   const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null)
-  const autoSendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pendingAutoSendTextRef = useRef<string | null>(null)
+  const autoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const visualTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -178,8 +180,12 @@ export function FreeConversationClient() {
         voiceTickRef.current = null
       }
       if (autoSendTimerRef.current) {
-        clearInterval(autoSendTimerRef.current)
+        clearTimeout(autoSendTimerRef.current)
         autoSendTimerRef.current = null
+      }
+      if (visualTimerRef.current) {
+        clearInterval(visualTimerRef.current)
+        visualTimerRef.current = null
       }
       const mr = mediaRecorderRef.current
       if (mr && mr.state === 'recording') {
@@ -191,17 +197,21 @@ export function FreeConversationClient() {
     }
   }, [])
 
-  // ── 음성 입력 후 자동 전송 카운트다운 (Phase 1-C) ────────────────────────────
+  // ── 음성 입력 후 자동 전송 카운트다운 (Phase 1-C / 23-d Phase C) ────────────
   const cancelAutoSend = useCallback(() => {
     if (autoSendTimerRef.current) {
-      clearInterval(autoSendTimerRef.current)
+      clearTimeout(autoSendTimerRef.current)
       autoSendTimerRef.current = null
     }
-    pendingAutoSendTextRef.current = null
+    if (visualTimerRef.current) {
+      clearInterval(visualTimerRef.current)
+      visualTimerRef.current = null
+    }
     setAutoSendCountdown(null)
   }, [])
 
-  // 최신 sendMessageWithText 참조를 ref로 보관해 setInterval 클로저 stale 문제 회피.
+  // 최신 sendMessageWithText 참조를 ref로 보관해 setTimeout 콜백에서 호출.
+  // (text는 클로저로 캡처하므로 stale X — ref는 함수 참조 자체만 최신화.)
   const sendMessageWithTextRef = useRef<((text: string) => void | Promise<void>) | null>(null)
 
   // ── NPC TTS (Phase 1-B) ──────────────────────────────────────────────────
@@ -212,31 +222,43 @@ export function FreeConversationClient() {
     setSpeakingTurnIdx(null)
   }, [])
 
-  // 명세 23-c Phase 7: 자연스러운 한국어 음성 우선 선택. getVoices()는 처음에 빈
-  // 배열일 수 있어 voiceschanged 이벤트 후 다시 가져오고 ref에 캐시한다.
+  // 명세 23-c Phase 7 / 23-d Phase B: 자연스러운 한국어 음성 우선 선택. getVoices()는
+  // 처음에 빈 배열일 수 있어 voiceschanged 이벤트 후 다시 가져오고 ref에 캐시한다.
+  // 23-d Phase B: 첫 NPC opener 자동 재생을 위해 voiceReady state로도 노출 — 마운트
+  // 시점에 voice 캐시가 비어 있어 opener 재생이 누락되는 문제 해결.
   const koVoiceRef = useRef<SpeechSynthesisVoice | null>(null)
+  const [voiceReady, setVoiceReady] = useState(false)
   useEffect(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
     const synth = window.speechSynthesis
     const PREFERRED = ['Heami', 'InJoon', 'SunHi', 'Yuna', '한국의', 'Korean'] as const
-    const pickVoice = () => {
+    const pickVoice = (fromEvent: boolean) => {
       const voices = synth.getVoices()
       if (voices.length === 0) return
       const koVoices = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('ko'))
-      if (koVoices.length === 0) return
       let chosen: SpeechSynthesisVoice | undefined
-      for (const tag of PREFERRED) {
-        chosen = koVoices.find((v) => v.name.includes(tag))
-        if (chosen) break
+      if (koVoices.length > 0) {
+        for (const tag of PREFERRED) {
+          chosen = koVoices.find((v) => v.name.includes(tag))
+          if (chosen) break
+        }
+        if (!chosen) chosen = koVoices.find((v) => v.lang.toLowerCase() === 'ko-kr')
+        if (!chosen) chosen = koVoices[0]
       }
-      if (!chosen) chosen = koVoices.find((v) => v.lang.toLowerCase() === 'ko-kr')
-      if (!chosen) chosen = koVoices[0]
       koVoiceRef.current = chosen ?? null
+      // 한국어 voice가 없어도 utt.lang='ko-KR'로 fallback 가능하므로 ready 처리.
+      if (fromEvent) {
+        setVoiceReady(true)
+      } else {
+        // 마운트 effect 본체에서의 setState 회피 (React 19 set-state-in-effect 룰).
+        queueMicrotask(() => setVoiceReady(true))
+      }
     }
-    pickVoice()
-    synth.addEventListener?.('voiceschanged', pickVoice)
+    pickVoice(false)
+    const onChanged = () => pickVoice(true)
+    synth.addEventListener?.('voiceschanged', onChanged)
     return () => {
-      synth.removeEventListener?.('voiceschanged', pickVoice)
+      synth.removeEventListener?.('voiceschanged', onChanged)
     }
   }, [])
 
@@ -263,6 +285,27 @@ export function FreeConversationClient() {
       setSpeakingTurnIdx(null)
     }
   }, [])
+
+  // 명세 23-d Phase B: 첫 NPC opener 자동 재생.
+  // 기존 sendMessageWithText 안의 자동 재생은 LLM 응답에만 적용되어, 주제 선택
+  // 직후 노출되는 opener 메시지가 음성으로 재생되지 않았다. voiceReady · stage ·
+  // ttsAutoPlay가 모두 충족된 시점에 opener를 한 번만 재생한다.
+  const openerSpokenRef = useRef(false)
+  useEffect(() => {
+    if (stage !== 'chat') {
+      // 다음 세션에서 다시 자동 재생되도록 리셋.
+      openerSpokenRef.current = false
+      return
+    }
+    if (openerSpokenRef.current) return
+    if (!ttsSupported || !ttsAutoPlay || !voiceReady) return
+    if (voiceState !== 'idle') return
+    const opener = turns[0]
+    if (!opener || opener.role !== 'ai') return
+    openerSpokenRef.current = true
+    // effect 본체에서의 setState 회피 — speakText 내부에서 setSpeakingTurnIdx 호출.
+    queueMicrotask(() => speakText(opener.text, 0))
+  }, [stage, ttsSupported, ttsAutoPlay, voiceReady, voiceState, turns, speakText])
 
   // ── 시작 ──────────────────────────────────────────────────────────────────
   const startConversation = useCallback((selectedTopic: string) => {
@@ -347,30 +390,49 @@ export function FreeConversationClient() {
     sendMessageWithTextRef.current = sendMessageWithText
   }, [sendMessageWithText])
 
-  // 명세 23-c Phase 6: 카운트다운이 0에 도달하면 자동 전송. setInterval setState
-  // 업데이터 안이 아니라 별도 effect에서 처리한다. setState 호출은 microtask로
-  // 미뤄 React 19 set-state-in-effect 룰을 피한다.
-  useEffect(() => {
-    if (autoSendCountdown === null) return
-    if (autoSendCountdown > 0) return
-    // 카운트다운 종료: timer 정리 + ref 비우기.
+  // 명세 23-d Phase C: 자동 전송은 setTimeout 클로저로 직접 트리거 (아래 startAutoSendCountdown).
+  // useEffect / queueMicrotask / pending text ref 의존을 모두 제거 — 23-c 구현이 실제 환경에서
+  // 자동 전송이 발화되지 않는 회귀를 보였기 때문. 카운트다운 시각 표시는 별도 setInterval로 분리.
+  const startAutoSendCountdown = useCallback((text: string) => {
+    if (!text || !text.trim()) return
+    // 기존 타이머 정리.
     if (autoSendTimerRef.current) {
-      clearInterval(autoSendTimerRef.current)
+      clearTimeout(autoSendTimerRef.current)
       autoSendTimerRef.current = null
     }
-    const text = pendingAutoSendTextRef.current
-    pendingAutoSendTextRef.current = null
-    queueMicrotask(() => {
-      // sendMessageWithText 내부에서 cancelAutoSend()가 호출되어 countdown이 null로 정리됨.
-      if (text && text.trim()) {
-        const fn = sendMessageWithTextRef.current
-        if (fn) void fn(text)
-        return
+    if (visualTimerRef.current) {
+      clearInterval(visualTimerRef.current)
+      visualTimerRef.current = null
+    }
+
+    // 시각 카운트다운: 1초마다 감소 표시.
+    setAutoSendCountdown(VOICE_AUTO_SEND_SECONDS)
+    let n = VOICE_AUTO_SEND_SECONDS
+    visualTimerRef.current = setInterval(() => {
+      n -= 1
+      if (n <= 0) {
+        if (visualTimerRef.current) {
+          clearInterval(visualTimerRef.current)
+          visualTimerRef.current = null
+        }
+        setAutoSendCountdown(0)
+      } else {
+        setAutoSendCountdown(n)
       }
-      // 빈 텍스트면 sendMessage가 호출되지 않으므로 직접 정리.
-      setAutoSendCountdown((cur) => (cur === 0 ? null : cur))
-    })
-  }, [autoSendCountdown])
+    }, 1000)
+
+    // 실제 전송: setTimeout 클로저로 text 캡처. ref 통해 최신 함수 호출.
+    autoSendTimerRef.current = setTimeout(() => {
+      autoSendTimerRef.current = null
+      if (visualTimerRef.current) {
+        clearInterval(visualTimerRef.current)
+        visualTimerRef.current = null
+      }
+      setAutoSendCountdown(null)
+      const fn = sendMessageWithTextRef.current
+      if (fn) void fn(text)
+    }, VOICE_AUTO_SEND_SECONDS * 1000)
+  }, [])
 
   // ── 음성 입력 (Phase C) ──────────────────────────────────────────────────
   // q4·발표 STT 패턴과 동일: MediaRecorder → Blob → POST /api/stt → transcript.
@@ -422,21 +484,9 @@ export function FreeConversationClient() {
               nextText = prev ? `${prev} ${transcript}` : transcript
               return nextText
             })
-            // 명세 23-c Phase 6: 카운트다운은 단순 감소만 담당하고, 0에 도달하면
-            // useEffect가 sendMessageWithText를 호출한다. setInterval 콜백 안에서
-            // setState 업데이터로 side-effect를 호출하면 React 19 strict 환경에서
-            // 트리거가 누락될 수 있어, ref 기반 비동기 트리거로 분리한다.
-            pendingAutoSendTextRef.current = nextText
-            setAutoSendCountdown(VOICE_AUTO_SEND_SECONDS)
-            if (autoSendTimerRef.current) {
-              clearInterval(autoSendTimerRef.current)
-            }
-            autoSendTimerRef.current = setInterval(() => {
-              setAutoSendCountdown((cur) => {
-                if (cur === null) return null
-                return cur - 1
-              })
-            }, 1000)
+            // 23-d Phase C: setTimeout 클로저 기반 자동 전송. text를 클로저로 캡처해
+            // stale 문제 회피, queueMicrotask·useEffect 의존성 모두 제거.
+            startAutoSendCountdown(nextText)
           }
         } catch (err) {
           console.error('[free-conversation] STT error', err)
@@ -458,7 +508,7 @@ export function FreeConversationClient() {
       setVoiceError('마이크 권한이 필요합니다. 브라우저 권한을 확인해 주세요.')
       setVoiceState('idle')
     }
-  }, [voiceState, sending, stopVoiceTick, stopSpeaking, cancelAutoSend])
+  }, [voiceState, sending, stopVoiceTick, stopSpeaking, cancelAutoSend, startAutoSendCountdown])
 
   const stopVoiceRecording = useCallback(() => {
     const mr = mediaRecorderRef.current
