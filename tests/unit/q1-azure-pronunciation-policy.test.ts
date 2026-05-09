@@ -682,11 +682,6 @@ describe('테스트 24: q1 ETRI 데모 버튼 제거 정책', () => {
     expect(etriDemoLinkRemoved).toBe(true)
   })
 
-  it('/student/etri-pronunciation-demo 라우트 자체는 유지됨 (공식 결과화면에서만 제거)', () => {
-    const routePreserved = true
-    expect(routePreserved).toBe(true)
-  })
-
   it('q1 발음 카드 제목 — Azure 성공 시 "발음평가 결과"', () => {
     const isAzureSuccess = true
     const title = isAzureSuccess ? '발음평가 결과' : '낭독 참고평가'
