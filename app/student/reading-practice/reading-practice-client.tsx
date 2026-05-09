@@ -343,16 +343,49 @@ function alignAzureWordsToReference(azureWords: AzureWordResult[] | null, sttRec
 function getResultWordStyle(w: ResultPassageWord): CSSProperties {
   // ErrorType priority over score
   if (w.errorType === 'Omission') {
-    return { color: '#DC2626', textDecoration: 'line-through', textDecorationColor: '#DC2626' }
+    return {
+      color: '#C8543C',
+      backgroundColor: '#FFEEEE',
+      textDecoration: 'line-through',
+      textDecorationColor: '#C8543C',
+      textDecorationThickness: '3px',
+      fontWeight: 600,
+    }
   }
   if (w.errorType === 'Mispronunciation') {
-    return { color: '#D97706', textDecoration: 'underline', textDecorationStyle: 'wavy' }
+    return {
+      color: '#C8543C',
+      backgroundColor: '#FFF3CD',
+      textDecoration: 'underline',
+      textDecorationColor: '#C8543C',
+      textDecorationThickness: '3px',
+      fontWeight: 600,
+    }
   }
   if (typeof w.accuracyScore === 'number' && w.accuracyScore < 80) {
-    return { color: '#D97706', textDecoration: 'underline' }
+    return {
+      color: '#C8543C',
+      backgroundColor: '#FFF3CD',
+      textDecoration: 'underline',
+      textDecorationColor: '#C8543C',
+      textDecorationThickness: '3px',
+    }
   }
   // 기본: 회색 (정상 단어)
-  return { color: 'var(--text-secondary)' }
+  return { color: '#888780' }
+}
+
+function getResultWordTitle(w: ResultPassageWord): string | undefined {
+  if (w.errorType === 'Omission') return '이 단어를 안 읽었습니다'
+  if (w.errorType === 'Mispronunciation') {
+    return typeof w.accuracyScore === 'number'
+      ? `발음 점수 ${Math.round(w.accuracyScore)}/100`
+      : '발음이 정확하지 않습니다'
+  }
+  if (typeof w.accuracyScore === 'number' && w.accuracyScore < 80) {
+    return `발음 점수 ${Math.round(w.accuracyScore)}/100`
+  }
+  return undefined
 }
 
 function ReadingResultPassage({
@@ -409,22 +442,26 @@ function ReadingResultPassage({
           {lineWords.map((w, wi) => {
             const isCurrent = currentGlobalIdx === w.globalIdx
             const seekable = w.offsetMs != null && onWordSeek != null
+            const baseStyle = getResultWordStyle(w)
             const style: CSSProperties = {
-              ...getResultWordStyle(w),
-              padding: '2px 2px',
+              ...baseStyle,
+              padding: '2px 4px',
               borderRadius: 4,
               cursor: seekable ? 'pointer' : 'default',
               transition: 'background 0.2s, color 0.2s',
-              background: isCurrent ? '#FFF3CD' : 'transparent',
-              ...(isCurrent ? { color: '#1F2D3D' } : {}),
+              ...(isCurrent ? { background: '#FDE68A', color: '#1F2D3D' } : {}),
             }
+            const tooltip = getResultWordTitle(w)
+            const title = seekable
+              ? (tooltip ? `${tooltip} · 클릭하면 이 단어부터 다시 듣기` : '이 단어부터 다시 듣기')
+              : tooltip
             return (
               <span
                 key={wi}
                 data-word-index={w.globalIdx}
                 style={style}
                 onClick={() => seekable && onWordSeek?.(w.offsetMs!)}
-                title={seekable ? '이 단어부터 다시 듣기' : undefined}
+                title={title}
               >
                 {w.text}{wi < lineWords.length - 1 ? ' ' : ''}
               </span>
@@ -433,10 +470,24 @@ function ReadingResultPassage({
         </p>
       ))}
       {insertions.length > 0 && (
-        <p style={{ marginTop: '0.8em', fontSize: '0.95em', color: '#7C3AED' }}>
+        <p style={{ marginTop: '0.8em', fontSize: '0.95em' }}>
           <span style={{ color: 'var(--text-muted)' }}>추가된 단어: </span>
           {insertions.map((ins, i) => (
-            <span key={i} style={{ marginRight: '0.4em' }}>
+            <span
+              key={i}
+              style={{
+                marginRight: '0.4em',
+                color: '#534AB7',
+                backgroundColor: '#EEEDFE',
+                textDecoration: 'underline',
+                textDecorationStyle: 'dotted',
+                textDecorationColor: '#534AB7',
+                padding: '2px 6px',
+                borderRadius: 4,
+                fontWeight: 600,
+              }}
+              title="제시문에 없는 단어를 추가했습니다"
+            >
               &ldquo;{ins.word}&rdquo;
             </span>
           ))}
@@ -1224,11 +1275,57 @@ export function ReadingPracticeClient() {
 
           {/* 본문 첨삭 — 단일 흐르는 본문 */}
           <Card data-testid="line-diff-panel">
-            <CardHeader
-              title="제시문-발화 비교"
-              description="회색: 제시문 단어 · 주황+밑줄: 발음 부정확 · 빨강+취소선: 누락된 단어 · 보라: 추가된 단어"
-            />
+            <CardHeader title="제시문-발화 비교" />
             <CardBody className="space-y-4">
+              <div
+                className="flex flex-wrap gap-x-4 gap-y-2 text-xs"
+                data-testid="word-annotation-legend"
+                aria-label="단어 첨삭 색상 범례"
+              >
+                <span className="flex items-center gap-2">
+                  <span style={{ color: '#888780', fontWeight: 600 }}>가나다</span>
+                  <span className="text-text-muted">정상</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <span style={{
+                    color: '#C8543C',
+                    backgroundColor: '#FFF3CD',
+                    padding: '2px 4px',
+                    borderRadius: 4,
+                    textDecoration: 'underline',
+                    textDecorationColor: '#C8543C',
+                    textDecorationThickness: '3px',
+                    fontWeight: 600,
+                  }}>가나다</span>
+                  <span className="text-text-muted">발음 부정확</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <span style={{
+                    color: '#C8543C',
+                    backgroundColor: '#FFEEEE',
+                    padding: '2px 4px',
+                    borderRadius: 4,
+                    textDecoration: 'line-through',
+                    textDecorationColor: '#C8543C',
+                    textDecorationThickness: '3px',
+                    fontWeight: 600,
+                  }}>가나다</span>
+                  <span className="text-text-muted">안 읽음</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <span style={{
+                    color: '#534AB7',
+                    backgroundColor: '#EEEDFE',
+                    padding: '2px 4px',
+                    borderRadius: 4,
+                    textDecoration: 'underline',
+                    textDecorationStyle: 'dotted',
+                    textDecorationColor: '#534AB7',
+                    fontWeight: 600,
+                  }}>가나다</span>
+                  <span className="text-text-muted">추가됨 (제시문 외)</span>
+                </span>
+              </div>
               {recordedAudioUrl && (
                 <div className="space-y-2" data-testid="recorded-audio-block">
                   <p className="text-xs text-text-muted">
