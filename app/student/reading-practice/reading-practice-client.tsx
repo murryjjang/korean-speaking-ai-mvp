@@ -45,6 +45,8 @@ interface AzureWordResult {
   word: string
   accuracyScore: number
   errorType: 'None' | 'Omission' | 'Insertion' | 'Mispronunciation'
+  offsetMs?: number
+  durationMs?: number
 }
 
 interface AzureResult {
@@ -216,6 +218,8 @@ interface ResultPassageWord {
   globalIdx: number
   errorType: AzureWordResult['errorType']
   accuracyScore?: number
+  offsetMs?: number
+  durationMs?: number
 }
 
 function alignAzureWordsToReference(azureWords: AzureWordResult[] | null, sttRecognized: string): {
@@ -237,6 +241,8 @@ function alignAzureWordsToReference(azureWords: AzureWordResult[] | null, sttRec
           globalIdx: rt.globalIdx,
           errorType: azureWords[ai].errorType,
           accuracyScore: azureWords[ai].accuracyScore,
+          offsetMs: azureWords[ai].offsetMs,
+          durationMs: azureWords[ai].durationMs,
         })
         ai++
       } else {
@@ -289,17 +295,31 @@ function getResultWordStyle(w: ResultPassageWord): CSSProperties {
 function ReadingResultPassage({
   sttRecognized,
   azureWords,
-  audioCurrentWordIdx,
-  onWordClick,
+  audioCurrentMs,
+  onWordSeek,
 }: {
   sttRecognized: string
   azureWords: AzureWordResult[] | null
-  audioCurrentWordIdx?: number | null
-  onWordClick?: (globalIdx: number) => void
+  audioCurrentMs?: number
+  onWordSeek?: (offsetMs: number) => void
 }) {
   const { words, insertions } = alignAzureWordsToReference(azureWords, sttRecognized)
   const wordsByLine: ResultPassageWord[][] = REFERENCE_LINES.map(() => [])
   for (const w of words) wordsByLine[w.lineIdx].push(w)
+
+  // Determine the currently spoken word from playback position. We use a small
+  // tail buffer (50ms) so the highlight doesn't flicker between adjacent words.
+  let currentGlobalIdx: number | null = null
+  if (typeof audioCurrentMs === 'number') {
+    for (const w of words) {
+      if (w.offsetMs == null) continue
+      const end = w.offsetMs + (w.durationMs ?? 0) + 50
+      if (audioCurrentMs >= w.offsetMs && audioCurrentMs <= end) {
+        currentGlobalIdx = w.globalIdx
+        break
+      }
+    }
+  }
 
   return (
     <article
@@ -324,13 +344,14 @@ function ReadingResultPassage({
           data-testid={`result-line-${lineIdx}`}
         >
           {lineWords.map((w, wi) => {
-            const isCurrent = audioCurrentWordIdx === w.globalIdx
+            const isCurrent = currentGlobalIdx === w.globalIdx
+            const seekable = w.offsetMs != null && onWordSeek != null
             const style: CSSProperties = {
               ...getResultWordStyle(w),
               padding: '2px 2px',
               borderRadius: 4,
-              cursor: onWordClick ? 'pointer' : 'default',
-              transition: 'background 0.2s',
+              cursor: seekable ? 'pointer' : 'default',
+              transition: 'background 0.2s, color 0.2s',
               background: isCurrent ? '#FFF3CD' : 'transparent',
               ...(isCurrent ? { color: '#1F2D3D' } : {}),
             }
@@ -339,7 +360,8 @@ function ReadingResultPassage({
                 key={wi}
                 data-word-index={w.globalIdx}
                 style={style}
-                onClick={() => onWordClick?.(w.globalIdx)}
+                onClick={() => seekable && onWordSeek?.(w.offsetMs!)}
+                title={seekable ? '이 단어부터 다시 듣기' : undefined}
               >
                 {w.text}{wi < lineWords.length - 1 ? ' ' : ''}
               </span>
@@ -375,6 +397,9 @@ export function ReadingPracticeClient() {
   const [finalScore, setFinalScore] = useState<number>(0)
   const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'playing'>('idle')
   const [providerNote, setProviderNote] = useState<string | null>(null)
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
+  const [playbackCurrentMs, setPlaybackCurrentMs] = useState<number>(0)
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -523,6 +548,12 @@ export function ReadingPracticeClient() {
       runFallbackSTT()
       return
     }
+    // Keep the recorded audio so the result page can replay it with word-sync.
+    try {
+      if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl)
+      const url = URL.createObjectURL(blob)
+      setRecordedAudioUrl(url)
+    } catch { /* noop */ }
     try {
       const fd = new FormData()
       fd.append('audio', blob, 'recording.webm')
@@ -608,6 +639,11 @@ export function ReadingPracticeClient() {
     setPlayingLineIdx(null)
     setRecorderState('idle')
     chunksRef.current = []
+    if (recordedAudioUrl) {
+      URL.revokeObjectURL(recordedAudioUrl)
+      setRecordedAudioUrl(null)
+    }
+    setPlaybackCurrentMs(0)
   }
 
   // ── Dynamic feedback ────────────────────────────────────────────────────────
@@ -1113,9 +1149,33 @@ export function ReadingPracticeClient() {
               description="회색: 제시문 단어 · 주황+밑줄: 발음 부정확 · 빨강+취소선: 누락된 단어 · 보라: 추가된 단어"
             />
             <CardBody className="space-y-4">
+              {recordedAudioUrl && (
+                <div className="space-y-2" data-testid="recorded-audio-block">
+                  <p className="text-xs text-text-muted">
+                    녹음을 재생하면 본문 단어가 시간 순으로 강조됩니다. 단어를 클릭하면 해당 위치부터 다시 들을 수 있습니다.
+                  </p>
+                  <audio
+                    ref={playbackAudioRef}
+                    src={recordedAudioUrl}
+                    controls
+                    className="w-full"
+                    data-testid="recorded-audio"
+                    onTimeUpdate={(e) => setPlaybackCurrentMs(e.currentTarget.currentTime * 1000)}
+                    onSeeked={(e) => setPlaybackCurrentMs(e.currentTarget.currentTime * 1000)}
+                    onEnded={() => setPlaybackCurrentMs(0)}
+                  />
+                </div>
+              )}
               <ReadingResultPassage
                 sttRecognized={sttLines.join(' ')}
                 azureWords={azureResult?.wordResults ?? null}
+                audioCurrentMs={recordedAudioUrl ? playbackCurrentMs : undefined}
+                onWordSeek={recordedAudioUrl ? (offsetMs) => {
+                  const a = playbackAudioRef.current
+                  if (!a) return
+                  a.currentTime = Math.max(0, offsetMs / 1000)
+                  a.play().catch(() => { /* user gesture may be required */ })
+                } : undefined}
               />
               <div className="p-3 bg-surface border border-border rounded-lg">
                 <p className="text-xs text-text-muted mb-1 font-semibold uppercase tracking-wide">내 발화 (음성 인식)</p>
@@ -1182,6 +1242,11 @@ export function ReadingPracticeClient() {
                 setFinalScore(0)
                 setProviderNote(null)
                 setRecorderState('idle')
+                if (recordedAudioUrl) {
+                  URL.revokeObjectURL(recordedAudioUrl)
+                  setRecordedAudioUrl(null)
+                }
+                setPlaybackCurrentMs(0)
                 setPhase('practice')
               }}
               data-testid="btn-retry"

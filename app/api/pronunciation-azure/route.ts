@@ -194,10 +194,13 @@ export async function POST(request: Request) {
     return buildDemoFallback('azure_no_pron_data', demoScore, recognizedText)
   }
 
+  // Azure returns Offset/Duration in 100-ns ticks (10000 ticks = 1 ms).
   const wordResults = words.map(w => ({
     word: w.Word,
     accuracyScore: w.PronunciationAssessment?.AccuracyScore ?? w.AccuracyScore ?? 100,
     errorType: w.PronunciationAssessment?.ErrorType ?? w.ErrorType ?? 'None',
+    offsetMs: typeof w.Offset === 'number' ? w.Offset / 10000 : undefined,
+    durationMs: typeof w.Duration === 'number' ? w.Duration / 10000 : undefined,
   }))
 
   // Fallback chain: PronScore (overall) → AccuracyScore → 72 floor.

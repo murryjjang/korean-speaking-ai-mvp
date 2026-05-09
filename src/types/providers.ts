@@ -36,6 +36,10 @@ export type AzureWordResult = {
   word: string
   accuracyScore: number
   errorType: 'None' | 'Omission' | 'Insertion' | 'Mispronunciation'
+  /** Azure Word.Offset converted from 100ns ticks to milliseconds; absent for omissions. */
+  offsetMs?: number
+  /** Azure Word.Duration converted from 100ns ticks to milliseconds. */
+  durationMs?: number
 }
 
 export type PronunciationResult = ProviderMeta & {
