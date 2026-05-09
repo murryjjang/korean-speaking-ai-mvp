@@ -95,7 +95,11 @@ export function useKaraokeTracking(
       let last = -1
       for (const rw of recWords) {
         if (!rw) continue
-        for (let off = 0; off < 8 && p + off < refStripped.length; off++) {
+        // Within last 5 words: expand lookahead to cover the rest of the
+        // reference so STT noise doesn't strand the final words.
+        const remaining = refStripped.length - p
+        const lookahead = remaining <= 5 ? remaining : 8
+        for (let off = 0; off < lookahead && p + off < refStripped.length; off++) {
           if (refStripped[p + off] === rw) {
             p = p + off + 1
             last = p - 1
