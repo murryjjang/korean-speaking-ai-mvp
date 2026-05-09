@@ -57,6 +57,12 @@ const LEVEL_OPTIONS = ['초급', '중급', '고급'] as const
 const DEFAULT_TOPIC = '지난 주말에 한 일'
 const DEFAULT_SCRIPT =
   '지난 주말에 저는 친구를 만났습니다. 우리는 카페에 갔습니다. 저는 아이스 아메리카노를 마셨습니다. 그리고 공원에서 산책했습니다. 날씨가 좋아서 기분이 좋았습니다. 저녁에는 집에서 가족과 함께 영화를 봤습니다.'
+
+// ── 시연용 사전 작성 ("한국의 겨울 날씨") ──────────────────────────────────
+// 1분 분량 원고. 시연 시 입력 시간 단축을 위해 한 번 클릭으로 채워 넣음.
+const DEMO_TOPIC = '한국의 겨울 날씨'
+const DEMO_SCRIPT =
+  '안녕하세요. 저는 김학습자입니다. 오늘은 한국의 겨울 날씨에 대해 발표하겠습니다. 한국의 겨울은 매우 춥고 건조합니다. 보통 12월부터 2월까지 겨울이 이어집니다. 1월과 2월에는 기온이 영하로 떨어집니다. 특히 강원도 산간 지역은 눈이 많이 옵니다. 서울에서도 가끔 폭설이 내립니다. 이상 발표를 마치겠습니다. 감사합니다.'
 const DEFAULT_CORRECTED =
   '지난 주말에 저는 친구를 만났습니다. 우리는 카페에 가서 아이스 아메리카노를 마셨습니다. 그 후 공원에서 산책했습니다. 날씨가 좋아서 기분이 매우 좋았습니다. 저녁에는 집으로 돌아와 가족과 함께 영화를 보며 즐거운 시간을 보냈습니다.'
 const DEMO_TRANSCRIPT =
@@ -1078,6 +1084,18 @@ export function PresentationPracticeClient() {
               data-testid="btn-load-sample"
             >
               샘플 원고 불러오기
+            </button>
+            <button
+              onClick={() => {
+                setScript(DEMO_SCRIPT)
+                setTopic(DEMO_TOPIC)
+              }}
+              className="px-3 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors inline-flex items-center gap-1"
+              data-testid="btn-load-demo-script"
+              title="시연 시 입력 시간 단축용. 한국의 겨울 날씨 1분 분량 원고."
+            >
+              <span aria-hidden>⭐</span>
+              <span>시연용 사전 작성 (겨울 날씨)</span>
             </button>
             <button
               onClick={async () => {

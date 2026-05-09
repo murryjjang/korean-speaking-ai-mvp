@@ -378,6 +378,32 @@ export const mockSubmissions: Submission[] = [
     status: 'ai_evaluated',
     submittedAt: '2026-05-02T09:30:00Z',
   },
+  // q3 정상 답변 샘플 (시연용): 핵심 정보 3개 모두 포함한 우수 답변
+  {
+    id: 'sub-023',
+    studentId: 'student-001',
+    classId: 'class-01',
+    moduleType: 'assessment',
+    questionSetId: 'beginner-set-1',
+    questionId: 'beginner-q3-listening-response',
+    audioUrl: '/mock/audio/sub-023.webm',
+    durationSec: 41,
+    status: 'ai_evaluated',
+    submittedAt: '2026-05-03T09:00:00Z',
+  },
+  // q3 정상 답변 샘플 (시연용): 핵심 정보 일부 누락한 보통 답변
+  {
+    id: 'sub-024',
+    studentId: 'student-002',
+    classId: 'class-01',
+    moduleType: 'assessment',
+    questionSetId: 'beginner-set-1',
+    questionId: 'beginner-q3-listening-response',
+    audioUrl: '/mock/audio/sub-024.webm',
+    durationSec: 33,
+    status: 'ai_evaluated',
+    submittedAt: '2026-05-03T09:10:00Z',
+  },
 ]
 
 export const mockAIEvaluations: AIEvaluation[] = [
@@ -735,6 +761,56 @@ export const mockAIEvaluations: AIEvaluation[] = [
     providerVersion: '1.0.0',
     latencyMs: 163,
     evaluatedAt: '2026-05-02T09:31:00Z',
+  },
+  // q3 정상 답변 샘플 #1: 핵심 정보 3개 모두 포함 (우수)
+  {
+    id: 'ai-eval-023',
+    submissionId: 'sub-023',
+    transcript:
+      '한국어 수업은 내일 오전 10시에 시작합니다. 장소는 2층 203호입니다. 학생들은 교재와 필기구를 꼭 가져와야 합니다.',
+    rubricId: 'rubric-listening-resp-01',
+    rubricVersion: '1.0',
+    scores: {
+      'ri-lr-comprehension': 6,
+      'ri-lr-accuracy': 7,
+      'ri-lr-required': 5,
+      'ri-lr-clarity': 4,
+    },
+    totalScore: 22,
+    normalizedScore: 88,
+    errorTags: [],
+    feedback:
+      '핵심 정보 세 가지(시간·장소·준비물)를 모두 정확하게 포함했습니다. 발화도 자연스럽고 명료합니다.',
+    providerName: 'mock',
+    providerVersion: '1.0.0',
+    latencyMs: 141,
+    evaluatedAt: '2026-05-03T09:01:00Z',
+  },
+  // q3 정상 답변 샘플 #2: 일부 정보 누락 (보통)
+  {
+    id: 'ai-eval-024',
+    submissionId: 'sub-024',
+    transcript:
+      '내일 한국어 수업이 있어요. 오전 10시에 시작해요. 교재를 가져가요.',
+    rubricId: 'rubric-listening-resp-01',
+    rubricVersion: '1.0',
+    scores: {
+      'ri-lr-comprehension': 4,
+      'ri-lr-accuracy': 5,
+      'ri-lr-required': 2,
+      'ri-lr-clarity': 3,
+    },
+    totalScore: 14,
+    normalizedScore: 56,
+    errorTags: [
+      { type: 'task', count: 2, examples: ['장소(203호) 누락', '필기구 언급 누락'] },
+    ],
+    feedback:
+      '시작 시간은 정확히 답변했으나 장소와 준비물 일부가 누락되었습니다. 메모를 활용해 핵심 세 가지를 모두 짚어 보세요.',
+    providerName: 'mock',
+    providerVersion: '1.0.0',
+    latencyMs: 152,
+    evaluatedAt: '2026-05-03T09:11:00Z',
   },
 ]
 
