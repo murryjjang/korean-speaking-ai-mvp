@@ -467,6 +467,7 @@ export default async function SpeakingResultPage({
   const totalMissionGoals = evalRecord.meta?.totalMissionGoals ?? 0
   const dialogueHybridScore = evalRecord.meta?.dialogueHybridScore
   const dialogueEvalSource = evalRecord.meta?.dialogueEvalSource
+  const dialogueConversationProvider = evalRecord.meta?.dialogueConversationProvider
 
   // Azure: providerName === 'azure' && pronScore != null
   const isAzureSuccess = pronunciationResult.providerName === 'azure' && pronunciationResult.pronScore != null
@@ -1034,8 +1035,8 @@ export default async function SpeakingResultPage({
                 </p>
               </div>
             )}
-            {/* q4 대화 미션: mock provider 안내 (소형, 학습자 친화적) */}
-            {isDialogueMission && sttResult.providerName === 'mock' && (
+            {/* q4 대화 미션: mock provider 안내 — conversation provider가 mock/fallback일 때만 표시. */}
+            {isDialogueMission && dialogueConversationProvider && dialogueConversationProvider !== 'openai' && (
               <div className="mb-3 p-3 bg-surface border border-border rounded-md" data-testid="q4-mock-provider-notice">
                 <p className="text-xs text-text-secondary leading-relaxed">
                   현재는 테스트용 대화 provider로 평가되었습니다. 실제 LLM 연결 후 대화 품질은 추가 개선됩니다.

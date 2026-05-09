@@ -35,6 +35,8 @@ export type SpeakingEvalRecord = {
     }
     /** q4 평가 출처 — 'llm'이면 하이브리드 점수 사용, 'rule'이면 기존 규칙 기반. */
     dialogueEvalSource?: 'llm' | 'rule'
+    /** q4 대화 provider — 'openai'면 LLM 대화, 그 외('mock'/'fallback')면 mock provider. */
+    dialogueConversationProvider?: 'openai' | 'mock' | 'fallback'
   }
 }
 

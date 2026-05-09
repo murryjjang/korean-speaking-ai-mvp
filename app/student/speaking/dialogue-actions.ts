@@ -31,6 +31,18 @@ export async function submitDialogue(
     throw new Error('no_valid_student_turns')
   }
 
+  // Derive conversation provider from AI turns. 'script' = scripted greeting, ignored.
+  // 'openai' = LLM 응답 성공 한 번이라도 있으면 LLM 대화. 그 외는 mock/fallback.
+  const aiTurnsFromProvider = turns.filter(
+    (t) => t.role === 'ai' && t.providerName && t.providerName !== 'script',
+  )
+  const dialogueConversationProvider: 'openai' | 'mock' | 'fallback' =
+    aiTurnsFromProvider.some((t) => t.providerName === 'openai')
+      ? 'openai'
+      : aiTurnsFromProvider.length === 0
+        ? 'fallback'
+        : (aiTurnsFromProvider[0].providerName as 'mock' | 'fallback')
+
   const aggregatedTranscript = generateAggregatedTranscript(turns)
 
   // Guard: aggregated transcript must have content
@@ -227,6 +239,7 @@ export async function submitDialogue(
       })),
       dialogueHybridScore: hybridResult.hybridScore ?? undefined,
       dialogueEvalSource: hybridResult.source,
+      dialogueConversationProvider,
     },
   }
 
