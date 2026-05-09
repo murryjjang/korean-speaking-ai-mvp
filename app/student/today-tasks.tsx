@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, CardBody, Badge, Button } from "@/src/components/ui";
+import { Card, CardHeader, CardBody, Badge } from "@/src/components/ui";
 
 export type TodayTask = {
   id: string;
@@ -62,9 +62,12 @@ export function TodayTasks({ tasks }: { tasks: TodayTask[] }) {
                   시작하기
                 </Link>
               ) : (
-                <Button variant="secondary" size="sm" disabled>
-                  제출 완료
-                </Button>
+                <Link
+                  href="#recent-results"
+                  className="inline-flex items-center justify-center gap-2 font-medium transition-colors px-3 py-1.5 text-xs rounded-md bg-surface text-text-primary hover:bg-surface-raised border border-border-strong"
+                >
+                  결과 보기
+                </Link>
               )}
             </li>
           ))}

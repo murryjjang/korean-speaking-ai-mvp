@@ -155,7 +155,7 @@ export default function StudentDashboardPage() {
       </div>
 
       {recentEval && rubric && (
-        <div className="mb-6">
+        <div id="recent-results" className="mb-6 scroll-mt-20">
           <ScoreBreakdown
             setName={recentSetName}
             submittedAt={new Date(
