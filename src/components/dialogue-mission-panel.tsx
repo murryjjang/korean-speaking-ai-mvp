@@ -351,6 +351,38 @@ export function DialogueMissionPanel({
     }
   }, [canSubmit, questionId, questionSetId, attemptId, turns, goalResults, router])
 
+  // 시간 종료 자동 제출 — 타이머가 maxDialogueDurationSec에 도달하면
+  // 1) 진행 중 녹음을 중단하고
+  // 2) 유효한 학습자 발화가 있으면 즉시 제출 → 결과 페이지로 이동
+  // 3) 없으면 'completed' 상태로 동결 (입력 불가)
+  // processing 중이면 끝나길 기다린 뒤 다시 트리거됨.
+  const timeUp = elapsedSec >= maxDialogueDurationSec
+  const autoSubmitTriggered = useRef(false)
+
+  useEffect(() => {
+    if (!timeUp) return
+    if (autoSubmitTriggered.current) return
+    if (panelStatus === 'idle' || panelStatus === 'submitting') return
+
+    if (panelStatus === 'recording' && recorder.state === 'recording') {
+      recorder.stopRecording()
+      return
+    }
+
+    if (panelStatus === 'processing') return
+
+    autoSubmitTriggered.current = true
+
+    const t = setTimeout(() => {
+      if (canSubmit) {
+        void handleSubmit()
+      } else {
+        setPanelStatus('completed')
+      }
+    }, 0)
+    return () => clearTimeout(t)
+  }, [timeUp, panelStatus, canSubmit, handleSubmit, recorder])
+
   const isCafeScenario = questionId.includes('beginner') && questionId.includes('q4')
 
   return (
@@ -418,10 +450,29 @@ export function DialogueMissionPanel({
               <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
                 대화
               </p>
-              <span className="text-xs text-text-muted font-mono tabular-nums">
-                {formatTime(elapsedSec)} / {formatTime(maxDialogueDurationSec)}
+              <span
+                className={`text-xs font-mono tabular-nums ${
+                  timeUp
+                    ? 'text-danger-600 font-semibold'
+                    : maxDialogueDurationSec - elapsedSec <= 10
+                      ? 'text-danger-500'
+                      : 'text-text-muted'
+                }`}
+                data-testid="dialogue-timer"
+              >
+                {formatTime(Math.min(elapsedSec, maxDialogueDurationSec))} / {formatTime(maxDialogueDurationSec)}
               </span>
             </div>
+            {timeUp && (
+              <div
+                className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md"
+                data-testid="dialogue-time-up-notice"
+              >
+                <p className="text-xs text-amber-700">
+                  시간이 종료되어 자동 제출됩니다.
+                </p>
+              </div>
+            )}
 
             <div
               className="space-y-3 max-h-72 overflow-y-auto"
@@ -509,6 +560,7 @@ export function DialogueMissionPanel({
                 <Button
                   variant="primary"
                   onClick={handleStartRecording}
+                  disabled={timeUp}
                   data-testid="record-turn-button"
                 >
                   말하기
@@ -615,12 +667,15 @@ export function DialogueMissionPanel({
                 대화를 마쳤습니다. 제출하면 AI 평가가 시작됩니다.
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
-                <Button variant="secondary" onClick={() => setPanelStatus('ready')}>
-                  대화 계속하기
-                </Button>
+                {!timeUp && (
+                  <Button variant="secondary" onClick={() => setPanelStatus('ready')}>
+                    대화 계속하기
+                  </Button>
+                )}
                 <Button
                   variant="primary"
                   onClick={handleSubmit}
+                  disabled={!canSubmit}
                   data-testid="submit-dialogue-button"
                 >
                   평가 제출하기
