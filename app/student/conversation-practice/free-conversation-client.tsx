@@ -75,6 +75,14 @@ export function FreeConversationClient() {
   const audioChunksRef = useRef<Blob[]>([])
   const voiceTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // 명세 23-b 1-B: NPC 음성 출력 (브라우저 TTS)
+  const [ttsSupported, setTtsSupported] = useState(false)
+  const [ttsAutoPlay, setTtsAutoPlay] = useState(true)
+  const [speakingTurnIdx, setSpeakingTurnIdx] = useState<number | null>(null)
+  useEffect(() => {
+    setTtsSupported(typeof window !== 'undefined' && 'speechSynthesis' in window)
+  }, [])
+
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
 
   // Auto-scroll on new turn
@@ -148,7 +156,7 @@ export function FreeConversationClient() {
     }
   }, [stage])
 
-  // 컴포넌트 언마운트 시 음성 녹음 인터벌 정리
+  // 컴포넌트 언마운트 시 음성 녹음 인터벌 + TTS 정리
   useEffect(() => {
     return () => {
       if (voiceTickRef.current) {
@@ -159,6 +167,37 @@ export function FreeConversationClient() {
       if (mr && mr.state === 'recording') {
         try { mr.stop() } catch { /* noop */ }
       }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel() } catch { /* noop */ }
+      }
+    }
+  }, [])
+
+  // ── NPC TTS (Phase 1-B) ──────────────────────────────────────────────────
+  // 학습자 녹음 중에는 음성 출력 안 함 (충돌 방지). 종료 화면(stage='end')에서도 재생 안 함.
+  const stopSpeaking = useCallback(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    try { window.speechSynthesis.cancel() } catch { /* noop */ }
+    setSpeakingTurnIdx(null)
+  }, [])
+
+  const speakText = useCallback((text: string, turnIdx: number) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    try {
+      window.speechSynthesis.cancel()
+      const utt = new SpeechSynthesisUtterance(text)
+      utt.lang = 'ko-KR'
+      utt.rate = 1.0
+      utt.onend = () => {
+        setSpeakingTurnIdx((cur) => (cur === turnIdx ? null : cur))
+      }
+      utt.onerror = () => {
+        setSpeakingTurnIdx((cur) => (cur === turnIdx ? null : cur))
+      }
+      setSpeakingTurnIdx(turnIdx)
+      window.speechSynthesis.speak(utt)
+    } catch {
+      setSpeakingTurnIdx(null)
     }
   }, [])
 
@@ -190,6 +229,8 @@ export function FreeConversationClient() {
   const startVoiceRecording = useCallback(async () => {
     if (voiceState !== 'idle' || sending) return
     setVoiceError(null)
+    // 녹음과 NPC 음성 충돌 방지: 재생 중이면 즉시 중단
+    stopSpeaking()
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mr = new MediaRecorder(stream)
@@ -240,7 +281,7 @@ export function FreeConversationClient() {
       setVoiceError('마이크 권한이 필요합니다. 브라우저 권한을 확인해 주세요.')
       setVoiceState('idle')
     }
-  }, [voiceState, sending, stopVoiceTick])
+  }, [voiceState, sending, stopVoiceTick, stopSpeaking])
 
   const stopVoiceRecording = useCallback(() => {
     const mr = mediaRecorderRef.current
@@ -283,11 +324,21 @@ export function FreeConversationClient() {
         npc_response: string
         learner_correction?: { original: string; corrected: string; reason: string }
       }
-      setTurns([
+      const finalTurns: ChatTurn[] = [
         ...nextTurns.slice(0, -1),
         { ...studentTurn, correction: data.learner_correction },
         { role: 'ai', text: data.npc_response },
-      ])
+      ]
+      setTurns(finalTurns)
+      // NPC 응답 자동 재생: 학습자가 녹음 중이 아닐 때만 (충돌 방지).
+      if (
+        ttsAutoPlay &&
+        typeof window !== 'undefined' &&
+        'speechSynthesis' in window &&
+        voiceState === 'idle'
+      ) {
+        speakText(data.npc_response, finalTurns.length - 1)
+      }
     } catch (err) {
       console.error('[free-conversation] respond error', err)
       setChatError('잠시 후 다시 시도해주세요.')
@@ -298,7 +349,7 @@ export function FreeConversationClient() {
     } finally {
       setSending(false)
     }
-  }, [input, sending, turns, topic])
+  }, [input, sending, turns, topic, ttsAutoPlay, voiceState, speakText])
 
   // ── 단계별 렌더 ───────────────────────────────────────────────────────────
 
@@ -390,13 +441,43 @@ export function FreeConversationClient() {
             </p>
           </div>
           <button
-            onClick={() => endConversation(turns, topic)}
+            onClick={() => {
+              stopSpeaking()
+              void endConversation(turns, topic)
+            }}
             className="px-3 py-1.5 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors"
             data-testid="btn-end-conversation"
           >
             대화 종료
           </button>
         </div>
+
+        {ttsSupported && (
+          <div className="mt-2 flex items-center gap-2" data-testid="tts-toggle-row">
+            <label className="inline-flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={ttsAutoPlay}
+                onChange={(e) => {
+                  setTtsAutoPlay(e.target.checked)
+                  if (!e.target.checked) stopSpeaking()
+                }}
+                className="rounded border-border"
+                data-testid="tts-autoplay-toggle"
+              />
+              <span>NPC 음성 자동 재생</span>
+            </label>
+            {speakingTurnIdx !== null && (
+              <button
+                onClick={() => stopSpeaking()}
+                className="text-xs px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+                data-testid="tts-stop-button"
+              >
+                ⏸ 중지
+              </button>
+            )}
+          </div>
+        )}
 
         {warned && !timeUp && (
           <div
@@ -436,6 +517,30 @@ export function FreeConversationClient() {
                 ].join(' ')}
               >
                 <p className="whitespace-pre-wrap">{t.text}</p>
+                {t.role === 'ai' && ttsSupported && (
+                  <div className="mt-1.5 -mb-0.5 flex justify-end">
+                    {speakingTurnIdx === i ? (
+                      <button
+                        onClick={() => stopSpeaking()}
+                        className="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 inline-flex items-center gap-0.5"
+                        data-testid={`tts-stop-${i}`}
+                        title="음성 중지"
+                      >
+                        <span aria-hidden>⏸</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => speakText(t.text, i)}
+                        disabled={voiceState === 'recording'}
+                        className="text-[11px] px-1.5 py-0.5 rounded border border-border text-text-muted hover:bg-slate-50 inline-flex items-center gap-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-testid={`tts-play-${i}`}
+                        title="다시 듣기"
+                      >
+                        <span aria-hidden>🔊</span>
+                      </button>
+                    )}
+                  </div>
+                )}
                 {t.role === 'student' && t.correction && t.correction.corrected !== t.correction.original && (
                   <div className="mt-2 pt-2 border-t border-white/30 text-xs">
                     <p className="opacity-90">
@@ -636,6 +741,7 @@ export function FreeConversationClient() {
       <div>
         <button
           onClick={() => {
+            stopSpeaking()
             setStage('start')
             setTopic('')
             setCustomTopic('')
