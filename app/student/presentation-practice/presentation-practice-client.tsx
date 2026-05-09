@@ -155,6 +155,11 @@ function getNativeFeedback(code: string): NativeFeedback {
   return NATIVE_FEEDBACK[code] ?? NATIVE_FEEDBACK['en']
 }
 
+const PRESENTATION_FEEDBACK_LANGS: { code: 'vi' | 'en'; label: string }[] = [
+  { code: 'vi', label: '베트남어 (Tiếng Việt)' },
+  { code: 'en', label: '영어 (English)' },
+]
+
 // ── 비교 결과 (demo) ─────────────────────────────────────────────────────────
 const DEMO_COMPARISON = {
   included: [
@@ -626,7 +631,6 @@ export function PresentationPracticeClient() {
   }
 
   const nativeCorrectionNote = NATIVE_CORRECTION_NOTE[nativeLang] ?? NATIVE_CORRECTION_NOTE['en']
-  const nativeFeedback = getNativeFeedback(nativeLang)
 
   const recordingDone = recordingState === 'done'
   const showTimerFeedback = recordingDone && recordingElapsedAtStop > 0
@@ -1253,29 +1257,37 @@ export function PresentationPracticeClient() {
             </div>
           </div>
 
-          <div data-testid="feedback-native">
-            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-              {NATIVE_LANGS.find(l => l.code === nativeLang)?.label ?? '모국어'} 피드백
-            </p>
-            <div className="space-y-2">
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
-                <ul className="text-sm text-emerald-700 space-y-1">
-                  {nativeFeedback.good.map((item, i) => (
-                    <li key={i}>• {item}</li>
-                  ))}
-                </ul>
+          {PRESENTATION_FEEDBACK_LANGS.map(({ code, label }, idx) => {
+            const fb = getNativeFeedback(code)
+            // Keep original "feedback-native" testid on the first (Vietnamese)
+            // block so existing smoke tests continue to find Vietnamese text.
+            const testId = idx === 0 ? 'feedback-native' : `feedback-${code}`
+            return (
+              <div key={code} data-testid={testId}>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+                  {label} 피드백
+                </p>
+                <div className="space-y-2">
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
+                    <ul className="text-sm text-emerald-700 space-y-1">
+                      {fb.good.map((item, i) => (
+                        <li key={i}>• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-xs font-semibold text-amber-700 mb-1">다음 목표</p>
+                    <ul className="text-sm text-amber-700 space-y-1">
+                      {fb.improve.map((item, i) => (
+                        <li key={i}>• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-xs font-semibold text-amber-700 mb-1">다음 목표</p>
-                <ul className="text-sm text-amber-700 space-y-1">
-                  {nativeFeedback.improve.map((item, i) => (
-                    <li key={i}>• {item}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
+            )
+          })}
 
           <p className="text-xs text-text-muted italic" data-testid="pronunciation-upgrade-notice">
             ※ 발음 세부 평가는 Azure 연동 안정화 후 2차 시연에서 고도화할 예정입니다.
