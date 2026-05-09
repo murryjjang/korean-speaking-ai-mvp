@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useActionState } from 'react'
 import { loginAction, type LoginState } from './actions'
 
@@ -12,9 +13,18 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface px-4">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-primary-700 tracking-tight">한국어 AI</h1>
-          <p className="mt-1 text-sm text-text-secondary">말하기 훈련·평가 플랫폼</p>
+        <div className="flex flex-col items-center gap-4 mb-8">
+          <Image
+            src="/images/kdli-logo.jpg"
+            alt="KDLI - Korea Defense Language Institute"
+            width={240}
+            height={72}
+            priority
+            className="h-16 w-auto"
+          />
+          <h1 className="text-2xl font-semibold text-text-primary tracking-tight">
+            AI 한국어 말하기 훈련·평가
+          </h1>
         </div>
 
         <form

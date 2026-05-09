@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Badge } from "@/src/components/ui/badge";
 import type { UserRole } from "./app-shell";
 
@@ -21,9 +22,14 @@ export function Topbar({ role, userName }: TopbarProps) {
   return (
     <header className="h-14 shrink-0 flex items-center justify-between px-6 bg-surface-raised border-b border-border">
       <div className="flex items-center gap-3">
-        <span className="text-primary-700 font-bold text-base tracking-tight leading-none">
-          한국어 AI
-        </span>
+        <Image
+          src="/images/kdli-logo.jpg"
+          alt="KDLI"
+          width={120}
+          height={36}
+          priority
+          className="h-6 sm:h-8 w-auto"
+        />
         <span className="text-border-strong text-sm" aria-hidden="true">
           |
         </span>
