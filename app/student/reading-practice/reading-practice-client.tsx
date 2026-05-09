@@ -779,9 +779,6 @@ export function ReadingPracticeClient() {
 
   // ── Dynamic feedback ────────────────────────────────────────────────────────
   const korFeedback = sttLines ? generateKoreanFeedback(finalScore, sttLines) : null
-  const nativeFeedbackText = finalScore >= 80
-    ? (NATIVE_FEEDBACK_GOOD[nativeLang] ?? NATIVE_FEEDBACK_GOOD['en'])
-    : (NATIVE_FEEDBACK_IMPROVE[nativeLang] ?? NATIVE_FEEDBACK_IMPROVE['en'])
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -1399,15 +1396,28 @@ export function ReadingPracticeClient() {
                 </div>
               </div>
 
-              {/* 모국어 피드백 */}
-              <div data-testid="feedback-native">
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                  {NATIVE_LANGS.find(l => l.code === nativeLang)?.label ?? '모국어'} 피드백
-                </p>
-                <div className="p-4 bg-primary-50 border border-primary-100 rounded-lg">
-                  <p className="text-sm text-primary-800 leading-relaxed">{nativeFeedbackText}</p>
-                </div>
-              </div>
+              {/* 모국어 피드백 — 베트남어 + 영어 stacked */}
+              {([
+                { code: 'vi', label: '베트남어 (Tiếng Việt)' },
+                { code: 'en', label: '영어 (English)' },
+              ] as const).map(({ code, label }, idx) => {
+                const text = finalScore >= 80
+                  ? (NATIVE_FEEDBACK_GOOD[code] ?? NATIVE_FEEDBACK_GOOD['en'])
+                  : (NATIVE_FEEDBACK_IMPROVE[code] ?? NATIVE_FEEDBACK_IMPROVE['en'])
+                // First block keeps "feedback-native" testid for backward
+                // compatibility with smoke tests; second uses code-suffixed id.
+                const testId = idx === 0 ? 'feedback-native' : `feedback-${code}`
+                return (
+                  <div key={code} data-testid={testId}>
+                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+                      {label} 피드백
+                    </p>
+                    <div className="p-4 bg-primary-50 border border-primary-100 rounded-lg">
+                      <p className="text-sm text-primary-800 leading-relaxed">{text}</p>
+                    </div>
+                  </div>
+                )
+              })}
             </CardBody>
           </Card>
 
