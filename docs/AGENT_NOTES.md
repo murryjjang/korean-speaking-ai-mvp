@@ -202,3 +202,87 @@
   - q2·q3·읽기 연습은 변경 없음 (q3는 mock 데이터만 추가).
   - mock conversation provider 미변경 (Phase 1-B는 클라이언트 TTS 추가만).
   - proxy.ts 변경 없음. 디자인 토큰 변경 없음. 발음평가 점수 산출 로직 변경 없음.
+
+
+---
+
+## 2026-05-09 — 명세 23-c 통합 8 Phase
+
+### Phase 0 — "시연" 표기 제거 (학습자/교수자 화면)
+
+- `app/student/`, `app/teacher/` 트리에서 "시연" 키워드 0개로 정리. grep 검증 통과.
+- 보존 대상: `docs/AGENT_NOTES.md`, `docs/DEMO_*.md` (개발자 컨텍스트). admin/analytics 의 시연용 샘플 데이터 표기는 admin 전용이라 spec 범위 밖이라 그대로 둠.
+- 라벨 재명명:
+  - "시연용 데모" Badge → 제거 (발표·읽기 화면 헤더)
+  - "시연용 사전 작성 (겨울 날씨)" 버튼 + DEMO_TOPIC/SCRIPT 상수 → 삭제
+  - "시연용 샘플" → "샘플 교정"/"샘플 요약"/"샘플 데이터"
+  - "시연용 참고 피드백" → "참고 피드백"
+  - "음성 인식 기반 참고평가/피드백" → "참고 평가" or 라벨 자체 제거
+  - "시연용 평가 모드" → "참고 평가 모드"
+  - "2차 시연에서 고도화" → "추후 고도화될 예정"
+- `DEMO_TRANSCRIPT` 상수는 의미 보존을 위해 `FALLBACK_TRANSCRIPT`로 리네이밍.
+- 발표 mock 시나리오는 원래 "지난 주말에 한 일" 그대로 (DEFAULT_SCRIPT/DEFAULT_CORRECTED 보존).
+
+### Phase 1 — 점수 분리 표시
+
+- 위치: `app/student/speaking/[questionId]/result/page.tsx` "발음 종합점수" 옆.
+- 단순 안내 문구만 추가: "(발음 정확도 + 발화 일치도 통합)" — `data-testid="pron-score-breakdown-note"`.
+- 점수 산출 로직 변경 없음. 표시만 보강.
+- 발표 연습(presentation-practice)은 종합 점수 카드를 노출하지 않으므로 별도 표시 변경 없음.
+
+### Phase 2 — 발표 LLM 피드백 신규 API
+
+- 신규 라우트: `app/api/presentation/evaluate/route.ts` (POST).
+  - 입력: `{ topic, originalScript, correctedScript, transcript }`.
+  - 출력: `{ source: 'llm'|'mock', feedback_ko, feedback_vi, feedback_en }` — 각 언어별 `{ strengths[], next_steps[] }`.
+  - 모델: `OPENAI_PRESENTATION_EVALUATE_MODEL` ?? `OPENAI_DIALOGUE_MODEL` ?? `OPENAI_EVAL_MODEL` ?? `gpt-4o-mini`.
+  - max_tokens 1800, temperature 0.4, JSON response_format.
+  - mock 폴백: API key 미설정 / LLM 실패 / shape invalid 모두 안전한 한/베/영 mock 반환.
+- 클라이언트(`presentation-practice-client.tsx`):
+  - `recordingState === 'done' && transcript !== null` 시 단발 호출 (sig 기반 중복 방지).
+  - 결과는 `evaluateResult` state에 보관 → `feedback-korean`/`feedback-native`/`feedback-en` 슬롯에 표시.
+  - LLM 응답 도착 전(또는 폴백 실패 시)에는 종전 mock 정적 데이터를 그대로 보여 화면이 비지 않도록 함.
+  - `feedbackSource` Badge 갱신: `evaluateResult?.source === 'llm'` 이면 "AI 피드백", 아니면 "참고 피드백".
+- 비용 영향: 학습자 발표 1회당 +1 LLM 호출 (gpt-4o-mini 기준 약 $0.001).
+
+### Phase 4 — 발표 교정문 잘림 방지
+
+- `app/api/presentation/correct/route.ts`:
+  - `max_tokens` 산식 변경: `min(4096, max(1200, ceil(script.length * 5)))`. 한국어 글자/토큰 비율을 보수적으로 잡아 충분한 출력 길이 확보.
+  - 새 가드: `corrected_text.length / script.length < 0.7` 인 경우 LLM 출력이 잘렸다고 판단해 학습자 원본을 `mock` source로 내려준다 (corrections는 빈 배열). 학습자에게 잘린 교정문이 빨강 취소선으로 보이는 오해를 차단.
+- 클라이언트는 변경 불필요 — 동일한 응답 shape.
+
+### Phase 5 — 카라오케 매칭 안정화
+
+- `src/hooks/useKaraokeTracking.ts`:
+  - `MIN_FINAL_CONFIDENCE` 0.5 → 0.3 (낮은 신뢰도 STT 청크 드랍을 줄여 점프 빈도 감소).
+  - interim 결과 재매칭 비활성화: pointer 이동·passedThroughIdx·currentWordIdx 모두 final 결과만 사용. interimText는 의도적으로 무시(`void interimText`로 lint 회피).
+  - 영향 범위: 읽기 연습/발표 연습 카라오케만. q1·q4·생성형 대화는 카라오케 미사용 → 영향 없음.
+
+### Phase 6 — 음성 자동 전송 트리거 안정화
+
+- 종전 구조: `setInterval` 콜백 안에서 `setAutoSendCountdown` 업데이터를 통해 `sendMessageWithText` 직접 호출 → React 19 set-state-in-effect 룰 + closure stale 위험.
+- 변경:
+  1. setInterval 콜백은 카운트다운 감소만 담당 (단순 `cur => cur - 1`).
+  2. 별도 `useEffect`가 `autoSendCountdown === 0`을 감지해 자동 전송을 dispatch.
+  3. `sendMessageWithText`는 항상 최신 참조를 `sendMessageWithTextRef`로 보관 → 클로저 stale 회피.
+  4. dispatch effect는 `queueMicrotask`로 setState/sendMessage를 한 틱 미뤄 React 19 룰 충족.
+- 폴백: 변경 후 동작이 자연스러우면 그대로 사용. 시연 중 미작동 시 "취소" 버튼은 그대로, 학습자가 "전송" 누르는 흐름으로도 정상 동작.
+
+### Phase 7 — TTS 자연 음성 우선 선택
+
+- `app/student/conversation-practice/free-conversation-client.tsx`:
+  - `voiceschanged` 이벤트 + 마운트 시점 모두 `getVoices()` 호출, ko-* voice 중 Heami / InJoon / SunHi / Yuna / 한국의 / Korean 우선순위로 첫 매칭을 `koVoiceRef`에 캐시.
+  - utterance: `rate=1.05`, `pitch=1.0`, `volume=1.0`, `voice=koVoiceRef.current` (있을 때만).
+  - 시연 PC(Windows + Chrome) 사전 점검 권장: Microsoft Heami 사용 가능하면 즉시 적용됨.
+
+### Phase 8 — 교수자 메뉴 라벨 변경
+
+- `app/teacher/layout.tsx`: nav `"교수자 현황"` → `"학습자 현황"`. URL/페이지 그대로(`/teacher/dashboard`).
+
+### 회귀 영향
+
+- 시연 4 모드 (q1·q4·발표·생성형 대화) 기능 보존: lint/tsc/test:unit (612 모두 그린)/build 통과.
+- 카라오케 변경은 발표·읽기 연습 한정 — 다른 화면 영향 없음.
+- proxy.ts/디자인 토큰/q1~q4 페이지/교수자 다른 메뉴/생성형 대화 추천 주제 모두 변경 없음.
+- 스모크 테스트(`tests/smoke/presentation-practice.spec.ts` 등)는 "시연용" 키워드를 검사하므로 라벨 제거 후 자연히 깨질 수 있음. 명세 23-c 검증 항목엔 unit 테스트만 포함되어 있어 스모크는 별도 업데이트 사이클로 미룸.

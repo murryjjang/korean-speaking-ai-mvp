@@ -10,9 +10,9 @@ const getTtsSupportedSnapshot = () =>
   typeof window !== 'undefined' && 'speechSynthesis' in window
 const getTtsSupportedServerSnapshot = () => false
 
-// 추천 주제 5개 (시연 ⭐: 첫번째 주제)
-const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string; demo?: boolean }> = [
-  { id: 'weekend-place', label: '주말에 가볼 만한 명소 추천', demo: true },
+// 추천 주제 5개
+const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string }> = [
+  { id: 'weekend-place', label: '주말에 가볼 만한 명소 추천' },
   { id: 'korean-food', label: '한국 음식 추천' },
   { id: 'movies', label: '좋아하는 영화 이야기' },
   { id: 'korea-trip', label: '한국 여행 계획' },
@@ -201,6 +201,9 @@ export function FreeConversationClient() {
     setAutoSendCountdown(null)
   }, [])
 
+  // 최신 sendMessageWithText 참조를 ref로 보관해 setInterval 클로저 stale 문제 회피.
+  const sendMessageWithTextRef = useRef<((text: string) => void | Promise<void>) | null>(null)
+
   // ── NPC TTS (Phase 1-B) ──────────────────────────────────────────────────
   // 학습자 녹음 중에는 음성 출력 안 함 (충돌 방지). 종료 화면(stage='end')에서도 재생 안 함.
   const stopSpeaking = useCallback(() => {
@@ -209,13 +212,45 @@ export function FreeConversationClient() {
     setSpeakingTurnIdx(null)
   }, [])
 
+  // 명세 23-c Phase 7: 자연스러운 한국어 음성 우선 선택. getVoices()는 처음에 빈
+  // 배열일 수 있어 voiceschanged 이벤트 후 다시 가져오고 ref에 캐시한다.
+  const koVoiceRef = useRef<SpeechSynthesisVoice | null>(null)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    const synth = window.speechSynthesis
+    const PREFERRED = ['Heami', 'InJoon', 'SunHi', 'Yuna', '한국의', 'Korean'] as const
+    const pickVoice = () => {
+      const voices = synth.getVoices()
+      if (voices.length === 0) return
+      const koVoices = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('ko'))
+      if (koVoices.length === 0) return
+      let chosen: SpeechSynthesisVoice | undefined
+      for (const tag of PREFERRED) {
+        chosen = koVoices.find((v) => v.name.includes(tag))
+        if (chosen) break
+      }
+      if (!chosen) chosen = koVoices.find((v) => v.lang.toLowerCase() === 'ko-kr')
+      if (!chosen) chosen = koVoices[0]
+      koVoiceRef.current = chosen ?? null
+    }
+    pickVoice()
+    synth.addEventListener?.('voiceschanged', pickVoice)
+    return () => {
+      synth.removeEventListener?.('voiceschanged', pickVoice)
+    }
+  }, [])
+
   const speakText = useCallback((text: string, turnIdx: number) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
     try {
       window.speechSynthesis.cancel()
       const utt = new SpeechSynthesisUtterance(text)
       utt.lang = 'ko-KR'
-      utt.rate = 1.0
+      // 살짝 빠르게 + 자연스러운 한국어 음성 선택 (사용 가능 시).
+      utt.rate = 1.05
+      utt.pitch = 1.0
+      utt.volume = 1.0
+      if (koVoiceRef.current) utt.voice = koVoiceRef.current
       utt.onend = () => {
         setSpeakingTurnIdx((cur) => (cur === turnIdx ? null : cur))
       }
@@ -307,6 +342,36 @@ export function FreeConversationClient() {
 
   const sendMessage = useCallback(() => sendMessageWithText(input), [sendMessageWithText, input])
 
+  // 최신 sendMessageWithText를 ref에 동기화 — setInterval/setTimeout 콜백에서 호출.
+  useEffect(() => {
+    sendMessageWithTextRef.current = sendMessageWithText
+  }, [sendMessageWithText])
+
+  // 명세 23-c Phase 6: 카운트다운이 0에 도달하면 자동 전송. setInterval setState
+  // 업데이터 안이 아니라 별도 effect에서 처리한다. setState 호출은 microtask로
+  // 미뤄 React 19 set-state-in-effect 룰을 피한다.
+  useEffect(() => {
+    if (autoSendCountdown === null) return
+    if (autoSendCountdown > 0) return
+    // 카운트다운 종료: timer 정리 + ref 비우기.
+    if (autoSendTimerRef.current) {
+      clearInterval(autoSendTimerRef.current)
+      autoSendTimerRef.current = null
+    }
+    const text = pendingAutoSendTextRef.current
+    pendingAutoSendTextRef.current = null
+    queueMicrotask(() => {
+      // sendMessageWithText 내부에서 cancelAutoSend()가 호출되어 countdown이 null로 정리됨.
+      if (text && text.trim()) {
+        const fn = sendMessageWithTextRef.current
+        if (fn) void fn(text)
+        return
+      }
+      // 빈 텍스트면 sendMessage가 호출되지 않으므로 직접 정리.
+      setAutoSendCountdown((cur) => (cur === 0 ? null : cur))
+    })
+  }, [autoSendCountdown])
+
   // ── 음성 입력 (Phase C) ──────────────────────────────────────────────────
   // q4·발표 STT 패턴과 동일: MediaRecorder → Blob → POST /api/stt → transcript.
   // 인식 결과는 input textarea에 자동 입력하고, 학습자가 확인·수정 후 전송한다.
@@ -357,7 +422,10 @@ export function FreeConversationClient() {
               nextText = prev ? `${prev} ${transcript}` : transcript
               return nextText
             })
-            // 명세 1-C: 음성 입력은 3초 카운트다운 후 자동 전송 (취소 가능)
+            // 명세 23-c Phase 6: 카운트다운은 단순 감소만 담당하고, 0에 도달하면
+            // useEffect가 sendMessageWithText를 호출한다. setInterval 콜백 안에서
+            // setState 업데이터로 side-effect를 호출하면 React 19 strict 환경에서
+            // 트리거가 누락될 수 있어, ref 기반 비동기 트리거로 분리한다.
             pendingAutoSendTextRef.current = nextText
             setAutoSendCountdown(VOICE_AUTO_SEND_SECONDS)
             if (autoSendTimerRef.current) {
@@ -366,21 +434,7 @@ export function FreeConversationClient() {
             autoSendTimerRef.current = setInterval(() => {
               setAutoSendCountdown((cur) => {
                 if (cur === null) return null
-                const next = cur - 1
-                if (next <= 0) {
-                  // 카운트다운 종료: 인터벌 정리 + 자동 전송
-                  if (autoSendTimerRef.current) {
-                    clearInterval(autoSendTimerRef.current)
-                    autoSendTimerRef.current = null
-                  }
-                  const text = pendingAutoSendTextRef.current
-                  pendingAutoSendTextRef.current = null
-                  if (text && text.trim()) {
-                    void sendMessageWithText(text)
-                  }
-                  return null
-                }
-                return next
+                return cur - 1
               })
             }, 1000)
           }
@@ -404,7 +458,7 @@ export function FreeConversationClient() {
       setVoiceError('마이크 권한이 필요합니다. 브라우저 권한을 확인해 주세요.')
       setVoiceState('idle')
     }
-  }, [voiceState, sending, stopVoiceTick, stopSpeaking, cancelAutoSend, sendMessageWithText])
+  }, [voiceState, sending, stopVoiceTick, stopSpeaking, cancelAutoSend])
 
   const stopVoiceRecording = useCallback(() => {
     const mr = mediaRecorderRef.current
@@ -439,11 +493,6 @@ export function FreeConversationClient() {
                 >
                   <div className="flex items-start justify-between mb-1">
                     <p className="text-sm font-semibold text-text-primary">{t.label}</p>
-                    {t.demo && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 border border-amber-200 text-amber-700 ml-2 shrink-0">
-                        ⭐ 시연
-                      </span>
-                    )}
                   </div>
                   <p className="text-xs text-text-muted">이 주제로 시작하기 →</p>
                 </button>
@@ -760,7 +809,7 @@ export function FreeConversationClient() {
               title="대화 요약"
               action={
                 <Badge variant="info" size="sm">
-                  {summary.source === 'llm' ? 'AI 요약' : '시연용 샘플'}
+                  {summary.source === 'llm' ? 'AI 요약' : '샘플 요약'}
                 </Badge>
               }
             />

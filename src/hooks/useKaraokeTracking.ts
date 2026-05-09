@@ -35,8 +35,10 @@ const stripWord = (w: string) =>
   w.replace(/[.,!?。、·"'\\(\\)\\[\\]]/g, '').toLowerCase().trim()
 
 // Confidence floor for final results. Web Speech often returns 0 for interim,
-// so we only filter when a positive confidence is reported.
-const MIN_FINAL_CONFIDENCE = 0.5
+// so we only filter when a positive confidence is reported. Loosened from 0.5
+// to 0.3 (명세 23-c Phase 5) to keep low-confidence STT chunks from being
+// dropped, which made the karaoke pointer feel jumpy.
+const MIN_FINAL_CONFIDENCE = 0.3
 
 interface KaraokeState {
   /** Last word the user is recognized as currently speaking (or just spoke). */
@@ -137,21 +139,18 @@ export function useKaraokeTracking(
       }
 
       const finalWords = finalText.split(/\s+/).filter(Boolean).map(stripWord)
-      const interimWords = interimText.split(/\s+/).filter(Boolean).map(stripWord)
 
       // Final pointer is monotonic; re-matching consumed words is a no-op.
       const finalRes = matchWords(finalWords, finalPointerRef.current)
       finalPointerRef.current = finalRes.p
 
-      // Interim projects from final but is recomputed each event, so a wrong
-      // interim guess can recover on the next chunk.
-      const interimRes = matchWords(interimWords, finalRes.p)
+      // 명세 23-c Phase 5: interim 결과로 pointer를 옮기지 않는다. interim은 STT가
+      // 미확정 추측이므로 카라오케 포인터가 흔들려 보였다. final 결과만 사용해
+      // 진행도와 현재 단어를 업데이트한다. (interimText는 의도적으로 무시.)
+      void interimText
 
-      const projectedP = interimRes.p
-      const lastSpoken =
-        interimRes.last >= 0 ? interimRes.last
-        : finalRes.last >= 0 ? finalRes.last
-        : projectedP - 1
+      const projectedP = finalRes.p
+      const lastSpoken = finalRes.last >= 0 ? finalRes.last : projectedP - 1
 
       setPassedThroughIdx(projectedP - 1)
       setCurrentWordIdx(lastSpoken >= 0 ? lastSpoken : null)

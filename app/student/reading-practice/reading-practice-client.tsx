@@ -761,7 +761,7 @@ export function ReadingPracticeClient() {
     const score = computeWordMatchScore(REFERENCE_LINES.join(' '), lines.join(' '))
     setFinalScore(score)
     setAzureResult(null)
-    setProviderNote('현재는 음성 인식 기반 참고평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화 예정입니다.')
+    setProviderNote('현재는 참고 평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화될 예정입니다.')
     setPhase('result')
   }
 
@@ -774,7 +774,7 @@ export function ReadingPracticeClient() {
       const data = await res.json() as AzureResult
 
       if (data.fallbackReason) {
-        setProviderNote('현재는 음성 인식 기반 참고평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화 예정입니다.')
+        setProviderNote('현재는 참고 평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화될 예정입니다.')
         setAzureResult(null)
         const score = computeWordMatchScore(referenceText, sttLinesCurrent.join(' '))
         setFinalScore(score)
@@ -789,7 +789,7 @@ export function ReadingPracticeClient() {
         }
       }
     } catch {
-      setProviderNote('현재는 음성 인식 기반 참고평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화 예정입니다.')
+      setProviderNote('현재는 참고 평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화될 예정입니다.')
       setAzureResult(null)
       const score = computeWordMatchScore(referenceText, sttLinesCurrent.join(' '))
       setFinalScore(score)
@@ -832,7 +832,6 @@ export function ReadingPracticeClient() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-3xl font-bold text-text-primary">읽기연습</h1>
-            <Badge variant="warning" size="sm">시연용 데모</Badge>
           </div>
           <p className="text-sm text-text-secondary">
             AI 음성을 듣고 따라 읽은 뒤, 음성 인식 결과와 제시문을 비교해 읽기 정확도를 확인합니다.
@@ -1209,7 +1208,7 @@ export function ReadingPracticeClient() {
                   className="underline text-primary-600 hover:text-primary-700"
                   data-testid="btn-demo-fallback"
                 >
-                  시연용 결과 보기
+                  샘플 결과 보기
                 </button>
                 를 눌러보세요.
               </p>
@@ -1240,7 +1239,7 @@ export function ReadingPracticeClient() {
               className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg"
               data-testid="etri-fallback-notice"
             >
-              <Badge variant="warning" size="sm" data-testid="provider-badge-fallback">음성 인식 기반 참고평가</Badge>
+              <Badge variant="warning" size="sm" data-testid="provider-badge-fallback">참고 평가</Badge>
               <p className="text-xs text-amber-800">{providerNote}</p>
             </div>
           )}
@@ -1253,7 +1252,7 @@ export function ReadingPracticeClient() {
               action={
                 azureResult
                   ? <Badge variant="success" size="sm" data-testid="provider-badge-azure">실시간 발음평가</Badge>
-                  : <Badge variant="warning" size="sm" data-testid="provider-badge-demo">음성 인식 기반 참고평가</Badge>
+                  : <Badge variant="warning" size="sm" data-testid="provider-badge-demo">참고 평가</Badge>
               }
             />
             <CardBody>
@@ -1519,7 +1518,7 @@ export function ReadingPracticeClient() {
             </button>
           </div>
 
-          {/* 시연자 설명 박스 */}
+          {/* 안내 박스 */}
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg" data-testid="demo-info-box">
             <p className="text-sm text-blue-800">
               이 기능은 초급 학습자가 혼자서도 듣고, 따라 읽고, 자신의 발화를 확인하며 반복 연습할 수 있도록 설계되었습니다.

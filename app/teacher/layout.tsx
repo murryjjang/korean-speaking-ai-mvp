@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/src/lib/supabase/server";
 
 const navItems: NavItem[] = [
   { label: "채점 관리", href: "/teacher" },
-  { label: "교수자 현황", href: "/teacher/dashboard" },
+  { label: "학습자 현황", href: "/teacher/dashboard" },
   { label: "제출 내역", href: "/teacher/submissions" },
   { label: "학생 관리", href: "/teacher/students", disabled: true },
   { label: "루브릭 설정", href: "/teacher/rubrics", disabled: true },

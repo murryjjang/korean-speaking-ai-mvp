@@ -3,8 +3,8 @@ import { Badge } from '@/src/components/ui'
 
 // ── 샘플 학습자 데이터 ────────────────────────────────────────────────────────
 
-// 시연용 점수 분포: 90/80/70/60/50 다섯 구간이 모두 보이도록 배치 (S001~S006).
-// 시연 시 교사 화면에서 변별력이 한눈에 드러나는 것이 목적.
+// 점수 분포: 90/80/70/60/50 다섯 구간이 모두 보이도록 배치 (S001~S006).
+// 변별력이 한눈에 드러나도록 구성된 샘플 데이터.
 const LEARNERS = [
   {
     id: 'S001',
@@ -106,7 +106,7 @@ export default function TeacherDashboardPage() {
       <div>
         <div className="flex flex-wrap items-center gap-3 mb-1">
           <h1 className="text-3xl font-bold text-text-primary">교수자 학습 현황</h1>
-          <Badge variant="warning" size="sm" data-testid="demo-data-badge">시연용 샘플 데이터</Badge>
+          <Badge variant="warning" size="sm" data-testid="demo-data-badge">샘플 데이터</Badge>
         </div>
         <p className="text-sm text-text-secondary">
           AI 분석 결과는 교수자 최종 판단을 돕기 위한 참고자료입니다.
@@ -260,7 +260,7 @@ export default function TeacherDashboardPage() {
           <Link href="/teacher/submissions" className="text-primary-600 hover:text-primary-700 underline">
             제출 내역 페이지
           </Link>
-          에서 진행합니다. 위 목록은 시연용 샘플입니다.
+          에서 진행합니다. 위 목록은 샘플 데이터입니다.
         </p>
       </section>
 

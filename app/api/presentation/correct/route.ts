@@ -168,6 +168,9 @@ export async function POST(request: Request) {
       ?? process.env.OPENAI_EVAL_MODEL
       ?? 'gpt-4o-mini'
 
+    // 명세 23-c Phase 4: 학습자 원고 토큰의 약 2.5배까지 허용해 교정문이 잘리지 않게 한다.
+    // 한국어는 글자당 1~2 토큰이라 보수적으로 character × 5 정도를 상한으로 둔다.
+    const tokenBudget = Math.min(4096, Math.max(1200, Math.ceil(script.length * 5)))
     const response = await client.chat.completions.create({
       model,
       messages: [
@@ -176,7 +179,7 @@ export async function POST(request: Request) {
       ],
       response_format: { type: 'json_object' },
       temperature: 0.4,
-      max_tokens: Math.max(800, Math.ceil(script.length * 3)),
+      max_tokens: tokenBudget,
     })
 
     const raw = response.choices[0]?.message?.content ?? ''
@@ -189,6 +192,21 @@ export async function POST(request: Request) {
     }
     if (!Array.isArray(corrections)) {
       throw new Error('missing_corrections')
+    }
+
+    // 명세 23-c Phase 4: 교정문이 원본보다 30% 이상 짧으면 잘림으로 간주하고
+    // 학습자 원본을 그대로 사용해 교정문 잘림으로 인한 오해를 방지한다.
+    const trimmedCorrected = correctedText.trim()
+    const lengthRatio = trimmedCorrected.length / script.length
+    if (lengthRatio < 0.7) {
+      console.warn(
+        `[presentation/correct] corrected_text too short (ratio=${lengthRatio.toFixed(2)}), using original script as fallback`,
+      )
+      return Response.json({
+        source: 'mock' as const,
+        corrected_text: script,
+        corrections: [],
+      })
     }
 
     const safeCorrections = corrections.flatMap((c): Array<{ original: string; corrected: string; reason: string }> => {
@@ -206,7 +224,7 @@ export async function POST(request: Request) {
 
     return Response.json({
       source: 'llm',
-      corrected_text: correctedText.trim(),
+      corrected_text: trimmedCorrected,
       corrections: safeCorrections,
     })
   } catch (err) {

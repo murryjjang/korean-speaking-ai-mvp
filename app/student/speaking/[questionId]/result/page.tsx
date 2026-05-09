@@ -36,7 +36,7 @@ const Q3_LISTENING_CRITERIA = [
   '불필요한 내용이 적음',
 ] as const
 
-// 발음 평가 기준 5개 — 시연용 fallback 표시용
+// 발음 평가 기준 5개 — fallback 표시용
 const PRONUNCIATION_CRITERIA = [
   { key: 'accuracy', label: '발음 정확도' },
   { key: 'fluency', label: '유창성' },
@@ -1203,7 +1203,7 @@ export default async function SpeakingResultPage({
               action={
                 isAzureSuccess
                   ? <Badge variant="success" size="sm" data-testid="provider-badge-azure">실시간 발음평가</Badge>
-                  : <Badge variant="warning" size="sm" data-testid="provider-badge-demo">시연용 평가 모드</Badge>
+                  : <Badge variant="warning" size="sm" data-testid="provider-badge-demo">참고 평가 모드</Badge>
               }
             />
             <CardBody>
@@ -1223,7 +1223,12 @@ export default async function SpeakingResultPage({
                 <div className="space-y-4 mb-4" data-testid="azure-pronunciation-section">
                   <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
                     <div>
-                      <span className="text-xs text-text-secondary block mb-0.5">발음 종합점수</span>
+                      <span className="text-xs text-text-secondary block mb-0.5">
+                        발음 종합점수
+                        <span className="ml-1 text-[10px] text-text-muted font-normal" data-testid="pron-score-breakdown-note">
+                          (발음 정확도 + 발화 일치도 통합)
+                        </span>
+                      </span>
                       <span
                         className="text-3xl font-bold tabular-nums"
                         style={{
@@ -1367,7 +1372,7 @@ export default async function SpeakingResultPage({
                 </div>
               )}
 
-              {/* demo/fallback: 시연용 점수 표시 */}
+              {/* demo/fallback: 참고 점수 표시 */}
               {/* confusion state (azure provider, no pronScore, no fallbackReason) shows message instead of score bars */}
               {!isAzureSuccess && !(pronunciationResult.providerName === 'etri' && typeof pronunciationResult.rawScore === 'number') && (
                 (pronunciationResult.fallbackReason || pronunciationResult.providerName === 'azure') ? (

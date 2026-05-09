@@ -58,14 +58,9 @@ const DEFAULT_TOPIC = '지난 주말에 한 일'
 const DEFAULT_SCRIPT =
   '지난 주말에 저는 친구를 만났습니다. 우리는 카페에 갔습니다. 저는 아이스 아메리카노를 마셨습니다. 그리고 공원에서 산책했습니다. 날씨가 좋아서 기분이 좋았습니다. 저녁에는 집에서 가족과 함께 영화를 봤습니다.'
 
-// ── 시연용 사전 작성 ("한국의 겨울 날씨") ──────────────────────────────────
-// 1분 분량 원고. 시연 시 입력 시간 단축을 위해 한 번 클릭으로 채워 넣음.
-const DEMO_TOPIC = '한국의 겨울 날씨'
-const DEMO_SCRIPT =
-  '안녕하세요. 저는 김학습자입니다. 오늘은 한국의 겨울 날씨에 대해 발표하겠습니다. 한국의 겨울은 매우 춥고 건조합니다. 보통 12월부터 2월까지 겨울이 이어집니다. 1월과 2월에는 기온이 영하로 떨어집니다. 특히 강원도 산간 지역은 눈이 많이 옵니다. 서울에서도 가끔 폭설이 내립니다. 이상 발표를 마치겠습니다. 감사합니다.'
 const DEFAULT_CORRECTED =
   '지난 주말에 저는 친구를 만났습니다. 우리는 카페에 가서 아이스 아메리카노를 마셨습니다. 그 후 공원에서 산책했습니다. 날씨가 좋아서 기분이 매우 좋았습니다. 저녁에는 집으로 돌아와 가족과 함께 영화를 보며 즐거운 시간을 보냈습니다.'
-const DEMO_TRANSCRIPT =
+const FALLBACK_TRANSCRIPT =
   '지난 주말에 저는 친구를 만났습니다. 우리는 카페에 가서 아이스 아메리카노를 마셨습니다. 그 후 공원에서 산책했습니다. 날씨가 좋아서 기분이 매우 좋았습니다. 저녁에는 집으로 돌아와 가족과 함께 영화를 보며 즐거운 시간을 보냈습니다.'
 
 // ── 교정 포인트 ─────────────────────────────────────────────────────────────
@@ -160,11 +155,6 @@ const NATIVE_FEEDBACK: Record<string, NativeFeedback> = {
 function getNativeFeedback(code: string): NativeFeedback {
   return NATIVE_FEEDBACK[code] ?? NATIVE_FEEDBACK['en']
 }
-
-const PRESENTATION_FEEDBACK_LANGS: { code: 'vi' | 'en'; label: string }[] = [
-  { code: 'vi', label: '베트남어 (Tiếng Việt)' },
-  { code: 'en', label: '영어 (English)' },
-]
 
 // ── 비교 결과 (demo) ─────────────────────────────────────────────────────────
 const DEMO_COMPARISON = {
@@ -534,11 +524,16 @@ export function PresentationPracticeClient() {
   // 23-a: 차이점 보기 모드 (separate/inline)
   const [correctionViewMode, setCorrectionViewMode] = useState<'separate' | 'inline'>('separate')
   const [targetSec, setTargetSec] = useState(60)
-  // Feedback source mirrors q4's dialogueEvalSource pattern: 'llm' when a real
-  // LLM response is shown, 'mock' for the demo/fallback content. Today the
-  // presentation feedback is always mock; the badge below stays informative
-  // until a real LLM hookup flips this to 'llm'.
-  const [feedbackSource] = useState<'llm' | 'mock'>('mock')
+  // 명세 23-c Phase 2: LLM 발표 평가 (한국어/베트남어/영어)
+  type LangFeedback = { strengths: string[]; next_steps: string[] }
+  type EvaluateResult = {
+    source: 'llm' | 'mock'
+    feedback_ko: LangFeedback
+    feedback_vi: LangFeedback
+    feedback_en: LangFeedback
+  }
+  const [evaluateResult, setEvaluateResult] = useState<EvaluateResult | null>(null)
+  const feedbackSource: 'llm' | 'mock' = evaluateResult?.source ?? 'mock'
   const [customSec, setCustomSec] = useState('')
   const [useCustom, setUseCustom] = useState(false)
 
@@ -668,9 +663,9 @@ export function PresentationPracticeClient() {
       form.append('questionId', 'presentation-practice')
       const res = await fetch('/api/stt', { method: 'POST', body: form })
       const data = await res.json()
-      setTranscript(data.transcript || DEMO_TRANSCRIPT)
+      setTranscript(data.transcript || FALLBACK_TRANSCRIPT)
     } catch {
-      setTranscript(DEMO_TRANSCRIPT)
+      setTranscript(FALLBACK_TRANSCRIPT)
     }
   }
 
@@ -687,6 +682,87 @@ export function PresentationPracticeClient() {
       setAzureResult(null)
     }
   }
+
+  // 명세 23-c Phase 2: STT 결과(또는 fallback transcript)가 도착하면 LLM 평가 호출.
+  // recordingState === 'done' && transcript !== null 일 때 한 번 호출하고,
+  // 호출 실패 시 mock 폴백을 받아 화면을 채운다.
+  const evaluateRequestedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (recordingState !== 'done') {
+      evaluateRequestedRef.current = null
+      return
+    }
+    if (transcript === null) return
+    // 동일 transcript에 대해 중복 호출 방지
+    const sig = `${transcript.length}:${(script || '').length}`
+    if (evaluateRequestedRef.current === sig) return
+    evaluateRequestedRef.current = sig
+
+    const correctedScript = correctionResult?.corrected_text ?? DEFAULT_CORRECTED
+    const originalScript = (script || DEFAULT_SCRIPT).trim()
+    const cancelled = { v: false }
+    ;(async () => {
+      try {
+        const res = await fetch('/api/presentation/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: topic.trim(),
+            originalScript,
+            correctedScript,
+            transcript,
+          }),
+        })
+        if (cancelled.v) return
+        if (!res.ok) throw new Error(`status_${res.status}`)
+        const data = (await res.json()) as EvaluateResult
+        if (
+          !data ||
+          !data.feedback_ko ||
+          !data.feedback_vi ||
+          !data.feedback_en
+        ) {
+          throw new Error('invalid_shape')
+        }
+        setEvaluateResult(data)
+      } catch (err) {
+        console.error('[presentation/evaluate] error, keeping local fallback', err)
+        // 폴백: 로컬 mock 데이터로 채움
+        setEvaluateResult({
+          source: 'mock',
+          feedback_ko: {
+            strengths: [
+              '발표 주제가 분명합니다.',
+              '내용을 시간 순서대로 말했습니다.',
+              '교정문과 실제 발화가 대부분 일치합니다.',
+            ],
+            next_steps: ['다음에는 마지막 문장을 조금 더 또렷하게 말해 보세요.'],
+          },
+          feedback_vi: {
+            strengths: [
+              'Chủ đề bài nói rõ ràng.',
+              'Bạn đã trình bày các việc đã làm cuối tuần theo thứ tự thời gian.',
+              'Nội dung bạn nói gần giống với bản đã chỉnh sửa.',
+            ],
+            next_steps: ['Lần sau, hãy đọc câu cuối rõ hơn một chút.'],
+          },
+          feedback_en: {
+            strengths: [
+              'The topic of the presentation is clear.',
+              'You described your weekend activities in chronological order.',
+              'Your speech closely matched the corrected version.',
+            ],
+            next_steps: ['Next time, try to pronounce the last sentence a bit more clearly.'],
+          },
+        })
+      }
+    })()
+    return () => {
+      cancelled.v = true
+    }
+  // 의존성: transcript와 recordingState. correctionResult/script/topic은 호출 시점 값으로 충분.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordingState, transcript])
 
   function startTickingTimer() {
     recordingIntervalRef.current = setInterval(() => {
@@ -709,6 +785,7 @@ export function PresentationPracticeClient() {
     setTargetReached(false)
     setTranscript(null)
     setAzureResult(null)
+    setEvaluateResult(null)
     if (recordedAudioUrl) {
       URL.revokeObjectURL(recordedAudioUrl)
       setRecordedAudioUrl(null)
@@ -737,14 +814,14 @@ export function PresentationPracticeClient() {
       setRecordingState('recording')
       startTickingTimer()
     } catch {
-      // Mic unavailable (headless/denied) → show demo transcript and run a
+      // Mic unavailable (headless/denied) → show fallback transcript and run a
       // brief timer tick so the timer-feedback area still has a value.
       setRecordingState('recording')
       startTickingTimer()
       setTimeout(() => {
         if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
         setRecordingElapsedAtStop(prev => prev || 1)
-        setTranscript(DEMO_TRANSCRIPT)
+        setTranscript(FALLBACK_TRANSCRIPT)
         setRecordingState('done')
       }, 100)
     }
@@ -759,7 +836,7 @@ export function PresentationPracticeClient() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
     } else {
-      setTranscript(DEMO_TRANSCRIPT)
+      setTranscript(FALLBACK_TRANSCRIPT)
       setRecordingState('done')
     }
   }
@@ -773,6 +850,7 @@ export function PresentationPracticeClient() {
     setAlert10(false)
     setTargetReached(false)
     setAzureResult(null)
+    setEvaluateResult(null)
     if (recordedAudioUrl) {
       URL.revokeObjectURL(recordedAudioUrl)
       setRecordedAudioUrl(null)
@@ -895,7 +973,6 @@ export function PresentationPracticeClient() {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <h1 className="text-3xl font-bold text-text-primary">발표연습</h1>
-          <Badge variant="warning" size="sm">시연용 데모</Badge>
         </div>
         <p className="text-sm text-text-secondary">
           발표 원고를 입력하면 AI가 자연스러운 한국어로 다듬고, 수정 이유를 한국어와 학습자
@@ -1086,18 +1163,6 @@ export function PresentationPracticeClient() {
               샘플 원고 불러오기
             </button>
             <button
-              onClick={() => {
-                setScript(DEMO_SCRIPT)
-                setTopic(DEMO_TOPIC)
-              }}
-              className="px-3 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors inline-flex items-center gap-1"
-              data-testid="btn-load-demo-script"
-              title="시연 시 입력 시간 단축용. 한국의 겨울 날씨 1분 분량 원고."
-            >
-              <span aria-hidden>⭐</span>
-              <span>시연용 사전 작성 (겨울 날씨)</span>
-            </button>
-            <button
               onClick={async () => {
                 const trimmed = (script || '').trim()
                 if (trimmed.length < 5) {
@@ -1132,7 +1197,7 @@ export function PresentationPracticeClient() {
                 } catch (err) {
                   console.error('[presentation correct] error', err)
                   setCorrectionError('교정 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
-                  // 폴백: 시연이 깨지지 않도록 demo 결과를 보여준다
+                  // 폴백: 네트워크/LLM 실패 시 샘플 결과를 보여준다
                   setCorrectionResult({
                     source: 'mock',
                     corrected_text: DEFAULT_CORRECTED,
@@ -1176,7 +1241,7 @@ export function PresentationPracticeClient() {
             title="AI 원고 교정 결과"
             action={
               <Badge variant="info" size="sm">
-                {correctionResult.source === 'llm' ? 'AI 교정' : '시연용 샘플'}
+                {correctionResult.source === 'llm' ? 'AI 교정' : '샘플 교정'}
               </Badge>
             }
           />
@@ -1477,10 +1542,7 @@ export function PresentationPracticeClient() {
       {/* STT 결과 */}
       {recordingState === 'done' && transcript !== null && (
         <Card data-testid="stt-result-card">
-          <CardHeader
-            title="내 발표 내용"
-            action={<Badge variant="info" size="sm">음성 인식 기반 참고평가</Badge>}
-          />
+          <CardHeader title="내 발표 내용" />
           <CardBody className="space-y-3">
             <div className="p-4 bg-surface border border-border rounded-lg text-sm text-text-primary leading-relaxed">
               {transcript}
@@ -1496,10 +1558,7 @@ export function PresentationPracticeClient() {
       {/* 교정문-발화 비교 */}
       {recordingState === 'done' && transcript !== null && (
         <Card data-testid="comparison-card">
-          <CardHeader
-            title="교정문-발화 비교"
-            action={<Badge variant="info" size="sm">음성 인식 기반 참고 피드백</Badge>}
-          />
+          <CardHeader title="교정문-발화 비교" />
           <CardBody className="space-y-4">
             <div data-testid="comparison-included">
               <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">
@@ -1564,7 +1623,7 @@ export function PresentationPracticeClient() {
           action={
             feedbackSource === 'mock' ? (
               <Badge variant="warning" size="sm" data-testid="sample-feedback-badge">
-                시연용 참고 피드백
+                참고 피드백
               </Badge>
             ) : (
               <Badge variant="success" size="sm" data-testid="ai-feedback-badge">
@@ -1574,34 +1633,31 @@ export function PresentationPracticeClient() {
           }
         />
         <CardBody className="space-y-4">
-          <div data-testid="feedback-korean">
-            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-              한국어 피드백
-            </p>
-            <div className="space-y-2">
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
-                <ul className="text-sm text-emerald-700 space-y-1">
-                  <li>• 발표 주제가 분명합니다.</li>
-                  <li>• 지난 주말에 한 일을 시간 순서대로 말했습니다.</li>
-                  <li>• 교정문과 실제 발화가 대부분 일치합니다.</li>
-                </ul>
-              </div>
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-xs font-semibold text-amber-700 mb-1">다음 목표</p>
-                <ul className="text-sm text-amber-700 space-y-1">
-                  <li>• 다음에는 마지막 문장을 조금 더 또렷하게 말해 보세요.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {PRESENTATION_FEEDBACK_LANGS.map(({ code, label }, idx) => {
-            const fb = getNativeFeedback(code)
-            // Keep original "feedback-native" testid on the first (Vietnamese)
-            // block so existing smoke tests continue to find Vietnamese text.
-            const testId = idx === 0 ? 'feedback-native' : `feedback-${code}`
-            return (
+          {(() => {
+            // 학습자 발화 기반 LLM 피드백이 도착하면 이를 보여주고, 도착 전 또는
+            // 폴백 시에는 mock 피드백을 동일 위치에 보여준다.
+            const koFb = evaluateResult?.feedback_ko ?? {
+              strengths: [
+                '발표 주제가 분명합니다.',
+                '내용을 시간 순서대로 말했습니다.',
+                '교정문과 실제 발화가 대부분 일치합니다.',
+              ],
+              next_steps: ['다음에는 마지막 문장을 조금 더 또렷하게 말해 보세요.'],
+            }
+            const viFb = evaluateResult?.feedback_vi ?? {
+              strengths: getNativeFeedback('vi').good,
+              next_steps: getNativeFeedback('vi').improve,
+            }
+            const enFb = evaluateResult?.feedback_en ?? {
+              strengths: getNativeFeedback('en').good,
+              next_steps: getNativeFeedback('en').improve,
+            }
+            const langs = [
+              { code: 'ko' as const, label: '한국어', testId: 'feedback-korean', fb: koFb },
+              { code: 'vi' as const, label: '베트남어 (Tiếng Việt)', testId: 'feedback-native', fb: viFb },
+              { code: 'en' as const, label: '영어 (English)', testId: 'feedback-en', fb: enFb },
+            ]
+            return langs.map(({ code, label, testId, fb }) => (
               <div key={code} data-testid={testId}>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
                   {label} 피드백
@@ -1610,7 +1666,7 @@ export function PresentationPracticeClient() {
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
                     <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
                     <ul className="text-sm text-emerald-700 space-y-1">
-                      {fb.good.map((item, i) => (
+                      {fb.strengths.map((item, i) => (
                         <li key={i}>• {item}</li>
                       ))}
                     </ul>
@@ -1618,18 +1674,18 @@ export function PresentationPracticeClient() {
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <p className="text-xs font-semibold text-amber-700 mb-1">다음 목표</p>
                     <ul className="text-sm text-amber-700 space-y-1">
-                      {fb.improve.map((item, i) => (
+                      {fb.next_steps.map((item, i) => (
                         <li key={i}>• {item}</li>
                       ))}
                     </ul>
                   </div>
                 </div>
               </div>
-            )
-          })}
+            ))
+          })()}
 
           <p className="text-xs text-text-muted italic" data-testid="pronunciation-upgrade-notice">
-            ※ 발음 세부 평가는 Azure 연동 안정화 후 2차 시연에서 고도화할 예정입니다.
+            ※ 발음 세부 평가는 Azure 연동 안정화 후 추후 고도화될 예정입니다.
           </p>
           <div
             className="p-3 bg-amber-50 border border-amber-200 rounded-lg"
@@ -1637,7 +1693,7 @@ export function PresentationPracticeClient() {
           >
             <p className="text-xs text-amber-800">
               현재 발표 피드백은 음성 인식 결과와 교정문 비교를 바탕으로 한 참고자료입니다.
-              발음 세부 평가는 Azure 연동 안정화 후 2차 시연에서 고도화할 예정입니다.
+              발음 세부 평가는 Azure 연동 안정화 후 추후 고도화될 예정입니다.
             </p>
           </div>
         </CardBody>
