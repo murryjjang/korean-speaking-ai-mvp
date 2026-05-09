@@ -440,6 +440,11 @@ export function PresentationPracticeClient() {
   const [correctionLoading, setCorrectionLoading] = useState(false)
   const [correctionError, setCorrectionError] = useState<string | null>(null)
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
+  // 23-a: 교정 톤 선택 (formal/general/casual)
+  type CorrectionTone = 'formal' | 'general' | 'casual'
+  const [correctionTone, setCorrectionTone] = useState<CorrectionTone>('formal')
+  // 23-a: 차이점 보기 모드 (separate/inline)
+  const [correctionViewMode, setCorrectionViewMode] = useState<'separate' | 'inline'>('separate')
   const [targetSec, setTargetSec] = useState(60)
   // Feedback source mirrors q4's dialogueEvalSource pattern: 'llm' when a real
   // LLM response is shown, 'mock' for the demo/fallback content. Today the
@@ -960,6 +965,27 @@ export function PresentationPracticeClient() {
             className="w-full rounded-md border border-border bg-surface text-text-primary text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
             data-testid="script-input"
           />
+          <div className="flex flex-wrap items-end gap-3" data-testid="correction-tone-row">
+            <label className="flex flex-col gap-1 text-xs text-text-secondary">
+              <span className="font-medium">교정 톤</span>
+              <select
+                value={correctionTone}
+                onChange={e => setCorrectionTone(e.target.value as CorrectionTone)}
+                className="rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-400"
+                data-testid="correction-tone-select"
+                disabled={correctionLoading}
+              >
+                <option value="formal">격식체 (-습니다, -입니다)</option>
+                <option value="general">일반체 (-요, -아·어요)</option>
+                <option value="casual">친근체 (반말)</option>
+              </select>
+            </label>
+            {correctionTone === 'casual' && (
+              <p className="text-xs text-amber-700 max-w-xs" data-testid="correction-tone-hint">
+                친근체는 친구·가족 사이 톤입니다. 공식 발표엔 격식체를 권장합니다.
+              </p>
+            )}
+          </div>
           <div className="flex gap-2 flex-wrap items-center">
             <button
               onClick={() => {
@@ -988,7 +1014,7 @@ export function PresentationPracticeClient() {
                   const res = await fetch('/api/presentation/correct', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ script: trimmed }),
+                    body: JSON.stringify({ script: trimmed, tone: correctionTone }),
                   })
                   if (!res.ok) {
                     throw new Error(`status_${res.status}`)
