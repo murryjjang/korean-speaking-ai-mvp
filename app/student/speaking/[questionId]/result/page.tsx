@@ -465,6 +465,8 @@ export default async function SpeakingResultPage({
   const goalResults = evalRecord.meta?.goalResults ?? []
   const achievedMissionGoals = evalRecord.meta?.achievedMissionGoals ?? 0
   const totalMissionGoals = evalRecord.meta?.totalMissionGoals ?? 0
+  const dialogueHybridScore = evalRecord.meta?.dialogueHybridScore
+  const dialogueEvalSource = evalRecord.meta?.dialogueEvalSource
 
   // Azure: providerName === 'azure' && pronScore != null
   const isAzureSuccess = pronunciationResult.providerName === 'azure' && pronunciationResult.pronScore != null
@@ -694,6 +696,34 @@ export default async function SpeakingResultPage({
                     </span>
                   )}
                 </div>
+                {dialogueHybridScore && (
+                  <div
+                    className="mb-3 px-3 py-2 bg-surface border border-border rounded-md space-y-1"
+                    data-testid="q4-hybrid-breakdown"
+                  >
+                    <p className="text-xs text-text-secondary">
+                      <span className="font-medium text-text-primary">정량</span>{' '}
+                      {dialogueHybridScore.quantitativeScore}/60
+                      <span className="text-text-muted">
+                        {' '}
+                        (미션 {dialogueHybridScore.quantitativeRaw}/{dialogueHybridScore.quantitativeMax})
+                      </span>
+                      {' · '}
+                      <span className="font-medium text-text-primary">정성</span>{' '}
+                      {dialogueHybridScore.qualitativeScore}/40
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      자연스러움 {dialogueHybridScore.qualitativeBreakdown.naturalness} ·
+                      {' '}정확성 {dialogueHybridScore.qualitativeBreakdown.koreanAccuracy} ·
+                      {' '}응답성 {dialogueHybridScore.qualitativeBreakdown.responsiveness}
+                    </p>
+                  </div>
+                )}
+                {dialogueEvalSource === 'rule' && (
+                  <p className="mb-2 text-[10px] text-text-muted italic" data-testid="q4-eval-source-note">
+                    * 규칙 기반 미션 판정으로 채점되었습니다.
+                  </p>
+                )}
                 <ul className="space-y-1.5 mb-4" data-testid="q4-dialogue-criteria-list">
                   {[
                     '메뉴판에 있는 품목을 주문함',
