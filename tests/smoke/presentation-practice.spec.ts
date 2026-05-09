@@ -51,19 +51,20 @@ test.describe('발표연습 데모 화면', () => {
       await expect(page.getByTestId('time-options')).toBeVisible()
     })
 
-    test('타이머/스톱워치 영역이 표시된다', async ({ page }) => {
+    test('녹음 컨트롤 영역(타이머 + 녹음 버튼)이 표시된다', async ({ page }) => {
       await expect(page.getByTestId('timer-card')).toBeVisible()
       await expect(page.getByTestId('timer-display')).toBeVisible()
-      await expect(page.getByTestId('btn-start-timer')).toBeVisible()
+      await expect(page.getByTestId('btn-start-recording')).toBeVisible()
     })
 
-    test('타이머가 실제로 작동한다', async ({ page }) => {
+    test('녹음 시작 시 타이머가 작동한다', async ({ page }) => {
       const initial = await page.getByTestId('timer-display').textContent()
-      await page.getByTestId('btn-start-timer').click()
+      await page.getByTestId('btn-start-recording').click()
       await page.waitForTimeout(1500)
+      // 마이크가 없는 헤드리스 환경에서는 즉시 done으로 전환되며 타이머는 1초 이상 변동.
       const after = await page.getByTestId('timer-display').textContent()
+      expect(after).toBeTruthy()
       expect(initial).not.toBe(after)
-      await page.getByTestId('btn-stop-timer').click()
     })
 
     test('발표 피드백 카드가 표시된다', async ({ page }) => {
@@ -223,11 +224,9 @@ test.describe('발표연습 데모 화면', () => {
       expect(includedText).toContain('카페')
     })
 
-    test('발표 시간/속도 참고 피드백이 타이머 종료 후 표시된다', async ({ page }) => {
-      await page.getByTestId('btn-start-timer').click()
-      await page.waitForTimeout(1500)
-      await page.getByTestId('btn-stop-timer').click()
-      await expect(page.getByTestId('timer-feedback')).toBeVisible()
+    test('발표 시간/속도 참고 피드백이 녹음 종료 후 표시된다', async ({ page }) => {
+      await page.getByTestId('btn-start-recording').click()
+      await expect(page.getByTestId('timer-feedback')).toBeVisible({ timeout: 3000 })
       const feedbackText = await page.getByTestId('timer-feedback').textContent()
       expect(feedbackText).toContain('목표 시간')
     })

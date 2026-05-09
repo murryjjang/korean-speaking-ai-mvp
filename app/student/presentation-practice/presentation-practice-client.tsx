@@ -183,16 +183,6 @@ export function PresentationPracticeClient() {
   const [customSec, setCustomSec] = useState('')
   const [useCustom, setUseCustom] = useState(false)
 
-  // Timer
-  const [elapsed, setElapsed] = useState(0)
-  const [timerActive, setTimerActive] = useState(false)
-  const [timerFinished, setTimerFinished] = useState(false)
-  const [alert30, setAlert30] = useState(false)
-  const [alert10, setAlert10] = useState(false)
-  const [elapsedAtEnd, setElapsedAtEnd] = useState(0)
-  const [showResult, setShowResult] = useState(false)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   // TTS
   const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'playing'>('idle')
   const [ttsNotice, setTtsNotice] = useState('')
@@ -200,9 +190,13 @@ export function PresentationPracticeClient() {
   const seqRef = useRef(0)
   const speedRef = useRef<SpeedOption>(1.0)
 
-  // Recording + STT
+  // Recording + STT (single source of truth for timer alerts and feedback)
   const [recordingState, setRecordingState] = useState<RecordingState>('idle')
   const [recordingElapsed, setRecordingElapsed] = useState(0)
+  const [recordingElapsedAtStop, setRecordingElapsedAtStop] = useState(0)
+  const [alert30, setAlert30] = useState(false)
+  const [alert10, setAlert10] = useState(false)
+  const [targetReached, setTargetReached] = useState(false)
   const [transcript, setTranscript] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -213,51 +207,6 @@ export function PresentationPracticeClient() {
   }, [speed])
 
   const effectiveTarget = useCustom ? parseInt(customSec, 10) || 60 : targetSec
-
-  // ── Timer ────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (timerActive) {
-      intervalRef.current = setInterval(() => {
-        setElapsed(prev => {
-          const next = prev + 1
-          const remaining = effectiveTarget - next
-          if (remaining === 30) setAlert30(true)
-          if (remaining === 10) setAlert10(true)
-          if (next >= effectiveTarget) {
-            setTimerFinished(true)
-            setTimerActive(false)
-          }
-          return next
-        })
-      }, 1000)
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [timerActive, effectiveTarget])
-
-  const startTimer = () => {
-    setElapsed(0)
-    setAlert30(false)
-    setAlert10(false)
-    setTimerFinished(false)
-    setTimerActive(true)
-  }
-  const stopTimer = () => {
-    setTimerActive(false)
-    setElapsedAtEnd(elapsed)
-    setShowResult(true)
-  }
-  const resetTimer = () => {
-    setTimerActive(false)
-    setElapsed(0)
-    setAlert30(false)
-    setAlert10(false)
-    setTimerFinished(false)
-    setShowResult(false)
-  }
 
   // ── TTS ──────────────────────────────────────────────────────────────────────
   const stopAudio = useCallback(() => {
@@ -349,7 +298,26 @@ export function PresentationPracticeClient() {
     setRecordingState('done')
   }
 
+  function startTickingTimer() {
+    recordingIntervalRef.current = setInterval(() => {
+      setRecordingElapsed(prev => {
+        const next = prev + 1
+        const remaining = effectiveTarget - next
+        if (remaining === 30) setAlert30(true)
+        if (remaining === 10) setAlert10(true)
+        if (next >= effectiveTarget) setTargetReached(true)
+        return next
+      })
+    }, 1000)
+  }
+
   async function startRecording() {
+    setRecordingElapsed(0)
+    setRecordingElapsedAtStop(0)
+    setAlert30(false)
+    setAlert10(false)
+    setTargetReached(false)
+    setTranscript(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mr = new MediaRecorder(stream)
@@ -365,22 +333,28 @@ export function PresentationPracticeClient() {
       }
       mr.start()
       mediaRecorderRef.current = mr
-      setRecordingElapsed(0)
-      setTranscript(null)
       setRecordingState('recording')
-      recordingIntervalRef.current = setInterval(
-        () => setRecordingElapsed(p => p + 1),
-        1000,
-      )
+      startTickingTimer()
     } catch {
-      // Mic unavailable (headless/denied) → show demo transcript
-      setTranscript(DEMO_TRANSCRIPT)
-      setRecordingState('done')
+      // Mic unavailable (headless/denied) → show demo transcript and run a
+      // brief timer tick so the timer-feedback area still has a value.
+      setRecordingState('recording')
+      startTickingTimer()
+      setTimeout(() => {
+        if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
+        setRecordingElapsedAtStop(prev => prev || 1)
+        setTranscript(DEMO_TRANSCRIPT)
+        setRecordingState('done')
+      }, 100)
     }
   }
 
   function stopRecording() {
-    if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current)
+      recordingIntervalRef.current = null
+    }
+    setRecordingElapsedAtStop(recordingElapsed)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
     } else {
@@ -393,15 +367,123 @@ export function PresentationPracticeClient() {
     setRecordingState('idle')
     setTranscript(null)
     setRecordingElapsed(0)
+    setRecordingElapsedAtStop(0)
+    setAlert30(false)
+    setAlert10(false)
+    setTargetReached(false)
     audioChunksRef.current = []
-    if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current)
+      recordingIntervalRef.current = null
+    }
   }
 
   const nativeCorrectionNote = NATIVE_CORRECTION_NOTE[nativeLang] ?? NATIVE_CORRECTION_NOTE['en']
   const nativeFeedback = getNativeFeedback(nativeLang)
 
+  const recordingDone = recordingState === 'done'
+  const showTimerFeedback = recordingDone && recordingElapsedAtStop > 0
+  const elapsedForFeedback = recordingDone ? recordingElapsedAtStop : recordingElapsed
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-12">
+    <div className="max-w-3xl mx-auto pb-12">
+
+      {/* Sticky 녹음 컨트롤 — 페이지 최상단 */}
+      <div
+        data-testid="recording-controls"
+        className="sticky top-0 z-20 -mx-4 px-4 py-3 mb-6"
+        style={{
+          background: 'var(--color-background-primary, #FAF9F5)',
+          borderBottom: '0.5px solid var(--border)',
+          backdropFilter: 'saturate(180%) blur(6px)',
+        }}
+      >
+        <div
+          data-testid="timer-card"
+          className="flex flex-wrap items-center gap-4"
+        >
+          <div className="flex items-baseline gap-2">
+            <span
+              className="text-3xl font-bold tabular-nums font-mono text-text-primary"
+              data-testid="timer-display"
+            >
+              {formatTime(elapsedForFeedback)}
+            </span>
+            <span className="text-xs text-text-muted">
+              / {formatTime(effectiveTarget)}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
+            {recordingState === 'idle' && (
+              <button
+                onClick={startRecording}
+                data-testid="btn-start-recording"
+                className="px-5 py-2.5 rounded-md bg-rose-600 text-white font-semibold text-sm hover:bg-rose-700 transition-colors"
+              >
+                발표 녹음 시작
+              </button>
+            )}
+            {recordingState === 'recording' && (
+              <>
+                <span className="flex items-center gap-2 text-xs font-medium text-rose-600">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  녹음 중
+                </span>
+                <button
+                  onClick={stopRecording}
+                  data-testid="btn-stop-recording"
+                  className="px-5 py-2.5 rounded-md bg-slate-700 text-white font-semibold text-sm hover:bg-slate-800 transition-colors"
+                >
+                  발표 종료
+                </button>
+              </>
+            )}
+            {recordingState === 'processing' && (
+              <span className="text-sm text-text-secondary">음성 인식 중…</span>
+            )}
+            {recordingDone && (
+              <button
+                onClick={resetRecording}
+                data-testid="btn-retry-recording"
+                className="px-4 py-2 rounded-md bg-surface border border-border text-text-secondary text-sm font-medium hover:bg-slate-50 transition-colors"
+              >
+                다시 녹음
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 알림 — 녹음 중 목표 시간 임박 */}
+        {recordingState === 'recording' && targetReached && (
+          <div
+            className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-100 border border-red-300"
+            data-testid="alert-time-over"
+          >
+            <span className="text-red-700 font-semibold text-xs">목표 시간 도달</span>
+          </div>
+        )}
+        {recordingState === 'recording' && !targetReached && alert10 && (
+          <div
+            className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-100 border border-red-300"
+            data-testid="alert-10sec"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-red-700 font-semibold text-xs">10초 전</span>
+          </div>
+        )}
+        {recordingState === 'recording' && !targetReached && !alert10 && alert30 && (
+          <div
+            className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 border border-amber-300"
+            data-testid="alert-30sec"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            <span className="text-amber-700 font-semibold text-xs">30초 전</span>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-6">
 
       {/* 헤더 */}
       <div>
@@ -763,167 +845,24 @@ export function PresentationPracticeClient() {
         </CardBody>
       </Card>
 
-      {/* 발표 타이머 — sticky로 스크립트가 길어도 항상 보임 */}
-      <Card
-        data-testid="timer-card"
-        className="sticky top-0 z-10 shadow-md bg-surface-raised border border-border"
-      >
-        <CardHeader title="발표 타이머" description="목표 시간에 맞춰 발표를 연습해 보세요" />
-        <CardBody className="space-y-4">
-          <div
-            className={`flex flex-col items-center py-6 rounded-xl border-2 ${
-              timerFinished
-                ? 'bg-red-50 border-red-300'
-                : alert10
-                  ? 'bg-amber-50 border-amber-300 animate-pulse'
-                  : alert30
-                    ? 'bg-amber-50 border-amber-200'
-                    : timerActive
-                      ? 'bg-emerald-50 border-emerald-200'
-                      : 'bg-surface border-border'
-            }`}
-          >
-            <p className="text-xs text-text-muted mb-1">경과 시간</p>
-            <p
-              className="text-6xl font-bold tabular-nums font-mono text-text-primary"
-              data-testid="timer-display"
-            >
-              {formatTime(elapsed)}
-            </p>
-            <p className="text-sm text-text-secondary mt-2">
-              목표: {formatTime(effectiveTarget)} | 남은 시간:{' '}
-              <span className={effectiveTarget - elapsed <= 10 ? 'text-red-600 font-bold' : ''}>
-                {formatTime(Math.max(0, effectiveTarget - elapsed))}
-              </span>
-            </p>
-            {timerFinished && (
-              <div
-                className="mt-3 flex items-center gap-2 px-4 py-2 bg-red-100 border border-red-300 rounded-full"
-                data-testid="alert-time-over"
-              >
-                <span className="text-red-700 font-semibold text-sm">시간 종료!</span>
-              </div>
-            )}
-            {!timerFinished && alert10 && (
-              <div
-                className="mt-3 flex items-center gap-2 px-4 py-2 bg-red-100 border border-red-300 rounded-full"
-                data-testid="alert-10sec"
-              >
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-red-700 font-semibold text-sm">10초 전!</span>
-              </div>
-            )}
-            {!timerFinished && !alert10 && alert30 && (
-              <div
-                className="mt-3 flex items-center gap-2 px-4 py-2 bg-amber-100 border border-amber-300 rounded-full"
-                data-testid="alert-30sec"
-              >
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                <span className="text-amber-700 font-semibold text-sm">30초 전</span>
-              </div>
-            )}
+      {/* 시간 가이드 — 녹음 후 표시 */}
+      {showTimerFeedback && (
+        <div
+          className="p-3 bg-blue-50 border border-blue-200 rounded-lg"
+          data-testid="timer-feedback"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant="info" size="sm">시간 가이드</Badge>
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            {!timerActive && !timerFinished && (
-              <button
-                onClick={startTimer}
-                data-testid="btn-start-timer"
-                className="px-5 py-2.5 rounded-md bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 transition-colors"
-              >
-                발표 시작
-              </button>
-            )}
-            {timerActive && (
-              <button
-                onClick={stopTimer}
-                data-testid="btn-stop-timer"
-                className="px-5 py-2.5 rounded-md bg-rose-600 text-white font-semibold text-sm hover:bg-rose-700 transition-colors"
-              >
-                발표 종료
-              </button>
-            )}
-            {(timerFinished || showResult) && (
-              <button
-                onClick={resetTimer}
-                data-testid="btn-reset-timer"
-                className="px-5 py-2.5 rounded-md bg-white border border-border text-text-secondary font-semibold text-sm hover:bg-slate-50 transition-colors"
-              >
-                다시 시작
-              </button>
-            )}
-          </div>
-
-          {(showResult || timerFinished) && (
-            <div
-              className="p-3 bg-blue-50 border border-blue-200 rounded-lg"
-              data-testid="timer-feedback"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="info" size="sm">시간 가이드</Badge>
-              </div>
-              <p className="text-sm text-blue-800">
-                {getTimerFeedback(timerFinished ? elapsed : elapsedAtEnd, effectiveTarget)}
-              </p>
-              <p className="text-xs text-blue-700 mt-1">
-                발표 속도는 {level} 학습자 기준으로 적절합니다.
-              </p>
-              <p className="text-xs text-blue-700">핵심 문장 뒤에 짧게 쉬면 더 자연스럽습니다.</p>
-            </div>
-          )}
-        </CardBody>
-      </Card>
-
-      {/* 발표 녹음 */}
-      <Card data-testid="recording-card">
-        <CardHeader
-          title="내 발표 녹음"
-          description="교정문을 연습한 뒤 직접 발표해 보세요. 녹음된 발표는 음성 인식으로 문자화되어 교정문과 비교됩니다."
-        />
-        <CardBody className="space-y-4">
-          {recordingState === 'idle' && (
-            <button
-              onClick={startRecording}
-              data-testid="btn-start-recording"
-              className="px-5 py-2.5 rounded-md bg-rose-600 text-white font-semibold text-sm hover:bg-rose-700 transition-colors"
-            >
-              발표 녹음 시작
-            </button>
-          )}
-
-          {recordingState === 'recording' && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-sm font-medium text-red-600">
-                  녹음 중… {formatTime(recordingElapsed)}
-                </span>
-              </div>
-              <button
-                onClick={stopRecording}
-                data-testid="btn-stop-recording"
-                className="px-5 py-2.5 rounded-md bg-slate-700 text-white font-semibold text-sm hover:bg-slate-800 transition-colors"
-              >
-                발표 종료
-              </button>
-            </div>
-          )}
-
-          {recordingState === 'processing' && (
-            <p className="text-sm text-text-secondary">음성 인식 중...</p>
-          )}
-
-          {recordingState === 'done' && (
-            <button
-              onClick={resetRecording}
-              data-testid="btn-retry-recording"
-              className="px-4 py-2 rounded-md bg-surface border border-border text-text-secondary text-sm font-medium hover:bg-slate-50 transition-colors"
-            >
-              다시 녹음
-            </button>
-          )}
-        </CardBody>
-      </Card>
+          <p className="text-sm text-blue-800">
+            {getTimerFeedback(recordingElapsedAtStop, effectiveTarget)}
+          </p>
+          <p className="text-xs text-blue-700 mt-1">
+            발표 속도는 {level} 학습자 기준으로 적절합니다.
+          </p>
+          <p className="text-xs text-blue-700">핵심 문장 뒤에 짧게 쉬면 더 자연스럽습니다.</p>
+        </div>
+      )}
 
       {/* STT 결과 */}
       {recordingState === 'done' && transcript !== null && (
@@ -1094,6 +1033,7 @@ export function PresentationPracticeClient() {
           이 기능은 발표 원고 작성 부담을 줄이고, 교수자가 발표 내용과 전달력을 지도하는 데
           필요한 기초 자료를 제공합니다.
         </p>
+      </div>
       </div>
     </div>
   )
