@@ -391,6 +391,7 @@ export function SpeakingClient({
   const isDialogueMission =
     question.typeId === 'qt-dialogue-mission' ||
     question.evaluationMode === 'interactive_dialogue'
+  const isReadingQuestion = question.typeId === 'qt-reading'
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -410,7 +411,10 @@ export function SpeakingClient({
           </Badge>
         </div>
         <CardBody>
-          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
+          <p
+            className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap"
+            style={isReadingQuestion ? { wordBreak: 'keep-all' } : undefined}
+          >
             {question.prompt}
           </p>
 

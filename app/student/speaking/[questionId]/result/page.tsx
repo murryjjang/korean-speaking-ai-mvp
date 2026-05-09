@@ -1270,7 +1270,11 @@ export default async function SpeakingResultPage({
                       </p>
                       <div className="bg-surface border border-border rounded-md p-3">
                         <p className="text-xs text-text-muted mb-2 font-medium">제시문</p>
-                        <p className="text-sm text-text-primary leading-relaxed" data-testid="reference-text">
+                        <p
+                          className="text-sm text-text-primary leading-relaxed"
+                          style={{ wordBreak: 'keep-all' }}
+                          data-testid="reference-text"
+                        >
                           {q1ReferenceText}
                         </p>
                       </div>
