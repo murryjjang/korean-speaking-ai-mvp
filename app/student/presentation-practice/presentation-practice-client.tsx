@@ -305,7 +305,7 @@ function PresentationScriptDisplay({
         style={{
           maxWidth: '720px',
           padding: '24px 40px',
-          background: '#FAF9F5',
+          backgroundColor: '#FAF9F5',
           border: '0.5px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
           fontSize: '1.25rem',
@@ -379,7 +379,7 @@ function PresentationScriptDisplay({
                 padding: '2px 4px',
                 borderRadius: 4,
                 cursor: seekable ? 'pointer' : 'default',
-                transition: 'background 0.2s, color 0.2s',
+                transition: 'background-color 0.2s, color 0.2s',
               }}
               onClick={() => seekable && onWordSeek?.(a.offsetMs!)}
               title={title}
@@ -406,14 +406,14 @@ function PresentationTimeGuide({ elapsedSec, targetSec }: { elapsedSec: number; 
           <span style={{ color: '#DC2626', fontWeight: 500 }}>목표 시간 초과</span>
         )}
       </div>
-      <div style={{ height: 4, background: 'var(--border)', borderRadius: 2 }}>
+      <div style={{ height: 4, backgroundColor: 'var(--border)', borderRadius: 2 }}>
         <div
           style={{
             width: `${widthPct}%`,
             height: '100%',
-            background: color,
+            backgroundColor: color,
             borderRadius: 2,
-            transition: 'width 0.5s ease-out, background 0.2s',
+            transition: 'width 0.5s ease-out, background-color 0.2s',
           }}
         />
       </div>
@@ -693,7 +693,7 @@ export function PresentationPracticeClient() {
         data-testid="recording-controls"
         className="sticky top-0 z-20 -mx-4 px-4 py-3 mb-6"
         style={{
-          background: 'var(--color-background-primary, #FAF9F5)',
+          backgroundColor: 'var(--color-background-primary, #FAF9F5)',
           borderBottom: '0.5px solid var(--border)',
           backdropFilter: 'saturate(180%) blur(6px)',
         }}

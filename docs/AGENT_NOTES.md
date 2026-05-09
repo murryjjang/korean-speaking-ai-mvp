@@ -95,3 +95,13 @@
 
 - q1, q2, q3: 시스템 프롬프트나 채점 로직 변경 없음. q4 NPC 시스템 프롬프트는 명세 19-B 그대로 보강 (인사 반복 회피).
 - 단위 테스트 (612/612), lint (0 errors), tsc (0 errors), build (compiled 성공) 모두 통과.
+
+---
+
+## 2026-05-09 — 명세 22-b/22-a/23/24 통합 자율 진행
+
+### Phase 22-b — React style shorthand 충돌 보정
+
+- 원인: `reading-practice-client.tsx`의 결과 페이지(line 489-496)에서 `baseStyle`이 `backgroundColor`를 설정하는데, `isCurrent` 분기에서 `background` shorthand로 덮어씀. React 리렌더 시 `background` 속성 제거 + `backgroundColor` 잔존 → 콘솔 경고.
+- 조치: 두 페이지(reading + presentation) 내 모든 `background:` shorthand를 `backgroundColor:`로 통일. 트랜지션 문자열도 `background-color`로 변경. gradient/image 미사용이라 의미 동일.
+- 확인 필요: 회원님이 reading + presentation 페이지에서 콘솔 경고가 사라졌는지 시연 환경에서 검증.

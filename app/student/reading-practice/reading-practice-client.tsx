@@ -258,7 +258,7 @@ function ReadingTimeGuide({
       <div
         style={{
           height: 4,
-          background: 'var(--border)',
+          backgroundColor: 'var(--border)',
           borderRadius: 2,
           overflow: 'hidden',
         }}
@@ -267,8 +267,8 @@ function ReadingTimeGuide({
           style={{
             width: `${widthPct}%`,
             height: '100%',
-            background: color,
-            transition: 'width 0.3s ease, background 0.3s ease',
+            backgroundColor: color,
+            transition: 'width 0.3s ease, background-color 0.3s ease',
           }}
         />
       </div>
@@ -468,7 +468,7 @@ function ReadingResultPassage({
       style={{
         maxWidth: '720px',
         padding: '32px 40px',
-        background: '#FAF9F5',
+        backgroundColor: '#FAF9F5',
         border: '0.5px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
         fontSize: '1.25rem',
@@ -492,8 +492,8 @@ function ReadingResultPassage({
               padding: '2px 4px',
               borderRadius: 4,
               cursor: seekable ? 'pointer' : 'default',
-              transition: 'background 0.2s, color 0.2s',
-              ...(isCurrent ? { background: '#FDE68A', color: '#1F2D3D' } : {}),
+              transition: 'background-color 0.2s, color 0.2s',
+              ...(isCurrent ? { backgroundColor: '#FDE68A', color: '#1F2D3D' } : {}),
             }
             const tooltip = getResultWordTitle(w)
             const title = seekable
@@ -1094,7 +1094,7 @@ export function ReadingPracticeClient() {
                 style={{
                   maxWidth: '720px',
                   padding: '32px 40px',
-                  background: '#FAF9F5',
+                  backgroundColor: '#FAF9F5',
                   border: '0.5px solid var(--border)',
                   borderRadius: 'var(--radius-lg)',
                   fontSize: '1.25rem',
@@ -1124,8 +1124,8 @@ export function ReadingPracticeClient() {
                         borderRadius: '6px',
                         padding: '4px 8px',
                         margin: '-2px -8px',
-                        transition: 'background 0.2s',
-                        background: isPlaying
+                        transition: 'background-color 0.2s',
+                        backgroundColor: isPlaying
                           ? 'rgba(212, 160, 86, 0.22)'
                           : isCurrent
                             ? 'rgba(212, 160, 86, 0.08)'
@@ -1137,7 +1137,7 @@ export function ReadingPracticeClient() {
                         const isPassed = karaoke.passedThroughIdx >= myGlobal && karaoke.currentWordIdx !== myGlobal
                         const isCurrentSpoken = karaoke.currentWordIdx === myGlobal
                         const wordStyle: CSSProperties = isCurrentSpoken
-                          ? { background: '#FFF3CD', color: '#1F2D3D', fontWeight: 600, padding: '0 2px', borderRadius: 3, transition: 'background 0.2s, color 0.2s, font-weight 0.2s' }
+                          ? { backgroundColor: '#FFF3CD', color: '#1F2D3D', fontWeight: 600, padding: '0 2px', borderRadius: 3, transition: 'background-color 0.2s, color 0.2s, font-weight 0.2s' }
                           : isPassed
                             ? { color: '#8A8580', transition: 'color 0.2s' }
                             : { transition: 'color 0.2s' }
