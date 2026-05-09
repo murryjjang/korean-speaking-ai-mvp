@@ -62,8 +62,8 @@ export function TodayTasks({ tasks }: { tasks: TodayTask[] }) {
                   시작하기
                 </Link>
               ) : (
-                <Button variant="ghost" size="sm" disabled>
-                  준비 중
+                <Button variant="secondary" size="sm" disabled>
+                  제출 완료
                 </Button>
               )}
             </li>
