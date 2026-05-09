@@ -42,7 +42,10 @@ export async function loginAction(
     redirect('/role-missing')
   }
 
-  if (profile.role === 'teacher' || profile.role === 'admin') {
+  if (profile.role === 'admin') {
+    redirect('/admin/analytics')
+  }
+  if (profile.role === 'teacher') {
     redirect('/teacher')
   }
 
