@@ -166,3 +166,39 @@
   - 톤 3종이 실제 LLM에서 다른 어말어미로 응답하는지 (mock에서는 톤별 결과 보장됨)
   - 인라인 보기에서 corrections.original이 학습자 원본과 매칭되는 비율
   - 음성 입력의 STT 정확도 (Whisper 한국어 기준).
+
+### Phase 23-b + 25 + 27 통합 — 검증 보정 + 시연 데이터 + 환경 가이드
+
+- **1-A. q1 word-break**
+  - `app/student/speaking/[questionId]/speaking-client.tsx` 의 prompt `<p>` 에 `style={isReadingQuestion ? { wordBreak: 'keep-all' } : undefined}` 적용 (qt-reading 한정).
+  - `app/student/speaking/[questionId]/result/page.tsx` 의 `data-testid="reference-text"` `<p>` 도 동일.
+  - 다른 question type / q2·q3·q4 영향 없음.
+- **1-B. NPC TTS (브라우저 speechSynthesis)**
+  - 자동 재생 토글: 헤더에 체크박스 (default ON), `speechSynthesis` 미지원 환경에서는 토글 자체가 숨겨짐.
+  - 지원 감지: `useSyncExternalStore`(server snapshot=`false`)로 hydration mismatch 회피 + `react-hooks/set-state-in-effect` 룰 회피.
+  - AI 메시지 옆 🔊 / ⏸ 버튼: 학습자 녹음 중에는 disabled. 새 녹음 시작하면 `stopSpeaking()` 호출로 즉시 중단.
+  - 한국어 utterance: `lang='ko-KR'`, `rate=1.0`. 종료/요약 화면에서는 자동 재생 안 함.
+- **1-C. 음성 자동 전송 (3초 카운트다운)**
+  - STT onstop → transcript 받으면 `pendingAutoSendTextRef`에 저장 + `autoSendCountdown=3` + setInterval(1초 단위로 감소).
+  - 카운트다운 0 도달 시 인터벌 콜백 안에서 `sendMessageWithText(text)` 직접 호출 (effect 안에 setState 두지 않기 위해 흐름 단순화).
+  - 취소 경로: "취소" 버튼 / textarea 직접 편집 / 새 녹음 시작 / 대화 종료 / 다시 시작.
+  - 키보드 입력은 자동 전송 대상 아님 (Enter 전송은 그대로).
+  - 함수 선언 순서: `sendMessageWithText`/`sendMessage`를 `startVoiceRecording` 위로 이동 (react-hooks/immutability 룰 회피).
+- **2-A. 학생 점수 분포**
+  - `app/teacher/dashboard/page.tsx` `LEARNERS` 배열을 92/84/75/66/57/88로 재배열. 90s/80s/70s/60s/50s 다섯 구간 모두 등장. 학번(S001~S006) 보존.
+- **2-B. q3 정상 답변 샘플**
+  - `src/lib/mock/data.ts`: sub-023 (student-001, 핵심 3개 모두, normalizedScore 88) + sub-024 (student-002, 일부 누락, normalizedScore 56) 추가. errorTags의 `task` 타입 활용 (ErrorTagType union 한정).
+- **2-C. 발표 사전 작성 + 시연 발화 시퀀스**
+  - `presentation-practice-client.tsx`: `DEMO_TOPIC` / `DEMO_SCRIPT` 상수 + "⭐ 시연용 사전 작성 (겨울 날씨)" 버튼. 기존 "샘플 원고 불러오기" 버튼 옆에 배치.
+  - `docs/DEMO_SCRIPT.md` 신규 작성: q1·q4·발표·생성형 대화 4 모드 발화 시퀀스 + 폴백 멘트.
+- **3. 시연 환경 가이드**
+  - `docs/DEMO_ENVIRONMENT_GUIDE.md` 신규: Chrome 프로필 분리 / PC 점검 체크리스트 / 폴백 결정 트리 (LLM·Azure·인터넷·마이크·TTS·`.next` 캐시) / 리허설 시간표 (10분).
+- **회원님 직접 작업 메모**
+  - `~/Videos/korean-speaking-ai-demo/` 사전 녹화 영상은 회원님이 직접 녹화 필요. `DEMO_ENVIRONMENT_GUIDE.md` 부록 참고.
+  - 시연 시 학생/교수자/관리자 각 Chrome 프로필 사전 준비 + 즐겨찾기 등록 필요.
+  - Supabase 학생 데이터는 mock 기반이라 별도 seed 작업 없음. 실제 Supabase에서 학생 점수 분포를 보이게 하려면 별도 seed 스크립트가 필요 (현재 시연은 `/teacher/dashboard` mock 기반이므로 무관).
+- **회귀 영향 없음 (확인됨)**
+  - 시연 4 모드 (q1·q4·발표·생성형 대화) 기능 보존: lint/tsc/test:unit (612) 모두 그린.
+  - q2·q3·읽기 연습은 변경 없음 (q3는 mock 데이터만 추가).
+  - mock conversation provider 미변경 (Phase 1-B는 클라이언트 TTS 추가만).
+  - proxy.ts 변경 없음. 디자인 토큰 변경 없음. 발음평가 점수 산출 로직 변경 없음.
