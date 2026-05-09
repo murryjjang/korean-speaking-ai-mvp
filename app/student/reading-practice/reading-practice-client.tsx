@@ -1137,7 +1137,7 @@ export function ReadingPracticeClient() {
                         const isPassed = karaoke.passedThroughIdx >= myGlobal && karaoke.currentWordIdx !== myGlobal
                         const isCurrentSpoken = karaoke.currentWordIdx === myGlobal
                         const wordStyle: CSSProperties = isCurrentSpoken
-                          ? { background: '#FFF3CD', color: '#1F2D3D', padding: '0 2px', borderRadius: 3, transition: 'background 0.2s, color 0.2s' }
+                          ? { background: '#FFF3CD', color: '#1F2D3D', fontWeight: 600, padding: '0 2px', borderRadius: 3, transition: 'background 0.2s, color 0.2s, font-weight 0.2s' }
                           : isPassed
                             ? { color: '#8A8580', transition: 'color 0.2s' }
                             : { transition: 'color 0.2s' }

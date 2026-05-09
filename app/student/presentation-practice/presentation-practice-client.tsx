@@ -352,7 +352,7 @@ function PresentationScriptDisplay({
               }
             }
           } else if (isKaraokeCurrent) {
-            baseStyle = { color: '#1F2D3D', fontWeight: 700, backgroundColor: '#FDE68A' }
+            baseStyle = { color: '#1F2D3D', fontWeight: 600, backgroundColor: '#FFF3CD' }
           } else if (isPassed) {
             baseStyle = { color: 'var(--text-primary)' }
           }
