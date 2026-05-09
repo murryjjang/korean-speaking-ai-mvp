@@ -1,4 +1,7 @@
-import { getDialogueConversationProvider } from '@/src/providers/conversation'
+import {
+  getDialogueConversationProvider,
+  MockDialogueConversationProvider,
+} from '@/src/providers/conversation'
 import { logProviderEvent } from '@/src/lib/supabase/provider-events'
 import questionsJson from '@/src/content/questions.json'
 import type { DialogueTurnInput } from '@/src/providers/conversation'
@@ -85,7 +88,7 @@ export async function POST(request: Request) {
       status: result.status,
     })
   } catch (err) {
-    console.error('[dialogue/respond] provider error:', err)
+    console.error('[dialogue/respond] provider error, falling back to mock:', err)
 
     try {
       await logProviderEvent({
@@ -100,10 +103,34 @@ export async function POST(request: Request) {
       // Non-blocking
     }
 
-    return Response.json({
-      aiText: '네, 알겠습니다.',
-      providerName: 'fallback',
-      status: 'fallback',
-    })
+    // 폴백: Mock provider 직접 호출 → 학습자 입장에서 응답 지연 외 차이 없음
+    try {
+      const safeMode = mode === 'practice' ? 'practice' : 'assessment'
+      const safePersonaId = typeof personaId === 'string' ? personaId : undefined
+      const fallbackProvider = new MockDialogueConversationProvider()
+      const fallbackResult = await fallbackProvider.getDialogueResponse({
+        questionId,
+        level: typeof level === 'string' ? level : (question.difficulty ?? 'beginner'),
+        aiRole,
+        aiInformation,
+        missionGoals,
+        turns: safeTurns,
+        latestStudentText,
+        mode: safeMode,
+        personaId: safePersonaId,
+      })
+      return Response.json({
+        aiText: fallbackResult.text,
+        providerName: fallbackResult.providerName,
+        status: 'fallback',
+      })
+    } catch (fallbackErr) {
+      console.error('[dialogue/respond] mock fallback also failed:', fallbackErr)
+      return Response.json({
+        aiText: '네, 알겠습니다.',
+        providerName: 'fallback',
+        status: 'fallback',
+      })
+    }
   }
 }
