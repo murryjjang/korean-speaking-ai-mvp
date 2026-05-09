@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 // Minimal Web Speech API types — Chrome/Edge expose webkitSpeechRecognition.
-type RecognitionAlt = { transcript?: string }
+type RecognitionAlt = { transcript?: string; confidence?: number }
 type RecognitionResult = { isFinal: boolean; 0?: RecognitionAlt; length: number }
 type RecognitionResultList = { length: number; [i: number]: RecognitionResult }
 interface RecognitionEvent {
@@ -34,6 +34,10 @@ function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
 const stripWord = (w: string) =>
   w.replace(/[.,!?。、·"'\\(\\)\\[\\]]/g, '').toLowerCase().trim()
 
+// Confidence floor for final results. Web Speech often returns 0 for interim,
+// so we only filter when a positive confidence is reported.
+const MIN_FINAL_CONFIDENCE = 0.5
+
 interface KaraokeState {
   /** Last word the user is recognized as currently speaking (or just spoke). */
   currentWordIdx: number | null
@@ -46,12 +50,16 @@ interface KaraokeState {
 /**
  * Tracks a learner's reading position over a fixed reference word list.
  *
- * Why pointer-only forward matching:
- * - SpeechRecognition emits cumulative interim+final results; matching from a
- *   monotonic pointer prevents the highlight from jumping backwards on noisy
- *   interim updates.
- * - A small lookahead window (8 words) tolerates a missed/garbled word without
- *   stalling the karaoke advance.
+ * Two-pointer design:
+ * - finalPointer is monotonic — only moves forward when a final SR result
+ *   places us further along the reference. Anchors recovery so interim
+ *   re-matches can never undo confirmed progress.
+ * - interim re-matches each event from finalPointer, so a wrong interim
+ *   guess can correct itself on the next chunk without permanent jumps.
+ *
+ * Adaptive lookahead: scales with passage length (8..16) so long passages
+ * tolerate more drift; the last 5 words always look at the rest so STT
+ * trailing noise doesn't strand the final words.
  */
 export function useKaraokeTracking(
   referenceWords: string[],
@@ -67,7 +75,7 @@ export function useKaraokeTracking(
     () => null,
   )
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
-  const pointerRef = useRef(0)
+  const finalPointerRef = useRef(0)
   const stoppingRef = useRef(false)
 
   useEffect(() => {
@@ -78,28 +86,27 @@ export function useKaraokeTracking(
     if (referenceWords.length === 0) return
 
     const refStripped = referenceWords.map(stripWord)
+    const baseLookahead = Math.max(8, Math.min(16, Math.ceil(refStripped.length * 0.2)))
+
     const sr = new Ctor()
     sr.lang = 'ko-KR'
     sr.continuous = true
     sr.interimResults = true
 
-    sr.onresult = (e: RecognitionEvent) => {
-      let combined = ''
-      for (let i = 0; i < e.results.length; i++) {
-        const r = e.results[i]
-        const alt = r[0]
-        if (alt?.transcript) combined += ' ' + alt.transcript
-      }
-      const recWords = combined.split(/\s+/).filter(Boolean).map(stripWord)
-      let p = pointerRef.current
+    // Match recWords against refStripped starting at startP. Returns the new
+    // pointer (one past the last consumed reference word) and the index of
+    // the most recently matched word (-1 if none).
+    const matchWords = (recWords: string[], startP: number): { p: number; last: number } => {
+      let p = startP
       let last = -1
       for (const rw of recWords) {
         if (!rw) continue
-        // Within last 5 words: expand lookahead to cover the rest of the
-        // reference so STT noise doesn't strand the final words.
         const remaining = refStripped.length - p
-        const lookahead = remaining <= 5 ? remaining : 8
-        for (let off = 0; off < lookahead && p + off < refStripped.length; off++) {
+        if (remaining <= 0) break
+        // Within last 5 words: search the rest of the passage so STT noise
+        // doesn't strand the final words.
+        const lookahead = remaining <= 5 ? remaining : Math.min(remaining, baseLookahead)
+        for (let off = 0; off < lookahead; off++) {
           if (refStripped[p + off] === rw) {
             p = p + off + 1
             last = p - 1
@@ -107,11 +114,47 @@ export function useKaraokeTracking(
           }
         }
       }
-      if (p > pointerRef.current) {
-        pointerRef.current = p
-        setPassedThroughIdx(p - 1)
-        setCurrentWordIdx(last >= 0 ? last : p - 1)
+      return { p, last }
+    }
+
+    sr.onresult = (e: RecognitionEvent) => {
+      let finalText = ''
+      let interimText = ''
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i]
+        const alt = r[0]
+        if (!alt?.transcript) continue
+        if (r.isFinal) {
+          // Drop low-confidence finals so a misheard chunk can't permanently
+          // jump the cursor. Treat unknown/zero confidence as acceptable
+          // because Chrome often reports 0 even for normal results.
+          const conf = alt.confidence
+          if (typeof conf === 'number' && conf > 0 && conf < MIN_FINAL_CONFIDENCE) continue
+          finalText += ' ' + alt.transcript
+        } else {
+          interimText += ' ' + alt.transcript
+        }
       }
+
+      const finalWords = finalText.split(/\s+/).filter(Boolean).map(stripWord)
+      const interimWords = interimText.split(/\s+/).filter(Boolean).map(stripWord)
+
+      // Final pointer is monotonic; re-matching consumed words is a no-op.
+      const finalRes = matchWords(finalWords, finalPointerRef.current)
+      finalPointerRef.current = finalRes.p
+
+      // Interim projects from final but is recomputed each event, so a wrong
+      // interim guess can recover on the next chunk.
+      const interimRes = matchWords(interimWords, finalRes.p)
+
+      const projectedP = interimRes.p
+      const lastSpoken =
+        interimRes.last >= 0 ? interimRes.last
+        : finalRes.last >= 0 ? finalRes.last
+        : projectedP - 1
+
+      setPassedThroughIdx(projectedP - 1)
+      setCurrentWordIdx(lastSpoken >= 0 ? lastSpoken : null)
     }
 
     sr.onerror = () => {
@@ -127,13 +170,14 @@ export function useKaraokeTracking(
 
     stoppingRef.current = false
     recognitionRef.current = sr
+    finalPointerRef.current = 0
     try { sr.start() } catch { /* noop — already started or permission denied */ }
 
     return () => {
       stoppingRef.current = true
       if (recognitionRef.current === sr) recognitionRef.current = null
       try { sr.stop() } catch { /* noop */ }
-      pointerRef.current = 0
+      finalPointerRef.current = 0
       setCurrentWordIdx(null)
       setPassedThroughIdx(-1)
     }
