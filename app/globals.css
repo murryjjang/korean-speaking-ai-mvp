@@ -1,51 +1,51 @@
 @import "tailwindcss";
 
-/* ─── 브랜드 색상 팔레트 ─── */
+/* ─── 브랜드 색상 팔레트 (KDLI 로고 매칭 — 따뜻한 기관형) ─── */
 @theme {
-  /* Primary: 교육기관형 네이비 블루 */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+  /* Primary: KDLI 로고 네이비 */
+  --color-primary-50: #EFF4FB;
+  --color-primary-100: #DCE7F4;
+  --color-primary-200: #B5C9E5;
+  --color-primary-300: #84A5D1;
+  --color-primary-400: #5081BC;
+  --color-primary-500: #2A5DA0; /* 메인 네이비 (로고 매칭) */
+  --color-primary-600: #1E4A85;
+  --color-primary-700: #163A6B; /* 로고 진한 네이비 */
+  --color-primary-800: #112B52;
+  --color-primary-900: #0C1F3D;
 
-  /* Success */
-  --color-success-50: #f0fdf4;
-  --color-success-100: #dcfce7;
-  --color-success-500: #22c55e;
-  --color-success-700: #15803d;
+  /* Success: sage 톤 */
+  --color-success-50: #F3F8EE;
+  --color-success-100: #E1EED4;
+  --color-success-500: #7FA866;
+  --color-success-700: #56773F;
 
-  /* Warning */
-  --color-warning-50: #fffbeb;
-  --color-warning-100: #fef3c7;
-  --color-warning-500: #f59e0b;
-  --color-warning-700: #b45309;
+  /* Warning: 로고 골드 매칭 (accent 겸함) */
+  --color-warning-50: #FDF8EC;
+  --color-warning-100: #FAEDCA;
+  --color-warning-500: #D4A056; /* 로고 지구본 골드 */
+  --color-warning-700: #8E661F;
 
-  /* Danger */
-  --color-danger-50: #fef2f2;
-  --color-danger-100: #fee2e2;
-  --color-danger-500: #ef4444;
-  --color-danger-700: #b91c1c;
+  /* Danger: warm coral red */
+  --color-danger-50: #FDF1ED;
+  --color-danger-100: #FAD9CE;
+  --color-danger-500: #C8543C;
+  --color-danger-700: #93341F;
 }
 
-/* ─── 시맨틱 CSS 변수 (라이트 모드) ─── */
+/* ─── 시맨틱 CSS 변수 (라이트 모드 — warm cream) ─── */
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+  --background: #FBF8F3; /* 메인 크림 */
+  --foreground: #2A2520; /* 따뜻한 진한 갈색 */
 
-  --surface: #f8fafc;
-  --surface-raised: #ffffff;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --surface: #F5F0E8; /* 깊은 크림 (섹션 배경) */
+  --surface-raised: #FFFFFF; /* 카드 표면 */
+  --border: #EFE6D9; /* 부드러운 베이지 보더 */
+  --border-strong: #D9CDB7;
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
+  --text-primary: #2A2520; /* 본문 (대비비 ≥ 12:1) */
+  --text-secondary: #6B5C52;
+  --text-muted: #A8998A;
 }
 
 /* ─── Tailwind 토큰 매핑 ─── */
@@ -67,20 +67,20 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* ─── 다크 모드 ─── */
+/* ─── 다크 모드 (warm dark) ─── */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #f1f5f9;
+    --background: #1F1812; /* 따뜻한 다크 */
+    --foreground: #F5EFE6;
 
-    --surface: #0f172a;
-    --surface-raised: #1e293b;
-    --border: #334155;
-    --border-strong: #475569;
+    --surface: #2A211A;
+    --surface-raised: #362B22;
+    --border: #4A3C30;
+    --border-strong: #5F4D3F;
 
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --text-primary: #F5EFE6;
+    --text-secondary: #BFB0A2;
+    --text-muted: #8A7C70;
   }
 }
 
