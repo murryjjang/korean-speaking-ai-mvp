@@ -165,6 +165,11 @@ export async function submitDialogue(
     const achievedGoals = goalResults.filter((g) => g.achieved)
     const unachievedGoals = goalResults.filter((g) => !g.achieved)
 
+    // 단일 진실 출처: 결과 화면의 "포함한 요소"/"빠진 요소" 표기를 상단 미션 breakdown과 동일하게
+    // goalResults(하이브리드 미션 판정)로 통일. 두 LLM 호출 결과 불일치 방지.
+    llmDetail.required_elements_found = achievedGoals.map((g) => g.labelKo)
+    llmDetail.missing_elements = unachievedGoals.map((g) => g.labelKo)
+
     if (achievedGoals.length > 0) {
       llmDetail.strengths = achievedGoals.map((g) => `"${g.labelKo}" 달성`)
     }
