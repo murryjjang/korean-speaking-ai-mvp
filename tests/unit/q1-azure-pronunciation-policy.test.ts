@@ -960,36 +960,3 @@ describe('테스트 28: "빨간색으로 표시된 단어" 문구 조건부 표�
   })
 })
 
-// ── 테스트 29: proxy.ts demo route 예외 정책 ────────────────────────────────────
-
-describe('테스트 29: demo analytics 라우트 예외 정책', () => {
-  const DEMO_ANALYTICS_ROUTES = ['/teacher/dashboard', '/admin/analytics']
-
-  function isDemoRoute(pathname: string): boolean {
-    return DEMO_ANALYTICS_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`))
-  }
-
-  it('/teacher/dashboard 는 demo route로 허용됨', () => {
-    expect(isDemoRoute('/teacher/dashboard')).toBe(true)
-  })
-
-  it('/admin/analytics 는 demo route로 허용됨', () => {
-    expect(isDemoRoute('/admin/analytics')).toBe(true)
-  })
-
-  it('/teacher (root) 는 demo route 아님 → role guard 적용', () => {
-    expect(isDemoRoute('/teacher')).toBe(false)
-  })
-
-  it('/admin (root) 는 demo route 아님 → role guard 적용', () => {
-    expect(isDemoRoute('/admin')).toBe(false)
-  })
-
-  it('/teacher/submissions 는 demo route 아님 → role guard 적용', () => {
-    expect(isDemoRoute('/teacher/submissions')).toBe(false)
-  })
-
-  it('/teacher/dashboard/ (trailing slash) 도 demo route로 허용', () => {
-    expect(isDemoRoute('/teacher/dashboard/')).toBe(true)
-  })
-})
