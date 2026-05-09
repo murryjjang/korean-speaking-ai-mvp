@@ -86,10 +86,11 @@ const WORD_TOKENS: WordToken[] = tokenizeReference(REFERENCE_LINES)
 
 // ── 권장 발화 시간 산출 ─────────────────────────────────────────────────────
 // 초급 학습자 분당 약 150자 기준 (네이티브 250자/분보다 보수적), 최소 30초.
+// 학습자가 매번 "초과"를 보지 않도록 +10초 버퍼.
 function computeRecommendedSec(lines: string[]): number {
   const charCount = lines.join('').replace(/\s/g, '').length
   const charsPerMinute = 150
-  return Math.max(30, Math.round((charCount / charsPerMinute) * 60))
+  return Math.max(30, Math.round((charCount / charsPerMinute) * 60) + 10)
 }
 const RECOMMENDED_READING_SEC = computeRecommendedSec(REFERENCE_LINES)
 
