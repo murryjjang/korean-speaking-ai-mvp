@@ -113,6 +113,8 @@ import {
   isProceduralQuestion,
 } from '@/src/lib/dialogue-policy'
 
+import { OpenAIDialogueConversationProvider } from './openai'
+
 function hasAny(text: string, keywords: string[]): boolean {
   const lower = text.toLowerCase()
   return keywords.some((kw) => lower.includes(kw))
@@ -499,7 +501,7 @@ function advancedEventResponse(input: DialogueConversationInput): string {
   return `행사 ${missing[0] ?? '관련 사항'}에 대해 말씀해 주시겠어요?`
 }
 
-class MockDialogueConversationProvider implements DialogueConversationProvider {
+export class MockDialogueConversationProvider implements DialogueConversationProvider {
   async getDialogueResponse(input: DialogueConversationInput): Promise<DialogueConversationOutput> {
     const start = Date.now()
     await new Promise<void>((resolve) => setTimeout(resolve, MOCK_LATENCY_MS))
@@ -563,9 +565,15 @@ export function getConversationProvider(): ConversationProvider {
 
 export function getDialogueConversationProvider(): DialogueConversationProvider {
   const name = process.env.CONVERSATION_PROVIDER ?? 'mock'
-  switch (name) {
-    case 'mock':
-    default:
+  if (name === 'openai') {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      console.warn('[conversation] CONVERSATION_PROVIDER=openai but OPENAI_API_KEY missing — falling back to mock')
       return new MockDialogueConversationProvider()
+    }
+    const model = process.env.OPENAI_DIALOGUE_MODEL ?? process.env.OPENAI_EVAL_MODEL ?? 'gpt-4o-mini'
+    // openai SDK 자체는 OpenAIDialogueConversationProvider 안에서 동적 import 됨
+    return new OpenAIDialogueConversationProvider(apiKey, model)
   }
+  return new MockDialogueConversationProvider()
 }
