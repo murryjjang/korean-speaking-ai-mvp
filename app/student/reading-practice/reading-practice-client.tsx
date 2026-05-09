@@ -84,6 +84,21 @@ function tokenizeReference(lines: string[]): WordToken[] {
 
 const WORD_TOKENS: WordToken[] = tokenizeReference(REFERENCE_LINES)
 
+// ── 권장 발화 시간 산출 ─────────────────────────────────────────────────────
+// 초급 학습자 분당 약 150자 기준 (네이티브 250자/분보다 보수적), 최소 30초.
+function computeRecommendedSec(lines: string[]): number {
+  const charCount = lines.join('').replace(/\s/g, '').length
+  const charsPerMinute = 150
+  return Math.max(30, Math.round((charCount / charsPerMinute) * 60))
+}
+const RECOMMENDED_READING_SEC = computeRecommendedSec(REFERENCE_LINES)
+
+function formatMmSs(totalSec: number): string {
+  const m = Math.floor(totalSec / 60)
+  const s = Math.max(0, Math.floor(totalSec % 60))
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 // ── 점수 계산 ────────────────────────────────────────────────────────────────
 function computeWordMatchScore(reference: string, recognized: string): number {
   const strip = (w: string) => w.replace(/[.,!?。、·]/g, '').trim()
@@ -208,6 +223,54 @@ const NATIVE_FEEDBACK_IMPROVE: Record<string, string> = {
   mn: 'Зарим үгс тодорхой таниагдаагүй байна. Улаанаар тэмдэглэгдсэн үгсийг дахин уншаад, өгүүлбэрийн төгсгөлийг илүү тодорхой дуудаарай.',
   ru: 'Некоторые слова не были чётко распознаны. Пожалуйста, перечитайте слова, выделенные красным, и говорите чётче в конце предложений.',
   uz: 'Ba\'zi so\'zlar aniq tanilmadi. Qizil belgilangan so\'zlarni qaytadan o\'qing va gap oxirida aniqroq gapiring.',
+}
+
+// ── ReadingTimeGuide: 권장 시간 대비 경과 진행률 보조 표시 ──────────────────
+function ReadingTimeGuide({
+  elapsedSec,
+  recommendedSec,
+  active,
+}: {
+  elapsedSec: number
+  recommendedSec: number
+  active: boolean
+}) {
+  const ratio = recommendedSec > 0 ? elapsedSec / recommendedSec : 0
+  const widthPct = Math.min(100, Math.round(ratio * 100))
+  const color = ratio <= 0.8 ? '#C49B4B' : ratio <= 1.0 ? '#D97706' : '#DC2626'
+  const overShoot = ratio > 1.0
+
+  return (
+    <div
+      className="mx-auto mt-4"
+      style={{ maxWidth: '720px' }}
+      data-testid="reading-time-guide"
+    >
+      <div className="flex items-center justify-between text-xs text-text-muted mb-1.5">
+        <span>권장 시간 {formatMmSs(recommendedSec)} / 경과 {formatMmSs(elapsedSec)}</span>
+        {overShoot && active && (
+          <span style={{ color: '#DC2626', fontWeight: 500 }}>권장 시간 초과</span>
+        )}
+      </div>
+      <div
+        style={{
+          height: 4,
+          background: 'var(--border)',
+          borderRadius: 2,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: `${widthPct}%`,
+            height: '100%',
+            background: color,
+            transition: 'width 0.3s ease, background 0.3s ease',
+          }}
+        />
+      </div>
+    </div>
+  )
 }
 
 // ── ResultPassage: 단일 흐르는 본문 + 단어별 첨삭 색상 ─────────────────────
@@ -400,6 +463,8 @@ export function ReadingPracticeClient() {
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
   const [playbackCurrentMs, setPlaybackCurrentMs] = useState<number>(0)
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null)
+  const [readingElapsedSec, setReadingElapsedSec] = useState(0)
+  const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -531,9 +596,18 @@ export function ReadingPracticeClient() {
     }
     recorder.start(250)
     setRecorderState('recording')
+    setReadingElapsedSec(0)
+    if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current)
+    elapsedIntervalRef.current = setInterval(() => {
+      setReadingElapsedSec(p => p + 1)
+    }, 1000)
   }
 
   const stopRecording = () => {
+    if (elapsedIntervalRef.current) {
+      clearInterval(elapsedIntervalRef.current)
+      elapsedIntervalRef.current = null
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
     } else {
@@ -644,6 +718,11 @@ export function ReadingPracticeClient() {
       setRecordedAudioUrl(null)
     }
     setPlaybackCurrentMs(0)
+    setReadingElapsedSec(0)
+    if (elapsedIntervalRef.current) {
+      clearInterval(elapsedIntervalRef.current)
+      elapsedIntervalRef.current = null
+    }
   }
 
   // ── Dynamic feedback ────────────────────────────────────────────────────────
@@ -991,6 +1070,13 @@ export function ReadingPracticeClient() {
                   )
                 })}
               </article>
+
+              {/* 시간 가이드 진행률 바 (보조 정보) */}
+              <ReadingTimeGuide
+                elapsedSec={readingElapsedSec}
+                recommendedSec={RECOMMENDED_READING_SEC}
+                active={recorderState === 'recording' || readingElapsedSec > 0}
+              />
             </CardBody>
           </Card>
 
