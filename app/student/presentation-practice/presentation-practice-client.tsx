@@ -174,7 +174,12 @@ export function PresentationPracticeClient() {
   const [script, setScript] = useState(DEFAULT_SCRIPT)
   const [speed, setSpeed] = useState<SpeedOption>(1.0)
   const [showCorrection, setShowCorrection] = useState(false)
-  const [targetSec, setTargetSec] = useState(60)
+  const [targetSec, setTargetSec] = useState(180)
+  // Feedback source mirrors q4's dialogueEvalSource pattern: 'llm' when a real
+  // LLM response is shown, 'mock' for the demo/fallback content. Today the
+  // presentation feedback is always mock; the badge below stays informative
+  // until a real LLM hookup flips this to 'llm'.
+  const [feedbackSource] = useState<'llm' | 'mock'>('mock')
   const [customSec, setCustomSec] = useState('')
   const [useCustom, setUseCustom] = useState(false)
 
@@ -669,10 +674,29 @@ export function PresentationPracticeClient() {
           action={ttsStatus === 'playing' ? <Badge variant="success" size="sm">재생 중</Badge> : null}
         />
         <CardBody className="space-y-3">
-          <div className="p-4 bg-slate-900 rounded-xl border border-slate-700">
-            <p className="text-base text-slate-100 leading-relaxed">
-              {showCorrection ? DEFAULT_CORRECTED : script || DEFAULT_SCRIPT}
-            </p>
+          <div
+            data-testid="presentation-script"
+            className="mx-auto"
+            style={{
+              maxWidth: '720px',
+              padding: '24px 40px',
+              background: '#FAF9F5',
+              border: '0.5px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              fontSize: '1.25rem',
+              lineHeight: 2.0,
+              wordBreak: 'keep-all',
+              color: 'var(--text-primary)',
+            }}
+          >
+            {(showCorrection ? DEFAULT_CORRECTED : script || DEFAULT_SCRIPT)
+              .split(/\s+/)
+              .filter(Boolean)
+              .map((w, i, arr) => (
+                <span key={i} data-word-index={i}>
+                  {w}{i < arr.length - 1 ? ' ' : ''}
+                </span>
+              ))}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -739,8 +763,11 @@ export function PresentationPracticeClient() {
         </CardBody>
       </Card>
 
-      {/* 발표 타이머 */}
-      <Card data-testid="timer-card">
+      {/* 발표 타이머 — sticky로 스크립트가 길어도 항상 보임 */}
+      <Card
+        data-testid="timer-card"
+        className="sticky top-0 z-10 shadow-md bg-surface-raised border border-border"
+      >
         <CardHeader title="발표 타이머" description="목표 시간에 맞춰 발표를 연습해 보세요" />
         <CardBody className="space-y-4">
           <div
@@ -833,7 +860,7 @@ export function PresentationPracticeClient() {
               data-testid="timer-feedback"
             >
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant="info" size="sm">시연용 참고 피드백</Badge>
+                <Badge variant="info" size="sm">시간 가이드</Badge>
               </div>
               <p className="text-sm text-blue-800">
                 {getTimerFeedback(timerFinished ? elapsed : elapsedAtEnd, effectiveTarget)}
@@ -985,9 +1012,15 @@ export function PresentationPracticeClient() {
         <CardHeader
           title="발표 피드백"
           action={
-            <Badge variant="warning" size="sm" data-testid="sample-feedback-badge">
-              시연용 참고 피드백
-            </Badge>
+            feedbackSource === 'mock' ? (
+              <Badge variant="warning" size="sm" data-testid="sample-feedback-badge">
+                시연용 참고 피드백
+              </Badge>
+            ) : (
+              <Badge variant="success" size="sm" data-testid="ai-feedback-badge">
+                AI 피드백
+              </Badge>
+            )
           }
         />
         <CardBody className="space-y-4">
