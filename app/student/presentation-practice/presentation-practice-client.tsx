@@ -214,6 +214,88 @@ function hasTrailingNotRecognizedPresentation(
   return refWords.length - 1 - lastRecognized >= 2
 }
 
+// ── 23-a 인라인 차이점 보기 ──────────────────────────────────────────────────
+// LLM이 반환한 corrections 배열을 학습자 원본 텍스트 위에 splice하여
+// 취소선(원본) + 주황 강조(교정)을 인라인으로 표시한다.
+// 매칭에 실패한 항목은 건너뛰고, 모든 항목이 실패하면 안내 메시지를 보인다.
+function stripQuotes(s: string): string {
+  return s.replace(/^[\s"'“”‘’]+|[\s"'“”‘’]+$/g, '').trim()
+}
+
+function CorrectionInlineView({
+  originalScript,
+  corrections,
+}: {
+  originalScript: string
+  corrections: Array<{ original: string; corrected: string; reason: string }>
+}) {
+  type Segment =
+    | { kind: 'plain'; text: string }
+    | { kind: 'diff'; original: string; corrected: string; reason: string; idx: number }
+
+  const segments: Segment[] = []
+  let cursor = 0
+  let diffIndex = 0
+  for (const c of corrections) {
+    const cleanOrig = stripQuotes(c.original)
+    const cleanCorr = stripQuotes(c.corrected)
+    if (!cleanOrig || cleanOrig.length < 2) continue
+    const idx = originalScript.indexOf(cleanOrig, cursor)
+    if (idx === -1) continue
+    if (idx > cursor) {
+      segments.push({ kind: 'plain', text: originalScript.slice(cursor, idx) })
+    }
+    segments.push({
+      kind: 'diff',
+      original: cleanOrig,
+      corrected: cleanCorr,
+      reason: c.reason,
+      idx: diffIndex++,
+    })
+    cursor = idx + cleanOrig.length
+  }
+  if (cursor < originalScript.length) {
+    segments.push({ kind: 'plain', text: originalScript.slice(cursor) })
+  }
+
+  const matchedAny = segments.some(s => s.kind === 'diff')
+
+  return (
+    <div data-testid="correction-inline-view" className="space-y-2">
+      <div className="p-3 bg-surface border border-border rounded-lg text-sm leading-relaxed">
+        {matchedAny ? (
+          segments.map((s, i) =>
+            s.kind === 'plain' ? (
+              <span key={i}>{s.text}</span>
+            ) : (
+              <span
+                key={i}
+                title={s.reason}
+                data-testid={`inline-diff-${s.idx}`}
+                className="inline-flex items-baseline gap-1 mx-0.5"
+              >
+                <span className="line-through" style={{ color: '#888780' }}>
+                  {s.original}
+                </span>
+                <span className="font-semibold" style={{ color: '#C8543C' }}>
+                  {s.corrected}
+                </span>
+              </span>
+            ),
+          )
+        ) : (
+          <p className="text-xs text-text-muted">
+            인라인 매칭 가능한 차이점이 없습니다. 분리 보기 탭에서 차이점을 확인해보세요.
+          </p>
+        )}
+      </div>
+      <p className="text-[11px] text-text-muted">
+        취소선 = 원본, 주황색 = 교정. 호버하면 교정 이유가 보입니다.
+      </p>
+    </div>
+  )
+}
+
 // ── 발표 스크립트 표시 (카라오케 + Azure 동기화 통합) ─────────────────────────
 function PresentationScriptDisplay({
   words,
@@ -1082,8 +1164,37 @@ export function PresentationPracticeClient() {
           />
           <CardBody className="space-y-4">
             <p className="text-xs text-text-muted">
-              아래 교정문은 {level} 학습자가 격식체로 발표하기 쉽도록 다듬은 결과입니다.
+              아래 교정문은 {level} 학습자가{' '}
+              {correctionTone === 'formal'
+                ? '격식체'
+                : correctionTone === 'general'
+                  ? '일반체'
+                  : '친근체'}
+              로 발표·발화하기 쉽도록 다듬은 결과입니다.
             </p>
+
+            {/* 23-a: 보기 모드 탭 */}
+            <div
+              className="inline-flex rounded-md border border-border overflow-hidden"
+              data-testid="correction-view-tabs"
+            >
+              {(['separate', 'inline'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setCorrectionViewMode(mode)}
+                  className={[
+                    'px-3 py-1.5 text-xs font-medium transition-colors',
+                    correctionViewMode === mode
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-surface text-text-secondary hover:bg-slate-50',
+                  ].join(' ')}
+                  data-testid={`tab-view-${mode}`}
+                  aria-pressed={correctionViewMode === mode}
+                >
+                  {mode === 'separate' ? '분리 보기' : '인라인 보기'}
+                </button>
+              ))}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1096,7 +1207,7 @@ export function PresentationPracticeClient() {
               </div>
               <div>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                  AI 교정 (격식체)
+                  AI 교정
                 </p>
                 <div
                   className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800 leading-relaxed"
@@ -1151,22 +1262,29 @@ export function PresentationPracticeClient() {
               <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
                 차이점
               </p>
-              <div className="space-y-2" data-testid="correction-ko-explain">
-                {correctionResult.corrections.length === 0 ? (
-                  <p className="text-xs text-text-muted">큰 차이 없이 자연스럽게 작성되었습니다.</p>
-                ) : (
-                  correctionResult.corrections.map((c, i) => (
-                    <div key={i} className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <div className="flex flex-wrap gap-2 items-center mb-1 text-xs">
-                        <span className="line-through text-text-muted">{c.original}</span>
-                        <span className="text-amber-600">→</span>
-                        <span className="font-semibold text-amber-700">{c.corrected}</span>
+              {correctionViewMode === 'separate' ? (
+                <div className="space-y-2" data-testid="correction-ko-explain">
+                  {correctionResult.corrections.length === 0 ? (
+                    <p className="text-xs text-text-muted">큰 차이 없이 자연스럽게 작성되었습니다.</p>
+                  ) : (
+                    correctionResult.corrections.map((c, i) => (
+                      <div key={i} className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex flex-wrap gap-2 items-center mb-1 text-xs">
+                          <span className="line-through text-text-muted">{c.original}</span>
+                          <span className="text-amber-600">→</span>
+                          <span className="font-semibold text-amber-700">{c.corrected}</span>
+                        </div>
+                        <p className="text-xs text-amber-800">{c.reason}</p>
                       </div>
-                      <p className="text-xs text-amber-800">{c.reason}</p>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <CorrectionInlineView
+                  originalScript={script || DEFAULT_SCRIPT}
+                  corrections={correctionResult.corrections}
+                />
+              )}
             </div>
 
             {correctionResult.source === 'mock' && (
