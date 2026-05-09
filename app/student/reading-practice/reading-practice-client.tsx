@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { computeEtriWordDiff } from '@/src/lib/etri-word-diff'
+import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
 
 // ── 지문 ────────────────────────────────────────────────────────────────────
 const REFERENCE_LINES = [
@@ -384,6 +385,10 @@ export function ReadingPracticeClient() {
 
   // Keep speedRef in sync
   useEffect(() => { speedRef.current = speed }, [speed])
+
+  // Karaoke tracking — active only while the learner is recording
+  const referenceWordsForKaraoke = useRef(WORD_TOKENS.map(t => t.text)).current
+  const karaoke = useKaraokeTracking(referenceWordsForKaraoke, recorderState === 'recording')
 
   // ── Audio stop ──────────────────────────────────────────────────────────────
   const stopAudio = useCallback(() => {
@@ -877,6 +882,11 @@ export function ReadingPracticeClient() {
               description="문장을 클릭하면 현재 줄이 바뀝니다 · 전체 듣기를 누르면 줄이 순서대로 강조됩니다"
             />
             <CardBody>
+              {karaoke.supported === false && (
+                <p className="mb-3 text-xs text-text-muted text-center" data-testid="karaoke-unsupported">
+                  Chrome 또는 Edge에서는 녹음 중 발화 위치 진행 표시가 활성화됩니다.
+                </p>
+              )}
               <article
                 data-testid="reference-lines"
                 className="mx-auto"
@@ -921,15 +931,26 @@ export function ReadingPracticeClient() {
                             : 'transparent',
                       }}
                     >
-                      {lineWords.map((w, wi) => (
-                        <span
-                          key={wi}
-                          data-word-index={baseGlobal + wi}
-                          data-line-word-index={wi}
-                        >
-                          {w}{wi < lineWords.length - 1 ? ' ' : ''}
-                        </span>
-                      ))}
+                      {lineWords.map((w, wi) => {
+                        const myGlobal = baseGlobal + wi
+                        const isPassed = karaoke.passedThroughIdx >= myGlobal && karaoke.currentWordIdx !== myGlobal
+                        const isCurrentSpoken = karaoke.currentWordIdx === myGlobal
+                        const wordStyle: CSSProperties = isCurrentSpoken
+                          ? { background: '#FFF3CD', color: '#1F2D3D', padding: '0 2px', borderRadius: 3, transition: 'background 0.2s, color 0.2s' }
+                          : isPassed
+                            ? { color: '#8A8580', transition: 'color 0.2s' }
+                            : { transition: 'color 0.2s' }
+                        return (
+                          <span
+                            key={wi}
+                            data-word-index={myGlobal}
+                            data-line-word-index={wi}
+                            style={wordStyle}
+                          >
+                            {w}{wi < lineWords.length - 1 ? ' ' : ''}
+                          </span>
+                        )
+                      })}
                     </p>
                   )
                 })}
