@@ -1,7 +1,30 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, type CSSProperties } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
+import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
+
+// ── Azure 단어 결과 타입 ──────────────────────────────────────────────────────
+interface AzureWordResult {
+  word: string
+  accuracyScore: number
+  errorType: 'None' | 'Omission' | 'Insertion' | 'Mispronunciation'
+  offsetMs?: number
+  durationMs?: number
+}
+
+interface AzureResult {
+  providerName: 'azure' | 'demo'
+  fallbackReason?: string
+  normalizedScore: number
+  pronScore: number | null
+  accuracyScore: number | null
+  fluencyScore: number | null
+  completenessScore: number | null
+  recognizedText: string
+  wordResults: AzureWordResult[]
+  latencyMs?: number
+}
 
 // ── 언어 ────────────────────────────────────────────────────────────────────
 const NATIVE_LANGS = [
@@ -166,6 +189,184 @@ function getTimerFeedback(elapsed: number, target: number): string {
 
 type RecordingState = 'idle' | 'recording' | 'processing' | 'done'
 
+// ── 발표 스크립트 표시 (카라오케 + Azure 동기화 통합) ─────────────────────────
+function PresentationScriptDisplay({
+  words,
+  karaokeCurrentIdx,
+  karaokePassedIdx,
+  karaokeActive,
+  karaokeSupported,
+  azureWords,
+  audioCurrentMs,
+  onWordSeek,
+}: {
+  words: string[]
+  karaokeCurrentIdx: number | null
+  karaokePassedIdx: number
+  karaokeActive: boolean
+  karaokeSupported: boolean | null
+  azureWords: AzureWordResult[] | null
+  audioCurrentMs?: number
+  onWordSeek?: (offsetMs: number) => void
+}) {
+  // Map Azure word results to reference words by sequential alignment.
+  type AzureMap = {
+    errorType?: AzureWordResult['errorType']
+    accuracyScore?: number
+    offsetMs?: number
+    durationMs?: number
+  }
+  const azureMap: AzureMap[] = useMemo(() => {
+    if (!azureWords || azureWords.length === 0) return words.map(() => ({}))
+    const strip = (w: string) => w.replace(/[.,!?。、·]/g, '').trim()
+    let ai = 0
+    return words.map(w => {
+      if (ai < azureWords.length && strip(azureWords[ai].word) === strip(w)) {
+        const a = azureWords[ai]
+        ai++
+        return {
+          errorType: a.errorType,
+          accuracyScore: a.accuracyScore,
+          offsetMs: a.offsetMs,
+          durationMs: a.durationMs,
+        }
+      }
+      return { errorType: 'Omission' as const }
+    })
+  }, [azureWords, words])
+
+  // Currently playing word index from audio currentTime.
+  let currentPlaybackIdx: number | null = null
+  if (typeof audioCurrentMs === 'number') {
+    for (let i = 0; i < azureMap.length; i++) {
+      const a = azureMap[i]
+      if (a.offsetMs == null) continue
+      const end = a.offsetMs + (a.durationMs ?? 0) + 50
+      if (audioCurrentMs >= a.offsetMs && audioCurrentMs <= end) {
+        currentPlaybackIdx = i
+        break
+      }
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {karaokeActive && karaokeSupported === false && (
+        <p className="text-[11px] text-text-muted italic" data-testid="karaoke-unsupported-note">
+          ※ 현재 브라우저는 실시간 카라오케가 지원되지 않습니다. 녹음 후 단어 동기화 결과는 정상 표시됩니다.
+        </p>
+      )}
+      <div
+        data-testid="presentation-script"
+        className="mx-auto"
+        style={{
+          maxWidth: '720px',
+          padding: '24px 40px',
+          background: '#FAF9F5',
+          border: '0.5px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          fontSize: '1.25rem',
+          lineHeight: 2.0,
+          wordBreak: 'keep-all',
+          color: 'var(--text-primary)',
+        }}
+      >
+        {words.map((w, i) => {
+          const isPassed = karaokeActive && i <= karaokePassedIdx
+          const isKaraokeCurrent = karaokeActive && karaokeCurrentIdx === i
+          const isPlaybackCurrent = currentPlaybackIdx === i
+          const a = azureMap[i] ?? {}
+          const seekable = a.offsetMs != null && onWordSeek != null
+
+          let baseStyle: CSSProperties = { color: '#888780' }
+          if (azureWords && azureWords.length > 0) {
+            if (a.errorType === 'Omission') {
+              baseStyle = {
+                color: '#C8543C',
+                backgroundColor: '#FFEEEE',
+                textDecoration: 'line-through',
+                textDecorationColor: '#C8543C',
+                textDecorationThickness: '3px',
+                fontWeight: 600,
+              }
+            } else if (a.errorType === 'Mispronunciation' || (typeof a.accuracyScore === 'number' && a.accuracyScore < 80)) {
+              baseStyle = {
+                color: '#C8543C',
+                backgroundColor: '#FFF3CD',
+                textDecoration: 'underline',
+                textDecorationColor: '#C8543C',
+                textDecorationThickness: '3px',
+                fontWeight: 600,
+              }
+            }
+          } else if (isKaraokeCurrent) {
+            baseStyle = { color: '#1F2D3D', fontWeight: 700, backgroundColor: '#FDE68A' }
+          } else if (isPassed) {
+            baseStyle = { color: 'var(--text-primary)' }
+          }
+
+          if (isPlaybackCurrent) {
+            baseStyle = { ...baseStyle, backgroundColor: '#FDE68A', color: '#1F2D3D' }
+          }
+
+          const tooltip = a.errorType === 'Omission'
+            ? '이 단어를 안 읽었습니다'
+            : a.errorType === 'Mispronunciation'
+              ? (typeof a.accuracyScore === 'number' ? `발음 점수 ${Math.round(a.accuracyScore)}/100` : '발음이 정확하지 않습니다')
+              : (typeof a.accuracyScore === 'number' && a.accuracyScore < 80 ? `발음 점수 ${Math.round(a.accuracyScore)}/100` : undefined)
+          const title = seekable ? (tooltip ? `${tooltip} · 클릭하면 이 단어부터 다시 듣기` : '이 단어부터 다시 듣기') : tooltip
+
+          return (
+            <span
+              key={i}
+              data-word-index={i}
+              style={{
+                ...baseStyle,
+                padding: '2px 4px',
+                borderRadius: 4,
+                cursor: seekable ? 'pointer' : 'default',
+                transition: 'background 0.2s, color 0.2s',
+              }}
+              onClick={() => seekable && onWordSeek?.(a.offsetMs!)}
+              title={title}
+            >
+              {w}{i < words.length - 1 ? ' ' : ''}
+            </span>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function PresentationTimeGuide({ elapsedSec, targetSec }: { elapsedSec: number; targetSec: number }) {
+  const ratio = targetSec > 0 ? elapsedSec / targetSec : 0
+  const widthPct = Math.min(100, Math.round(ratio * 100))
+  const color = ratio <= 0.8 ? '#C49B4B' : ratio <= 1.0 ? '#D97706' : '#DC2626'
+  const overShoot = ratio > 1.0
+  return (
+    <div className="mx-auto mt-2" style={{ maxWidth: '720px' }} data-testid="presentation-time-guide">
+      <div className="flex items-center justify-between text-xs text-text-muted mb-1.5">
+        <span>목표 시간 {formatTime(targetSec)} / 경과 {formatTime(elapsedSec)}</span>
+        {overShoot && (
+          <span style={{ color: '#DC2626', fontWeight: 500 }}>목표 시간 초과</span>
+        )}
+      </div>
+      <div style={{ height: 4, background: 'var(--border)', borderRadius: 2 }}>
+        <div
+          style={{
+            width: `${widthPct}%`,
+            height: '100%',
+            background: color,
+            borderRadius: 2,
+            transition: 'width 0.5s ease-out, background 0.2s',
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 export function PresentationPracticeClient() {
   const [nativeLang, setNativeLang] = useState('vi')
@@ -201,6 +402,22 @@ export function PresentationPracticeClient() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Word-synced playback (Azure)
+  const [azureResult, setAzureResult] = useState<AzureResult | null>(null)
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
+  const [playbackCurrentMs, setPlaybackCurrentMs] = useState(0)
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Reference text used as both karaoke target and Azure pronunciation reference
+  const referenceText = (showCorrection ? DEFAULT_CORRECTED : (script || DEFAULT_SCRIPT)).trim()
+  const referenceWords = useMemo(
+    () => referenceText.split(/\s+/).filter(Boolean),
+    [referenceText],
+  )
+
+  // Karaoke real-time tracking (only while recording)
+  const karaoke = useKaraokeTracking(referenceWords, recordingState === 'recording')
 
   useEffect(() => {
     speedRef.current = speed
@@ -295,7 +512,20 @@ export function PresentationPracticeClient() {
     } catch {
       setTranscript(DEMO_TRANSCRIPT)
     }
-    setRecordingState('done')
+  }
+
+  async function runAzurePronunciation(audioBlob: Blob, refText: string) {
+    try {
+      const fd = new FormData()
+      fd.append('audio', audioBlob, 'recording.webm')
+      fd.append('referenceText', refText)
+      const res = await fetch('/api/pronunciation-azure', { method: 'POST', body: fd })
+      const data = (await res.json()) as AzureResult
+      if (!data.fallbackReason) setAzureResult(data)
+      else setAzureResult(null)
+    } catch {
+      setAzureResult(null)
+    }
   }
 
   function startTickingTimer() {
@@ -318,6 +548,12 @@ export function PresentationPracticeClient() {
     setAlert10(false)
     setTargetReached(false)
     setTranscript(null)
+    setAzureResult(null)
+    if (recordedAudioUrl) {
+      URL.revokeObjectURL(recordedAudioUrl)
+      setRecordedAudioUrl(null)
+    }
+    setPlaybackCurrentMs(0)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mr = new MediaRecorder(stream)
@@ -328,8 +564,13 @@ export function PresentationPracticeClient() {
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop())
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        setRecordedAudioUrl(URL.createObjectURL(audioBlob))
         setRecordingState('processing')
-        await runSTT(audioBlob)
+        await Promise.all([
+          runSTT(audioBlob),
+          runAzurePronunciation(audioBlob, referenceText),
+        ])
+        setRecordingState('done')
       }
       mr.start()
       mediaRecorderRef.current = mr
@@ -371,6 +612,12 @@ export function PresentationPracticeClient() {
     setAlert30(false)
     setAlert10(false)
     setTargetReached(false)
+    setAzureResult(null)
+    if (recordedAudioUrl) {
+      URL.revokeObjectURL(recordedAudioUrl)
+      setRecordedAudioUrl(null)
+    }
+    setPlaybackCurrentMs(0)
     audioChunksRef.current = []
     if (recordingIntervalRef.current) {
       clearInterval(recordingIntervalRef.current)
@@ -756,30 +1003,29 @@ export function PresentationPracticeClient() {
           action={ttsStatus === 'playing' ? <Badge variant="success" size="sm">재생 중</Badge> : null}
         />
         <CardBody className="space-y-3">
-          <div
-            data-testid="presentation-script"
-            className="mx-auto"
-            style={{
-              maxWidth: '720px',
-              padding: '24px 40px',
-              background: '#FAF9F5',
-              border: '0.5px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              fontSize: '1.25rem',
-              lineHeight: 2.0,
-              wordBreak: 'keep-all',
-              color: 'var(--text-primary)',
-            }}
-          >
-            {(showCorrection ? DEFAULT_CORRECTED : script || DEFAULT_SCRIPT)
-              .split(/\s+/)
-              .filter(Boolean)
-              .map((w, i, arr) => (
-                <span key={i} data-word-index={i}>
-                  {w}{i < arr.length - 1 ? ' ' : ''}
-                </span>
-              ))}
-          </div>
+          <PresentationScriptDisplay
+            words={referenceWords}
+            karaokeCurrentIdx={karaoke.currentWordIdx}
+            karaokePassedIdx={karaoke.passedThroughIdx}
+            karaokeActive={recordingState === 'recording'}
+            karaokeSupported={karaoke.supported}
+            azureWords={recordingState === 'done' ? azureResult?.wordResults ?? null : null}
+            audioCurrentMs={recordingState === 'done' && recordedAudioUrl ? playbackCurrentMs : undefined}
+            onWordSeek={recordingState === 'done' && recordedAudioUrl ? (offsetMs) => {
+              const a = playbackAudioRef.current
+              if (!a) return
+              a.currentTime = Math.max(0, offsetMs / 1000)
+              a.play().catch(() => { /* user gesture may be required */ })
+            } : undefined}
+          />
+
+          {/* 시간 가이드 — 녹음 중 진행률 (읽기 패턴) */}
+          {recordingState === 'recording' && (
+            <PresentationTimeGuide
+              elapsedSec={recordingElapsed}
+              targetSec={effectiveTarget}
+            />
+          )}
 
           <div className="flex flex-wrap gap-2">
             <button
@@ -862,6 +1108,28 @@ export function PresentationPracticeClient() {
           </p>
           <p className="text-xs text-blue-700">핵심 문장 뒤에 짧게 쉬면 더 자연스럽습니다.</p>
         </div>
+      )}
+
+      {/* 녹음 재생 — Azure 단어 동기화 */}
+      {recordingState === 'done' && recordedAudioUrl && (
+        <Card data-testid="recorded-playback-card">
+          <CardHeader
+            title="내 발표 다시 듣기"
+            description="재생하면 위 발표 원고의 단어가 시간 순으로 강조됩니다. 단어를 클릭하면 해당 위치부터 다시 들을 수 있습니다."
+          />
+          <CardBody>
+            <audio
+              ref={playbackAudioRef}
+              src={recordedAudioUrl}
+              controls
+              className="w-full"
+              data-testid="recorded-audio"
+              onTimeUpdate={(e) => setPlaybackCurrentMs(e.currentTarget.currentTime * 1000)}
+              onSeeked={(e) => setPlaybackCurrentMs(e.currentTarget.currentTime * 1000)}
+              onEnded={() => setPlaybackCurrentMs(0)}
+            />
+          </CardBody>
+        </Card>
       )}
 
       {/* STT 결과 */}
