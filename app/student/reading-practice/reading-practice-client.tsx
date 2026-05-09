@@ -926,12 +926,6 @@ export function ReadingPracticeClient() {
             </button>
           </div>
 
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg" data-testid="demo-mode-notice">
-            <p className="text-xs text-amber-800">
-              현재는 음성 인식 기반 참고평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화 예정입니다.
-            </p>
-          </div>
-
           {/* TTS 컨트롤 */}
           <Card>
             <CardHeader
