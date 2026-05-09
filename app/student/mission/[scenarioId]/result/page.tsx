@@ -117,7 +117,7 @@ export default async function MissionResultPage({
           <CardBody>
             <p className="text-sm text-text-secondary mb-3">{scenario.situation}</p>
             <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
-              <span className="inline-flex items-center bg-slate-100 text-slate-600 rounded px-2 py-0.5">
+              <span className="inline-flex items-center bg-surface text-text-secondary rounded px-2 py-0.5">
                 AI 페르소나: {scenario.persona.name} · {scenario.persona.role}
               </span>
             </div>
@@ -176,7 +176,7 @@ export default async function MissionResultPage({
                         ✓
                       </span>
                     ) : (
-                      <span className="w-5 h-5 rounded-full border-2 border-slate-300 shrink-0" />
+                      <span className="w-5 h-5 rounded-full border-2 border-border-strong shrink-0" />
                     )}
                     <span
                       className={g.achieved ? 'text-text-muted line-through' : 'text-text-secondary'}
@@ -257,7 +257,7 @@ export default async function MissionResultPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2 pb-4">
           <Link
             href="/student/mission"
-            className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 w-full sm:w-auto"
+            className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-text-primary hover:bg-slate-50 border border-border-strong w-full sm:w-auto"
           >
             미션 목록으로
           </Link>

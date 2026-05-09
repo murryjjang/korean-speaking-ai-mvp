@@ -39,12 +39,12 @@ const roleColors = {
     icon: "bg-primary-100 text-primary-700",
   },
   teacher: {
-    border: "border-slate-200 hover:border-slate-400",
-    badge: "bg-slate-100 text-slate-700 border-slate-200",
-    icon: "bg-slate-100 text-slate-700",
+    border: "border-border hover:border-slate-400",
+    badge: "bg-surface text-text-primary border-border",
+    icon: "bg-surface text-text-primary",
   },
   admin: {
-    border: "border-slate-200 hover:border-slate-500",
+    border: "border-border hover:border-slate-500",
     badge: "bg-slate-800 text-slate-100 border-slate-700",
     icon: "bg-slate-200 text-slate-800",
   },

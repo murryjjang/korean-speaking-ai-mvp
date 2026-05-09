@@ -241,7 +241,7 @@ function LineDiff({
         </div>
         {recognized && (
           <div className="flex flex-wrap gap-1 text-sm leading-relaxed">
-            <span className="text-xs text-slate-500 mr-1 self-center shrink-0">내 발화:</span>
+            <span className="text-xs text-text-muted mr-1 self-center shrink-0">내 발화:</span>
             <span className="text-slate-300">{recognized}</span>
           </div>
         )}
@@ -249,7 +249,7 @@ function LineDiff({
           <p className="text-xs text-emerald-500 italic">제시문과 발화가 대부분 일치합니다.</p>
         )}
         {hasErrors && (
-          <p className="text-[10px] text-slate-500 italic">
+          <p className="text-[10px] text-text-muted italic">
             음성 인식 결과와 제시문을 비교한 교정 포인트입니다.
           </p>
         )}
@@ -278,7 +278,7 @@ function LineDiff({
         ))}
       </div>
       <div className="flex flex-wrap gap-1 text-sm leading-relaxed">
-        <span className="text-xs text-slate-500 mr-1 self-center shrink-0">내 발화:</span>
+        <span className="text-xs text-text-muted mr-1 self-center shrink-0">내 발화:</span>
         {recTokens.length > 0 ? recTokens.map((tok, i) => (
           <span
             key={i}
@@ -287,14 +287,14 @@ function LineDiff({
             {tok.text}
           </span>
         )) : (
-          <span className="text-slate-500 italic text-xs">인식 결과 없음</span>
+          <span className="text-text-muted italic text-xs">인식 결과 없음</span>
         )}
       </div>
       {!hasAnyMismatch && (
         <p className="text-xs text-emerald-500 italic">제시문과 발화가 대부분 일치합니다.</p>
       )}
       {hasAnyMismatch && (
-        <p className="text-[10px] text-slate-500 italic">
+        <p className="text-[10px] text-text-muted italic">
           음성 인식 결과와 제시문을 비교한 교정 포인트입니다.
         </p>
       )}
@@ -846,7 +846,7 @@ export function ReadingPracticeClient() {
                     data-testid={`line-${i}`}
                   >
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className={`text-xs font-mono ${isPlaying || isCurrent ? 'text-primary-400' : 'text-slate-500'}`}>
+                      <span className={`text-xs font-mono ${isPlaying || isCurrent ? 'text-primary-400' : 'text-text-muted'}`}>
                         {i + 1}행
                       </span>
                       {isPlaying && (
@@ -1037,7 +1037,7 @@ export function ReadingPracticeClient() {
                         azureWords={azureWords}
                       />
                     ) : (
-                      <p className="text-sm text-slate-500 italic mt-2">인식 결과 없음</p>
+                      <p className="text-sm text-text-muted italic mt-2">인식 결과 없음</p>
                     )}
                   </div>
                 )

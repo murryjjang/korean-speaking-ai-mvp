@@ -599,7 +599,7 @@ export function PresentationPracticeClient() {
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
                   원문
                 </p>
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-text-primary leading-relaxed">
+                <div className="p-3 bg-surface border border-border rounded-lg text-sm text-text-primary leading-relaxed">
                   {script || DEFAULT_SCRIPT}
                 </div>
               </div>
@@ -616,7 +616,7 @@ export function PresentationPracticeClient() {
               </div>
             </div>
 
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            <div className="p-3 bg-surface border border-border rounded-lg">
               <p className="text-xs font-semibold text-text-muted mb-2">핵심 수정 포인트</p>
               <ul className="text-xs text-text-secondary space-y-1">
                 <li>• 문장 연결 개선 (-아서/어서 활용)</li>
@@ -634,7 +634,7 @@ export function PresentationPracticeClient() {
                 {DEMO_CORRECTIONS.map((c, i) => (
                   <div key={i} className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <div className="flex flex-wrap gap-2 items-center mb-1 text-xs">
-                      <span className="line-through text-slate-500">{c.original}</span>
+                      <span className="line-through text-text-muted">{c.original}</span>
                       <span className="text-amber-600">→</span>
                       <span className="font-semibold text-amber-700">{c.corrected}</span>
                     </div>
@@ -688,7 +688,7 @@ export function PresentationPracticeClient() {
               onClick={() => playTTS(DEFAULT_CORRECTED, 0.75)}
               disabled={ttsStatus === 'loading' || ttsStatus === 'playing'}
               data-testid="btn-play-slow"
-              className="px-3 py-2 rounded-md bg-slate-100 border border-slate-200 text-text-secondary text-sm font-medium hover:bg-slate-200 disabled:opacity-50 transition-colors"
+              className="px-3 py-2 rounded-md bg-surface border border-border text-text-secondary text-sm font-medium hover:bg-slate-200 disabled:opacity-50 transition-colors"
             >
               천천히 듣기
             </button>
@@ -696,7 +696,7 @@ export function PresentationPracticeClient() {
               onClick={() => playTTS(DEFAULT_CORRECTED, 1.0)}
               disabled={ttsStatus === 'loading' || ttsStatus === 'playing'}
               data-testid="btn-play-normal"
-              className="px-3 py-2 rounded-md bg-slate-100 border border-slate-200 text-text-secondary text-sm font-medium hover:bg-slate-200 disabled:opacity-50 transition-colors"
+              className="px-3 py-2 rounded-md bg-surface border border-border text-text-secondary text-sm font-medium hover:bg-slate-200 disabled:opacity-50 transition-colors"
             >
               보통 속도로 듣기
             </button>
@@ -906,7 +906,7 @@ export function PresentationPracticeClient() {
             action={<Badge variant="info" size="sm">음성 인식 기반 참고평가</Badge>}
           />
           <CardBody className="space-y-3">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-text-primary leading-relaxed">
+            <div className="p-4 bg-surface border border-border rounded-lg text-sm text-text-primary leading-relaxed">
               {transcript}
             </div>
             <p className="text-xs text-text-muted">

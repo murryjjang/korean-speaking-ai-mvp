@@ -248,7 +248,7 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
         <CardBody>
           <p className="text-sm text-text-secondary mb-3">{scenario.situation}</p>
           <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
-            <span className="inline-flex items-center bg-slate-100 text-slate-600 rounded px-2 py-0.5">
+            <span className="inline-flex items-center bg-surface text-text-secondary rounded px-2 py-0.5">
               {scenario.persona.name} · {scenario.persona.role}
             </span>
             <span>예상 {scenario.estimatedMinutes}분</span>
@@ -286,7 +286,7 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
                   ) : status === 'in_progress' ? (
                     <span className="w-5 h-5 rounded-full border-2 border-primary-700 bg-primary-50 shrink-0" />
                   ) : (
-                    <span className="w-5 h-5 rounded-full border-2 border-slate-300 shrink-0" />
+                    <span className="w-5 h-5 rounded-full border-2 border-border-strong shrink-0" />
                   )}
                   <span
                     className={
@@ -328,7 +328,7 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
             <span
               key={dim.id}
               title={dim.description}
-              className="inline-flex items-center text-xs bg-slate-100 text-slate-600 rounded px-2 py-1"
+              className="inline-flex items-center text-xs bg-surface text-text-secondary rounded px-2 py-1"
             >
               {dim.label}
             </span>
@@ -394,7 +394,7 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
                       <div
                         className={`text-sm px-3 py-2 rounded-lg leading-relaxed ${
                           item.role === 'ai'
-                            ? 'bg-slate-100 text-text-primary'
+                            ? 'bg-surface text-text-primary'
                             : 'bg-primary-700 text-white'
                         }`}
                       >
@@ -407,7 +407,7 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
                   <div className="flex gap-2">
                     <div className="flex flex-col gap-0.5 max-w-[75%] items-start">
                       <span className="text-xs text-text-muted px-1">{scenario.persona.name}</span>
-                      <div className="text-sm px-3 py-2 rounded-lg bg-slate-100 text-text-muted">
+                      <div className="text-sm px-3 py-2 rounded-lg bg-surface text-text-muted">
                         <span className="animate-pulse">...</span>
                       </div>
                     </div>
@@ -474,7 +474,7 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
                     <Link
                       href="/student/mission"
-                      className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 w-full sm:w-auto"
+                      className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-text-primary hover:bg-slate-50 border border-border-strong w-full sm:w-auto"
                     >
                       목록으로
                     </Link>

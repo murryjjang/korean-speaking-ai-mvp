@@ -25,7 +25,7 @@ export function WizardStepIndicator({ currentStep, isFinalized }: WizardStepIndi
                     ? 'bg-success-500 text-white'
                     : isActive
                       ? 'bg-primary-700 text-white'
-                      : 'bg-slate-200 text-slate-500',
+                      : 'bg-slate-200 text-text-muted',
                 ].join(' ')}
               >
                 {isDone ? '✓' : step.num}

@@ -439,7 +439,7 @@ export default async function SpeakingResultPage({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2 pb-4">
             <Link
               href="/student"
-              className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-text-primary hover:bg-slate-50 border border-border-strong w-full sm:w-auto"
             >
               학습 현황으로
             </Link>
@@ -1006,16 +1006,16 @@ export default async function SpeakingResultPage({
             )}
             {/* q4 대화 미션: mock provider 안내 (소형, 학습자 친화적) */}
             {isDialogueMission && sttResult.providerName === 'mock' && (
-              <div className="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-md" data-testid="q4-mock-provider-notice">
-                <p className="text-xs text-slate-600 leading-relaxed">
+              <div className="mb-3 p-3 bg-surface border border-border rounded-md" data-testid="q4-mock-provider-notice">
+                <p className="text-xs text-text-secondary leading-relaxed">
                   현재는 테스트용 대화 provider로 평가되었습니다. 실제 LLM 연결 후 대화 품질은 추가 개선됩니다.
                 </p>
               </div>
             )}
             {/* 비 q4: mock fallback 경고 */}
             {!isDialogueMission && sttResult.providerName === 'mock' && (
-              <div className="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-md">
-                <p className="text-xs text-slate-600 leading-relaxed">
+              <div className="mb-3 p-3 bg-surface border border-border rounded-md">
+                <p className="text-xs text-text-secondary leading-relaxed">
                   음성 인식 서비스에 연결하지 못해 테스트용 텍스트로 평가되었습니다. 결과가 실제 발화와 다를 수 있습니다.
                 </p>
               </div>
@@ -1373,14 +1373,14 @@ export default async function SpeakingResultPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2 pb-4">
           <Link
             href="/student"
-            className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 w-full sm:w-auto"
+            className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-text-primary hover:bg-slate-50 border border-border-strong w-full sm:w-auto"
           >
             학습 현황으로
           </Link>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Link
               href={`/student/speaking/${questionId}`}
-              className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-text-primary hover:bg-slate-50 border border-border-strong w-full sm:w-auto"
             >
               다시 도전하기
             </Link>

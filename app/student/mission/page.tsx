@@ -75,7 +75,7 @@ export default function MissionListPage() {
                       <span
                         key={dim.id}
                         title={dim.description}
-                        className="inline-flex items-center text-xs bg-slate-100 text-slate-600 rounded px-2 py-1"
+                        className="inline-flex items-center text-xs bg-surface text-text-secondary rounded px-2 py-1"
                       >
                         {dim.label}
                       </span>

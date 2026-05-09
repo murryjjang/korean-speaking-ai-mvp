@@ -457,8 +457,8 @@ export default function AdminAnalyticsPage() {
       </section>
 
       {/* 하단 안내 */}
-      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
-        <p className="font-semibold text-slate-700">Known Issues (개발자 참고)</p>
+      <div className="p-4 bg-surface border border-border rounded-xl text-xs text-text-secondary space-y-1">
+        <p className="font-semibold text-text-primary">Known Issues (개발자 참고)</p>
         <ul className="space-y-0.5 list-disc list-inside">
           <li>현재 분석 화면은 1차 시연용 샘플 데이터 기반 — 실제 운영 후 Supabase 평가 결과와 연결 예정</li>
           <li>학습자 식별자는 개인정보 보호를 위해 익명화 필요</li>

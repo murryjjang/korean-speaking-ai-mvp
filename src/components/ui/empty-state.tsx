@@ -17,7 +17,7 @@ export function EmptyState({
     <div
       className={`flex flex-col items-center justify-center py-12 text-center px-6 ${className}`}
     >
-      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+      <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center mb-4">
         <svg
           className="w-6 h-6 text-text-muted"
           fill="none"
