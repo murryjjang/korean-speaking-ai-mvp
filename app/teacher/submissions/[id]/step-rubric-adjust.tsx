@@ -91,7 +91,7 @@ export function StepRubricAdjust({
         </p>
         <p>AI 점수를 초기값으로 참고하세요. 교수자 판단에 따라 조정 후 최종 확정합니다.</p>
         <p className="mt-1 text-info-600">
-          <span className="font-medium">ETRI 발음 원점수</span>는 학습자 결과 화면에서 확인할 수 있습니다.
+          <span className="font-medium">발음 원점수</span>는 학습자 결과 화면에서 확인할 수 있습니다.
           파일럿 기간에는 발음 점수를 보정 전 참고값으로 취급하며, 교수자 검토 후 반영 여부를 결정합니다.
         </p>
       </div>
