@@ -429,6 +429,17 @@ export function PresentationPracticeClient() {
   const [script, setScript] = useState(DEFAULT_SCRIPT)
   const [speed, setSpeed] = useState<SpeedOption>(1.0)
   const [showCorrection, setShowCorrection] = useState(false)
+  // 23: AI 교정 결과 (LLM 또는 mock fallback)
+  type CorrectionItem = { original: string; corrected: string; reason: string }
+  type CorrectionResult = {
+    source: 'llm' | 'mock'
+    corrected_text: string
+    corrections: CorrectionItem[]
+  }
+  const [correctionResult, setCorrectionResult] = useState<CorrectionResult | null>(null)
+  const [correctionLoading, setCorrectionLoading] = useState(false)
+  const [correctionError, setCorrectionError] = useState<string | null>(null)
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
   const [targetSec, setTargetSec] = useState(60)
   // Feedback source mirrors q4's dialogueEvalSource pattern: 'llm' when a real
   // LLM response is shown, 'mock' for the demo/fallback content. Today the
@@ -464,7 +475,9 @@ export function PresentationPracticeClient() {
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null)
 
   // Reference text used as both karaoke target and Azure pronunciation reference
-  const referenceText = (showCorrection ? DEFAULT_CORRECTED : (script || DEFAULT_SCRIPT)).trim()
+  // 교정 결과가 있으면 그 corrected_text를, 없으면 demo, 그것도 없으면 학습자 입력 사용
+  const correctionDisplayText = correctionResult?.corrected_text ?? DEFAULT_CORRECTED
+  const referenceText = (showCorrection ? correctionDisplayText : (script || DEFAULT_SCRIPT)).trim()
   const referenceWords = useMemo(
     () => referenceText.split(/\s+/).filter(Boolean),
     [referenceText],
@@ -947,7 +960,7 @@ export function PresentationPracticeClient() {
             className="w-full rounded-md border border-border bg-surface text-text-primary text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
             data-testid="script-input"
           />
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap items-center">
             <button
               onClick={() => {
                 setScript(DEFAULT_SCRIPT)
@@ -959,32 +972,97 @@ export function PresentationPracticeClient() {
               샘플 원고 불러오기
             </button>
             <button
-              onClick={() => setShowCorrection(true)}
-              className="px-3 py-1.5 rounded-md bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 transition-colors"
+              onClick={async () => {
+                const trimmed = (script || '').trim()
+                if (trimmed.length < 5) {
+                  setCorrectionError('원고를 먼저 작성해주세요 (5자 이상).')
+                  return
+                }
+                if (trimmed.length > 5000) {
+                  setCorrectionError('원고가 너무 깁니다. 5000자 이내로 작성해주세요.')
+                  return
+                }
+                setCorrectionError(null)
+                setCorrectionLoading(true)
+                try {
+                  const res = await fetch('/api/presentation/correct', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script: trimmed }),
+                  })
+                  if (!res.ok) {
+                    throw new Error(`status_${res.status}`)
+                  }
+                  const data = await res.json()
+                  if (typeof data?.corrected_text !== 'string' || !Array.isArray(data?.corrections)) {
+                    throw new Error('invalid_shape')
+                  }
+                  setCorrectionResult({
+                    source: data.source === 'llm' ? 'llm' : 'mock',
+                    corrected_text: data.corrected_text,
+                    corrections: data.corrections,
+                  })
+                  setShowCorrection(true)
+                } catch (err) {
+                  console.error('[presentation correct] error', err)
+                  setCorrectionError('교정 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+                  // 폴백: 시연이 깨지지 않도록 demo 결과를 보여준다
+                  setCorrectionResult({
+                    source: 'mock',
+                    corrected_text: DEFAULT_CORRECTED,
+                    corrections: DEMO_CORRECTIONS.map(c => ({
+                      original: c.original,
+                      corrected: c.corrected,
+                      reason: c.koExplain,
+                    })),
+                  })
+                  setShowCorrection(true)
+                } finally {
+                  setCorrectionLoading(false)
+                }
+              }}
+              disabled={correctionLoading}
+              className="px-3 py-1.5 rounded-md bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 transition-colors disabled:opacity-60 disabled:cursor-wait inline-flex items-center gap-1.5"
               data-testid="btn-ai-correction"
             >
-              AI 원고 교정하기
+              {correctionLoading ? (
+                <>
+                  <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>교정 중...</span>
+                </>
+              ) : (
+                <span>AI 원고 교정하기</span>
+              )}
             </button>
           </div>
+          {correctionError && (
+            <p className="text-xs text-red-600" data-testid="correction-error">
+              {correctionError}
+            </p>
+          )}
         </CardBody>
       </Card>
 
       {/* AI 교정 결과 */}
-      {showCorrection && (
+      {showCorrection && correctionResult && (
         <Card data-testid="correction-card">
           <CardHeader
             title="AI 원고 교정 결과"
-            action={<Badge variant="info" size="sm">시연용 샘플</Badge>}
+            action={
+              <Badge variant="info" size="sm">
+                {correctionResult.source === 'llm' ? 'AI 교정' : '시연용 샘플'}
+              </Badge>
+            }
           />
           <CardBody className="space-y-4">
             <p className="text-xs text-text-muted">
-              아래 교정문은 {level} 학습자가 발표하기 쉽도록 문장을 자연스럽게 연결한 예시입니다.
+              아래 교정문은 {level} 학습자가 격식체로 발표하기 쉽도록 다듬은 결과입니다.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                  원문
+                  내가 쓴 원고
                 </p>
                 <div className="p-3 bg-surface border border-border rounded-lg text-sm text-text-primary leading-relaxed">
                   {script || DEFAULT_SCRIPT}
@@ -992,58 +1070,94 @@ export function PresentationPracticeClient() {
               </div>
               <div>
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                  교정문
+                  AI 교정 (격식체)
                 </p>
                 <div
                   className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800 leading-relaxed"
                   data-testid="corrected-text"
                 >
-                  {DEFAULT_CORRECTED}
+                  {correctionResult.corrected_text}
                 </div>
               </div>
             </div>
 
-            <div className="p-3 bg-surface border border-border rounded-lg">
-              <p className="text-xs font-semibold text-text-muted mb-2">핵심 수정 포인트</p>
-              <ul className="text-xs text-text-secondary space-y-1">
-                <li>• 문장 연결 개선 (-아서/어서 활용)</li>
-                <li>• 연결어 개선 (그리고 → 그 후)</li>
-                <li>• 감정 표현 강화 (매우 추가)</li>
-                <li>• 발표 흐름 자연화</li>
-              </ul>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowReplaceConfirm(true)}
+                className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors"
+                data-testid="btn-replace-with-correction"
+              >
+                교정본으로 교체
+              </button>
             </div>
+
+            {showReplaceConfirm && (
+              <div
+                className="p-3 bg-amber-50 border border-amber-300 rounded-lg space-y-2"
+                data-testid="replace-confirm"
+              >
+                <p className="text-xs text-amber-900">
+                  교정본으로 교체하면 위 입력 영역의 내 원고가 사라집니다. 진행하시겠어요?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setScript(correctionResult.corrected_text)
+                      setShowReplaceConfirm(false)
+                    }}
+                    className="px-3 py-1 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors"
+                    data-testid="btn-replace-confirm"
+                  >
+                    네, 교체할게요
+                  </button>
+                  <button
+                    onClick={() => setShowReplaceConfirm(false)}
+                    className="px-3 py-1 rounded-md bg-surface border border-border text-text-secondary text-xs font-medium hover:bg-slate-50 transition-colors"
+                    data-testid="btn-replace-cancel"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                한국어 설명
+                차이점
               </p>
               <div className="space-y-2" data-testid="correction-ko-explain">
-                {DEMO_CORRECTIONS.map((c, i) => (
-                  <div key={i} className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <div className="flex flex-wrap gap-2 items-center mb-1 text-xs">
-                      <span className="line-through text-text-muted">{c.original}</span>
-                      <span className="text-amber-600">→</span>
-                      <span className="font-semibold text-amber-700">{c.corrected}</span>
+                {correctionResult.corrections.length === 0 ? (
+                  <p className="text-xs text-text-muted">큰 차이 없이 자연스럽게 작성되었습니다.</p>
+                ) : (
+                  correctionResult.corrections.map((c, i) => (
+                    <div key={i} className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex flex-wrap gap-2 items-center mb-1 text-xs">
+                        <span className="line-through text-text-muted">{c.original}</span>
+                        <span className="text-amber-600">→</span>
+                        <span className="font-semibold text-amber-700">{c.corrected}</span>
+                      </div>
+                      <p className="text-xs text-amber-800">{c.reason}</p>
                     </div>
-                    <p className="text-xs text-amber-800">{c.koExplain}</p>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
-            <div>
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                {NATIVE_LANGS.find(l => l.code === nativeLang)?.label ?? '모국어'} 설명
-              </p>
-              <div
-                className="p-3 bg-primary-50 border border-primary-100 rounded-lg"
-                data-testid="correction-native-explain"
-              >
-                <pre className="text-sm text-primary-800 whitespace-pre-wrap font-sans leading-relaxed">
-                  {nativeCorrectionNote}
-                </pre>
+            {correctionResult.source === 'mock' && (
+              <div>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+                  {NATIVE_LANGS.find(l => l.code === nativeLang)?.label ?? '모국어'} 설명
+                </p>
+                <div
+                  className="p-3 bg-primary-50 border border-primary-100 rounded-lg"
+                  data-testid="correction-native-explain"
+                >
+                  <pre className="text-sm text-primary-800 whitespace-pre-wrap font-sans leading-relaxed">
+                    {nativeCorrectionNote}
+                  </pre>
+                </div>
               </div>
-            </div>
+            )}
           </CardBody>
         </Card>
       )}

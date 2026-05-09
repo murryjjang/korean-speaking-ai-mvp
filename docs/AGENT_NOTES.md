@@ -105,3 +105,24 @@
 - 원인: `reading-practice-client.tsx`의 결과 페이지(line 489-496)에서 `baseStyle`이 `backgroundColor`를 설정하는데, `isCurrent` 분기에서 `background` shorthand로 덮어씀. React 리렌더 시 `background` 속성 제거 + `backgroundColor` 잔존 → 콘솔 경고.
 - 조치: 두 페이지(reading + presentation) 내 모든 `background:` shorthand를 `backgroundColor:`로 통일. 트랜지션 문자열도 `background-color`로 변경. gradient/image 미사용이라 의미 동일.
 - 확인 필요: 회원님이 reading + presentation 페이지에서 콘솔 경고가 사라졌는지 시연 환경에서 검증.
+
+### Phase 22-a — 비용 최적화 로드맵 문서
+
+- `docs/COST_OPTIMIZATION_ROADMAP.md` 신규. 7개 영역(STT, q4 다국어 피드백, LLM 모델, Azure Speech 티어, TTS, 평가 검증, 인프라) 표준 형식으로 정리. 학습자 100명 기준 월 비용·도입 시점·의사결정 가이드 포함.
+- 향후 명세에서 비용·정확도 트레이드오프 발견 시 본 문서에 자동 추가하는 규칙 명시.
+
+### Phase 23 — 발표 AI 교정 버튼
+
+- 신규 API 라우트 `/api/presentation/correct`: q4 OpenAI 인프라와 동일 패턴(SDK 동적 import + JSON response_format).
+  - `OPENAI_API_KEY` 없거나 호출 실패 시 demo `MOCK_CORRECTED` + `MOCK_CORRECTIONS` 폴백 반환 → 시연 깨지지 않음.
+  - 응답 shape: `{ source: 'llm' | 'mock', corrected_text: string, corrections: [{original, corrected, reason}] }`
+  - 모델 우선순위: `OPENAI_PRESENTATION_CORRECT_MODEL` → `OPENAI_DIALOGUE_MODEL` → `OPENAI_EVAL_MODEL` → `gpt-4o-mini`
+- UI 변경 (`presentation-practice-client.tsx`):
+  - `correctionResult` state 도입 → 카드 표시는 LLM 응답 기반.
+  - 기존 정적 `DEFAULT_CORRECTED` / `DEMO_CORRECTIONS` / native explain은 mock fallback으로 유지 (smoke test 호환: corrected-text "가서", correction-ko-explain "-아서/어서", correction-native-explain "Thay vì").
+  - 가드: 5자 미만/5000자 초과 시 호출 차단 + 안내 (`correction-error` testid).
+  - 로딩 상태: 버튼 disabled + spinner + "교정 중..." 텍스트.
+  - "교정본으로 교체" 버튼: 확인 다이얼로그 (`replace-confirm`) 후 textarea의 `script`를 corrected_text로 교체.
+  - 카드 헤더 배지: source='llm'이면 "AI 교정", 'mock'이면 "시연용 샘플".
+- 시연 안전 가드: LLM 호출 자체가 실패해도 mock 폴백을 항상 보여주므로 카드는 반드시 표시됨.
+- 확인 필요: 회원님이 OpenAI 키 설정된 환경에서 실제 LLM 응답이 자연스러운지 검증.
