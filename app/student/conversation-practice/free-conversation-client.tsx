@@ -66,6 +66,15 @@ export function FreeConversationClient() {
   const [summary, setSummary] = useState<SummaryResult | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
 
+  // Phase C: 음성 입력 (q4·발표 STT 패턴 재사용)
+  type VoiceState = 'idle' | 'recording' | 'processing'
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle')
+  const [voiceElapsed, setVoiceElapsed] = useState(0)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const voiceTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
 
   // Auto-scroll on new turn
@@ -139,6 +148,20 @@ export function FreeConversationClient() {
     }
   }, [stage])
 
+  // 컴포넌트 언마운트 시 음성 녹음 인터벌 정리
+  useEffect(() => {
+    return () => {
+      if (voiceTickRef.current) {
+        clearInterval(voiceTickRef.current)
+        voiceTickRef.current = null
+      }
+      const mr = mediaRecorderRef.current
+      if (mr && mr.state === 'recording') {
+        try { mr.stop() } catch { /* noop */ }
+      }
+    }
+  }, [])
+
   // ── 시작 ──────────────────────────────────────────────────────────────────
   const startConversation = useCallback((selectedTopic: string) => {
     const t = selectedTopic.trim()
@@ -152,6 +175,79 @@ export function FreeConversationClient() {
     setSummary(null)
     setChatError(null)
     setStage('chat')
+  }, [])
+
+  // ── 음성 입력 (Phase C) ──────────────────────────────────────────────────
+  // q4·발표 STT 패턴과 동일: MediaRecorder → Blob → POST /api/stt → transcript.
+  // 인식 결과는 input textarea에 자동 입력하고, 학습자가 확인·수정 후 전송한다.
+  const stopVoiceTick = useCallback(() => {
+    if (voiceTickRef.current) {
+      clearInterval(voiceTickRef.current)
+      voiceTickRef.current = null
+    }
+  }, [])
+
+  const startVoiceRecording = useCallback(async () => {
+    if (voiceState !== 'idle' || sending) return
+    setVoiceError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        stopVoiceTick()
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        if (blob.size < 3000) {
+          setVoiceState('idle')
+          setVoiceElapsed(0)
+          setVoiceError('녹음이 너무 짧습니다. 마이크에 가까이 대고 다시 말씀해 주세요.')
+          return
+        }
+        setVoiceState('processing')
+        try {
+          const form = new FormData()
+          form.append('audio', blob, 'recording.webm')
+          form.append('questionId', 'free-conversation')
+          const res = await fetch('/api/stt', { method: 'POST', body: form })
+          const data = await res.json()
+          const transcript = typeof data?.transcript === 'string' ? data.transcript.trim() : ''
+          if (!transcript) {
+            setVoiceError('음성을 인식하지 못했습니다. 다시 시도하거나 텍스트로 입력해 주세요.')
+          } else {
+            setInput((prev) => (prev ? `${prev} ${transcript}` : transcript))
+          }
+        } catch (err) {
+          console.error('[free-conversation] STT error', err)
+          setVoiceError('음성 인식 중 오류가 발생했습니다. 텍스트로 입력해 주세요.')
+        } finally {
+          setVoiceState('idle')
+          setVoiceElapsed(0)
+        }
+      }
+      mediaRecorderRef.current = mr
+      mr.start()
+      setVoiceState('recording')
+      setVoiceElapsed(0)
+      voiceTickRef.current = setInterval(() => {
+        setVoiceElapsed((p) => p + 1)
+      }, 1000)
+    } catch (err) {
+      console.error('[free-conversation] mic error', err)
+      setVoiceError('마이크 권한이 필요합니다. 브라우저 권한을 확인해 주세요.')
+      setVoiceState('idle')
+    }
+  }, [voiceState, sending, stopVoiceTick])
+
+  const stopVoiceRecording = useCallback(() => {
+    const mr = mediaRecorderRef.current
+    if (mr && mr.state === 'recording') {
+      mr.stop()
+      mediaRecorderRef.current = null
+    }
   }, [])
 
   // ── 발화 전송 ─────────────────────────────────────────────────────────────
@@ -373,6 +469,9 @@ export function FreeConversationClient() {
           {chatError && (
             <p className="text-xs text-red-600 mb-2" data-testid="conversation-error">{chatError}</p>
           )}
+          {voiceError && (
+            <p className="text-xs text-amber-700 mb-2" data-testid="voice-error">{voiceError}</p>
+          )}
           <div className="flex items-end gap-2">
             <textarea
               value={input}
@@ -387,17 +486,54 @@ export function FreeConversationClient() {
               placeholder={timeUp ? '시간이 종료되어 입력할 수 없습니다.' : '한국어로 자유롭게 입력하세요. (Enter 전송, Shift+Enter 줄바꿈)'}
               className="flex-1 rounded-md border border-border bg-surface text-text-primary text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
               data-testid="conversation-input"
-              disabled={sending || timeUp}
+              disabled={sending || timeUp || voiceState !== 'idle'}
             />
-            <button
-              onClick={() => void sendMessage()}
-              disabled={sending || timeUp || input.trim().length === 0}
-              className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="btn-send-message"
-            >
-              전송
-            </button>
+            <div className="flex flex-col gap-1.5">
+              {voiceState === 'idle' && (
+                <button
+                  onClick={() => void startVoiceRecording()}
+                  disabled={sending || timeUp}
+                  title="음성으로 입력"
+                  className="px-3 py-2 rounded-md bg-surface border border-border text-text-secondary text-xs font-medium hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                  data-testid="btn-voice-start"
+                >
+                  <span aria-hidden>🎤</span>
+                  <span>음성</span>
+                </button>
+              )}
+              {voiceState === 'recording' && (
+                <button
+                  onClick={() => stopVoiceRecording()}
+                  className="px-3 py-2 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors inline-flex items-center gap-1"
+                  data-testid="btn-voice-stop"
+                  title="녹음 중지"
+                >
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" aria-hidden />
+                  <span className="font-mono tabular-nums">{formatTime(voiceElapsed)}</span>
+                </button>
+              )}
+              {voiceState === 'processing' && (
+                <span
+                  className="px-3 py-2 rounded-md bg-surface border border-border text-text-secondary text-xs font-medium inline-flex items-center gap-1"
+                  data-testid="voice-processing"
+                >
+                  <span className="inline-block w-3 h-3 border-2 border-text-muted border-t-transparent rounded-full animate-spin" />
+                  <span>인식 중</span>
+                </span>
+              )}
+              <button
+                onClick={() => void sendMessage()}
+                disabled={sending || timeUp || voiceState !== 'idle' || input.trim().length === 0}
+                className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-send-message"
+              >
+                전송
+              </button>
+            </div>
           </div>
+          <p className="mt-2 text-[11px] text-text-muted">
+            🎤 버튼으로 음성 입력 후 텍스트를 확인하고 “전송”을 누르세요. 텍스트 직접 입력도 가능합니다.
+          </p>
         </div>
       </div>
     )

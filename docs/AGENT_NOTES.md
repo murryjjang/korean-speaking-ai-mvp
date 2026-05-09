@@ -145,3 +145,24 @@
 - 매 턴 교정 표시: `learner_correction.corrected !== original`이면 ✏️ 줄긋기 + 화살표 + 이유. 같으면 ✓ + 칭찬.
 - 종료 화면: source 배지 (AI 요약 / 시연용 샘플), 한·베·영 stacked 요약, 잘한 점/개선할 점 3언어, 대화 히스토리 (스크롤), "다시 대화하기" 버튼 (시작 화면 복귀).
 - 회귀 영향: smoke test `/student/conversation-practice 페이지 정상 렌더링` + `persona card에 dialectHint` 두 개는 placeholder 페이지 기준이라 새 화면에 맞춰 update. q4/q1/q3/읽기/발표 mock conversation provider는 변경 없음 (가드 5 준수).
+
+### Phase 23-a — 톤 선택 + 인라인 보기 + 음성 입력
+
+- **A. 톤 선택 (formal/general/casual)**
+  - `/api/presentation/correct`: body에 `tone` 추가. `buildSystemPrompt(tone)`이 톤별 어말어미 가이드를 시스템 프롬프트에 반영. mock 폴백도 `MOCK_BY_TONE`으로 톤별 다른 결과 (격식체/일반체/친근체 각 corrected_text + corrections) 반환.
+  - 발표 페이지: `correctionTone` state + 드롭다운(`correction-tone-select`). 친근체 선택 시 안내(`correction-tone-hint`).
+- **B. 분리/인라인 탭**
+  - `correctionViewMode` state + 탭(`tab-view-separate` / `tab-view-inline`).
+  - 분리: 기존 그대로(원본 박스 + 교정 박스 + 차이점 카드).
+  - 인라인: `CorrectionInlineView` 컴포넌트가 `script` 위에 corrections를 splice. `original` 매칭 안 되면 해당 항목만 skip, 모두 실패하면 안내 표시. 색상은 명세 대로 #888780(취소선) + #C8543C(교정).
+  - 호버 툴팁: `<span title={reason}>` (네이티브 툴팁, 추가 라이브러리 X).
+- **C. 자유 대화 음성 입력**
+  - 발표 STT 패턴 그대로 차용: `getUserMedia` + `MediaRecorder` + POST `/api/stt` (FormData `audio` + `questionId='free-conversation'`).
+  - state machine: `voiceState` = 'idle' | 'recording' | 'processing'. 녹음 중에는 timer 표시 + 빨간 정지 버튼, 처리 중에는 spinner.
+  - 인식 결과는 input textarea에 자동 입력 (이전 텍스트 있으면 공백 + append). 자동 전송 X — 학습자가 확인·수정·전송.
+  - 가드: 녹음 < 3000 bytes면 폴백 메시지("너무 짧음"). 마이크 거부 시 안내.
+  - 컴포넌트 언마운트 시 인터벌 + recorder 정리.
+- 확인 필요: 회원님이 시연 환경에서
+  - 톤 3종이 실제 LLM에서 다른 어말어미로 응답하는지 (mock에서는 톤별 결과 보장됨)
+  - 인라인 보기에서 corrections.original이 학습자 원본과 매칭되는 비율
+  - 음성 입력의 STT 정확도 (Whisper 한국어 기준).
