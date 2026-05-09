@@ -45,6 +45,68 @@ const PRONUNCIATION_CRITERIA = [
   { key: 'completeness', label: '완성도' },
 ] as const
 
+// q4 대화 미션 다국어 피드백 — 점수 + 미션 달성 비율로 톤 조정
+// LLM 호출 없이 정적 템플릿 사용. 학습자에게 동일한 정보를 모국어로 보조 전달.
+function dialogueMultilingualFeedback(
+  overallScore: number,
+  achieved: number,
+  total: number,
+): { vi: { strengths: string[]; nextSteps: string[] }; en: { strengths: string[]; nextSteps: string[] } } {
+  const ratio = total > 0 ? achieved / total : overallScore / 100
+  if (overallScore >= 80 && ratio >= 0.75) {
+    return {
+      vi: {
+        strengths: [
+          'Bạn đã hoàn thành hầu hết các mục tiêu của nhiệm vụ.',
+          'Cuộc hội thoại tự nhiên và tiếng Hàn của bạn dễ hiểu.',
+        ],
+        nextSteps: ['Lần sau, hãy thử dùng các cách diễn đạt phong phú hơn để nói tự nhiên hơn.'],
+      },
+      en: {
+        strengths: [
+          'You completed most of the mission goals.',
+          'Your conversation flowed naturally and your Korean was easy to follow.',
+        ],
+        nextSteps: ['Next time, try varying your expressions to sound even more natural.'],
+      },
+    }
+  }
+  if (overallScore >= 60 || ratio >= 0.5) {
+    return {
+      vi: {
+        strengths: ['Bạn đã đạt được một số mục tiêu của nhiệm vụ.'],
+        nextSteps: [
+          'Hãy nói thêm các mục tiêu còn thiếu trong khung "보완할 점" ở trên.',
+          'Khi đặt hàng, hãy nói rõ số lượng và cách thanh toán.',
+        ],
+      },
+      en: {
+        strengths: ['You achieved several of the mission goals.'],
+        nextSteps: [
+          'Address the remaining items listed in "보완할 점" above.',
+          'When ordering, state the quantity and payment method clearly.',
+        ],
+      },
+    }
+  }
+  return {
+    vi: {
+      strengths: ['Bạn đã cố gắng giao tiếp với NPC bằng tiếng Hàn.'],
+      nextSteps: [
+        'Hãy nghe câu hỏi của NPC kỹ hơn và trả lời theo từng bước.',
+        'Đừng bỏ qua các mục tiêu: chọn món, số lượng, ăn tại chỗ/mang đi, cách thanh toán.',
+      ],
+    },
+    en: {
+      strengths: ['You attempted to communicate with the NPC in Korean.'],
+      nextSteps: [
+        'Listen carefully to each NPC question and respond step by step.',
+        'Cover every mission goal: order item, quantity, dine-in/takeout, and payment method.',
+      ],
+    },
+  }
+}
+
 // mock wordScores → 평가 기준 점수 정규화 헬퍼
 // ETRI 연동 시 criterion-level 데이터를 직접 사용하도록 확장 가능
 function normalizePronunciationDisplay(
@@ -1014,6 +1076,59 @@ export default async function SpeakingResultPage({
             )}
           </CardBody>
         </Card>
+
+        {/* q4 다국어 피드백 — 베트남어 + 영어 */}
+        {isDialogueMission && (() => {
+          const ml = dialogueMultilingualFeedback(displayScore, achievedMissionGoals, totalMissionGoals)
+          return (
+            <Card data-testid="q4-multilingual-feedback">
+              <CardHeader
+                title="모국어 피드백"
+                description="한국어 평가 내용을 베트남어와 영어로 보조 안내합니다."
+              />
+              <CardBody className="space-y-5">
+                <div data-testid="q4-feedback-vi">
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+                    베트남어 (Tiếng Việt)
+                  </p>
+                  <div className="space-y-2">
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
+                      <ul className="text-sm text-emerald-700 space-y-1">
+                        {ml.vi.strengths.map((t, i) => <li key={i}>• {t}</li>)}
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-xs font-semibold text-amber-700 mb-1">다음 목표</p>
+                      <ul className="text-sm text-amber-700 space-y-1">
+                        {ml.vi.nextSteps.map((t, i) => <li key={i}>• {t}</li>)}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <div data-testid="q4-feedback-en">
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+                    영어 (English)
+                  </p>
+                  <div className="space-y-2">
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
+                      <ul className="text-sm text-emerald-700 space-y-1">
+                        {ml.en.strengths.map((t, i) => <li key={i}>• {t}</li>)}
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-xs font-semibold text-amber-700 mb-1">다음 목표</p>
+                      <ul className="text-sm text-amber-700 space-y-1">
+                        {ml.en.nextSteps.map((t, i) => <li key={i}>• {t}</li>)}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+          )
+        })()}
 
         {/* STT 전사 결과 / q4: 대화 기록 */}
         <Card>
