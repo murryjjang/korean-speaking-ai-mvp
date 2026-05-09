@@ -1,7 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
+
+// 클라이언트 마운트 후 speechSynthesis 지원 여부를 동기적으로 노출.
+// useEffect + setState 패턴은 React 19 react-hooks/set-state-in-effect 룰에 걸림.
+const subscribeNoop = () => () => {}
+const getTtsSupportedSnapshot = () =>
+  typeof window !== 'undefined' && 'speechSynthesis' in window
+const getTtsSupportedServerSnapshot = () => false
 
 // 추천 주제 5개 (시연 ⭐: 첫번째 주제)
 const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string; demo?: boolean }> = [
@@ -14,6 +21,7 @@ const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string; demo?: bool
 
 const TOTAL_SECONDS = 600 // 10분
 const WARNING_AT = 480 // 8분 (남은 2분 경고)
+const VOICE_AUTO_SEND_SECONDS = 3 // 음성 입력 후 자동 전송 카운트다운 (취소 가능)
 
 type ChatTurn = {
   role: 'ai' | 'student'
@@ -76,12 +84,18 @@ export function FreeConversationClient() {
   const voiceTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // 명세 23-b 1-B: NPC 음성 출력 (브라우저 TTS)
-  const [ttsSupported, setTtsSupported] = useState(false)
+  const ttsSupported = useSyncExternalStore(
+    subscribeNoop,
+    getTtsSupportedSnapshot,
+    getTtsSupportedServerSnapshot,
+  )
   const [ttsAutoPlay, setTtsAutoPlay] = useState(true)
   const [speakingTurnIdx, setSpeakingTurnIdx] = useState<number | null>(null)
-  useEffect(() => {
-    setTtsSupported(typeof window !== 'undefined' && 'speechSynthesis' in window)
-  }, [])
+
+  // 명세 23-b 1-C: 음성 입력 후 3초 카운트다운 자동 전송 (취소 가능)
+  const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null)
+  const autoSendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pendingAutoSendTextRef = useRef<string | null>(null)
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -163,6 +177,10 @@ export function FreeConversationClient() {
         clearInterval(voiceTickRef.current)
         voiceTickRef.current = null
       }
+      if (autoSendTimerRef.current) {
+        clearInterval(autoSendTimerRef.current)
+        autoSendTimerRef.current = null
+      }
       const mr = mediaRecorderRef.current
       if (mr && mr.state === 'recording') {
         try { mr.stop() } catch { /* noop */ }
@@ -171,6 +189,16 @@ export function FreeConversationClient() {
         try { window.speechSynthesis.cancel() } catch { /* noop */ }
       }
     }
+  }, [])
+
+  // ── 음성 입력 후 자동 전송 카운트다운 (Phase 1-C) ────────────────────────────
+  const cancelAutoSend = useCallback(() => {
+    if (autoSendTimerRef.current) {
+      clearInterval(autoSendTimerRef.current)
+      autoSendTimerRef.current = null
+    }
+    pendingAutoSendTextRef.current = null
+    setAutoSendCountdown(null)
   }, [])
 
   // ── NPC TTS (Phase 1-B) ──────────────────────────────────────────────────
@@ -216,89 +244,15 @@ export function FreeConversationClient() {
     setStage('chat')
   }, [])
 
-  // ── 음성 입력 (Phase C) ──────────────────────────────────────────────────
-  // q4·발표 STT 패턴과 동일: MediaRecorder → Blob → POST /api/stt → transcript.
-  // 인식 결과는 input textarea에 자동 입력하고, 학습자가 확인·수정 후 전송한다.
-  const stopVoiceTick = useCallback(() => {
-    if (voiceTickRef.current) {
-      clearInterval(voiceTickRef.current)
-      voiceTickRef.current = null
-    }
-  }, [])
-
-  const startVoiceRecording = useCallback(async () => {
-    if (voiceState !== 'idle' || sending) return
-    setVoiceError(null)
-    // 녹음과 NPC 음성 충돌 방지: 재생 중이면 즉시 중단
-    stopSpeaking()
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mr = new MediaRecorder(stream)
-      audioChunksRef.current = []
-      mr.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data)
-      }
-      mr.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
-        stopVoiceTick()
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        if (blob.size < 3000) {
-          setVoiceState('idle')
-          setVoiceElapsed(0)
-          setVoiceError('녹음이 너무 짧습니다. 마이크에 가까이 대고 다시 말씀해 주세요.')
-          return
-        }
-        setVoiceState('processing')
-        try {
-          const form = new FormData()
-          form.append('audio', blob, 'recording.webm')
-          form.append('questionId', 'free-conversation')
-          const res = await fetch('/api/stt', { method: 'POST', body: form })
-          const data = await res.json()
-          const transcript = typeof data?.transcript === 'string' ? data.transcript.trim() : ''
-          if (!transcript) {
-            setVoiceError('음성을 인식하지 못했습니다. 다시 시도하거나 텍스트로 입력해 주세요.')
-          } else {
-            setInput((prev) => (prev ? `${prev} ${transcript}` : transcript))
-          }
-        } catch (err) {
-          console.error('[free-conversation] STT error', err)
-          setVoiceError('음성 인식 중 오류가 발생했습니다. 텍스트로 입력해 주세요.')
-        } finally {
-          setVoiceState('idle')
-          setVoiceElapsed(0)
-        }
-      }
-      mediaRecorderRef.current = mr
-      mr.start()
-      setVoiceState('recording')
-      setVoiceElapsed(0)
-      voiceTickRef.current = setInterval(() => {
-        setVoiceElapsed((p) => p + 1)
-      }, 1000)
-    } catch (err) {
-      console.error('[free-conversation] mic error', err)
-      setVoiceError('마이크 권한이 필요합니다. 브라우저 권한을 확인해 주세요.')
-      setVoiceState('idle')
-    }
-  }, [voiceState, sending, stopVoiceTick, stopSpeaking])
-
-  const stopVoiceRecording = useCallback(() => {
-    const mr = mediaRecorderRef.current
-    if (mr && mr.state === 'recording') {
-      mr.stop()
-      mediaRecorderRef.current = null
-    }
-  }, [])
-
   // ── 발화 전송 ─────────────────────────────────────────────────────────────
-  const sendMessage = useCallback(async () => {
-    const trimmed = input.trim()
+  const sendMessageWithText = useCallback(async (rawText: string) => {
+    const trimmed = rawText.trim()
     if (!trimmed || sending) return
     if (trimmed.length > 1000) {
       setChatError('한 번에 1000자까지만 입력할 수 있어요.')
       return
     }
+    cancelAutoSend()
     setChatError(null)
     setSending(true)
 
@@ -349,7 +303,116 @@ export function FreeConversationClient() {
     } finally {
       setSending(false)
     }
-  }, [input, sending, turns, topic, ttsAutoPlay, voiceState, speakText])
+  }, [sending, turns, topic, cancelAutoSend, ttsAutoPlay, voiceState, speakText])
+
+  const sendMessage = useCallback(() => sendMessageWithText(input), [sendMessageWithText, input])
+
+  // ── 음성 입력 (Phase C) ──────────────────────────────────────────────────
+  // q4·발표 STT 패턴과 동일: MediaRecorder → Blob → POST /api/stt → transcript.
+  // 인식 결과는 input textarea에 자동 입력하고, 학습자가 확인·수정 후 전송한다.
+  const stopVoiceTick = useCallback(() => {
+    if (voiceTickRef.current) {
+      clearInterval(voiceTickRef.current)
+      voiceTickRef.current = null
+    }
+  }, [])
+
+  const startVoiceRecording = useCallback(async () => {
+    if (voiceState !== 'idle' || sending) return
+    setVoiceError(null)
+    cancelAutoSend()
+    // 녹음과 NPC 음성 충돌 방지: 재생 중이면 즉시 중단
+    stopSpeaking()
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        stopVoiceTick()
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        if (blob.size < 3000) {
+          setVoiceState('idle')
+          setVoiceElapsed(0)
+          setVoiceError('녹음이 너무 짧습니다. 마이크에 가까이 대고 다시 말씀해 주세요.')
+          return
+        }
+        setVoiceState('processing')
+        try {
+          const form = new FormData()
+          form.append('audio', blob, 'recording.webm')
+          form.append('questionId', 'free-conversation')
+          const res = await fetch('/api/stt', { method: 'POST', body: form })
+          const data = await res.json()
+          const transcript = typeof data?.transcript === 'string' ? data.transcript.trim() : ''
+          if (!transcript) {
+            setVoiceError('음성을 인식하지 못했습니다. 다시 시도하거나 텍스트로 입력해 주세요.')
+          } else {
+            // textarea에 표시 (기존 입력이 있으면 공백으로 이어붙임)
+            let nextText = ''
+            setInput((prev) => {
+              nextText = prev ? `${prev} ${transcript}` : transcript
+              return nextText
+            })
+            // 명세 1-C: 음성 입력은 3초 카운트다운 후 자동 전송 (취소 가능)
+            pendingAutoSendTextRef.current = nextText
+            setAutoSendCountdown(VOICE_AUTO_SEND_SECONDS)
+            if (autoSendTimerRef.current) {
+              clearInterval(autoSendTimerRef.current)
+            }
+            autoSendTimerRef.current = setInterval(() => {
+              setAutoSendCountdown((cur) => {
+                if (cur === null) return null
+                const next = cur - 1
+                if (next <= 0) {
+                  // 카운트다운 종료: 인터벌 정리 + 자동 전송
+                  if (autoSendTimerRef.current) {
+                    clearInterval(autoSendTimerRef.current)
+                    autoSendTimerRef.current = null
+                  }
+                  const text = pendingAutoSendTextRef.current
+                  pendingAutoSendTextRef.current = null
+                  if (text && text.trim()) {
+                    void sendMessageWithText(text)
+                  }
+                  return null
+                }
+                return next
+              })
+            }, 1000)
+          }
+        } catch (err) {
+          console.error('[free-conversation] STT error', err)
+          setVoiceError('음성 인식 중 오류가 발생했습니다. 텍스트로 입력해 주세요.')
+        } finally {
+          setVoiceState('idle')
+          setVoiceElapsed(0)
+        }
+      }
+      mediaRecorderRef.current = mr
+      mr.start()
+      setVoiceState('recording')
+      setVoiceElapsed(0)
+      voiceTickRef.current = setInterval(() => {
+        setVoiceElapsed((p) => p + 1)
+      }, 1000)
+    } catch (err) {
+      console.error('[free-conversation] mic error', err)
+      setVoiceError('마이크 권한이 필요합니다. 브라우저 권한을 확인해 주세요.')
+      setVoiceState('idle')
+    }
+  }, [voiceState, sending, stopVoiceTick, stopSpeaking, cancelAutoSend, sendMessageWithText])
+
+  const stopVoiceRecording = useCallback(() => {
+    const mr = mediaRecorderRef.current
+    if (mr && mr.state === 'recording') {
+      mr.stop()
+      mediaRecorderRef.current = null
+    }
+  }, [])
 
   // ── 단계별 렌더 ───────────────────────────────────────────────────────────
 
@@ -443,6 +506,7 @@ export function FreeConversationClient() {
           <button
             onClick={() => {
               stopSpeaking()
+              cancelAutoSend()
               void endConversation(turns, topic)
             }}
             className="px-3 py-1.5 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors"
@@ -577,10 +641,37 @@ export function FreeConversationClient() {
           {voiceError && (
             <p className="text-xs text-amber-700 mb-2" data-testid="voice-error">{voiceError}</p>
           )}
+          {autoSendCountdown !== null && autoSendCountdown > 0 && (
+            <div
+              className="mb-2 flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-amber-50 border border-amber-200"
+              data-testid="auto-send-countdown"
+            >
+              <div className="flex items-center gap-2 text-amber-800">
+                <span
+                  className="text-2xl font-bold tabular-nums leading-none"
+                  data-testid="auto-send-countdown-number"
+                >
+                  {autoSendCountdown}
+                </span>
+                <span className="text-xs">초 후 자동 전송됩니다.</span>
+              </div>
+              <button
+                onClick={() => cancelAutoSend()}
+                className="text-xs px-2.5 py-1 rounded bg-white border border-amber-300 text-amber-800 font-medium hover:bg-amber-100"
+                data-testid="btn-cancel-auto-send"
+              >
+                취소
+              </button>
+            </div>
+          )}
           <div className="flex items-end gap-2">
             <textarea
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value)
+                // 카운트다운 중 학습자가 직접 편집하면 자동 취소
+                if (autoSendCountdown !== null) cancelAutoSend()
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -742,6 +833,7 @@ export function FreeConversationClient() {
         <button
           onClick={() => {
             stopSpeaking()
+            cancelAutoSend()
             setStage('start')
             setTopic('')
             setCustomTopic('')
