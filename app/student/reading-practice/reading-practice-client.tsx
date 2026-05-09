@@ -1,5 +1,6 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { computeEtriWordDiff } from '@/src/lib/etri-word-diff'
@@ -57,6 +58,28 @@ interface AzureResult {
   wordResults: AzureWordResult[]
   latencyMs?: number
 }
+
+// ── 단어 토큰화 (본문 단일 블록 렌더링용) ───────────────────────────────────
+interface WordToken {
+  text: string
+  globalIdx: number
+  lineIdx: number
+  wordIdxInLine: number
+}
+
+function tokenizeReference(lines: string[]): WordToken[] {
+  const tokens: WordToken[] = []
+  let g = 0
+  for (let li = 0; li < lines.length; li++) {
+    const ws = lines[li].split(/\s+/).filter(Boolean)
+    for (let wi = 0; wi < ws.length; wi++) {
+      tokens.push({ text: ws[wi], globalIdx: g++, lineIdx: li, wordIdxInLine: wi })
+    }
+  }
+  return tokens
+}
+
+const WORD_TOKENS: WordToken[] = tokenizeReference(REFERENCE_LINES)
 
 // ── 점수 계산 ────────────────────────────────────────────────────────────────
 function computeWordMatchScore(reference: string, recognized: string): number {
@@ -184,121 +207,156 @@ const NATIVE_FEEDBACK_IMPROVE: Record<string, string> = {
   uz: 'Ba\'zi so\'zlar aniq tanilmadi. Qizil belgilangan so\'zlarni qaytadan o\'qing va gap oxirida aniqroq gapiring.',
 }
 
-// ── LineDiff: 줄별 제시문/내 발화/빨간색 첨삭 ─────────────────────────────────
-function LineDiff({
-  reference,
-  recognized,
-  azureWords,
-}: {
-  reference: string
-  recognized: string
-  azureWords?: AzureWordResult[]
-}) {
+// ── ResultPassage: 단일 흐르는 본문 + 단어별 첨삭 색상 ─────────────────────
+interface ResultPassageWord {
+  text: string
+  lineIdx: number
+  wordIdxInLine: number
+  globalIdx: number
+  errorType: AzureWordResult['errorType']
+  accuracyScore?: number
+}
+
+function alignAzureWordsToReference(azureWords: AzureWordResult[] | null, sttRecognized: string): {
+  words: ResultPassageWord[]
+  insertions: { word: string; afterGlobalIdx: number }[]
+} {
   const strip = (w: string) => w.replace(/[.,!?。、·]/g, '').trim()
+  const out: ResultPassageWord[] = []
+  const insertions: { word: string; afterGlobalIdx: number }[] = []
 
-  // Azure word-level rendering
   if (azureWords && azureWords.length > 0) {
-    const refWords = reference.split(/\s+/).filter(Boolean)
-
-    // Align azure words to reference words
-    type AlignToken = { text: string; errorType: AzureWordResult['errorType'] }
-    const aligned: AlignToken[] = []
     let ai = 0
-    for (const rw of refWords) {
-      if (ai < azureWords.length && strip(azureWords[ai].word) === strip(rw)) {
-        aligned.push({ text: rw, errorType: azureWords[ai].errorType })
+    for (const rt of WORD_TOKENS) {
+      if (ai < azureWords.length && strip(azureWords[ai].word) === strip(rt.text)) {
+        out.push({
+          text: rt.text,
+          lineIdx: rt.lineIdx,
+          wordIdxInLine: rt.wordIdxInLine,
+          globalIdx: rt.globalIdx,
+          errorType: azureWords[ai].errorType,
+          accuracyScore: azureWords[ai].accuracyScore,
+        })
         ai++
       } else {
-        aligned.push({ text: rw, errorType: 'Omission' })
+        out.push({
+          text: rt.text,
+          lineIdx: rt.lineIdx,
+          wordIdxInLine: rt.wordIdxInLine,
+          globalIdx: rt.globalIdx,
+          errorType: 'Omission',
+        })
       }
     }
-    // Remaining azure words as insertions
-    const insertions = azureWords.slice(ai).filter(w => w.errorType === 'Insertion')
-    const hasErrors = aligned.some(tok => tok.errorType !== 'None') || insertions.length > 0
-
-    return (
-      <div className="mt-2 space-y-2">
-        <div className="flex flex-wrap gap-1 text-lg leading-relaxed">
-          {aligned.map((tok, i) => {
-            if (tok.errorType === 'None') {
-              return <span key={i} className="text-emerald-400 font-medium">{tok.text}</span>
-            }
-            if (tok.errorType === 'Omission') {
-              return (
-                <span key={i} className="inline-flex items-center gap-0.5">
-                  <span className="text-red-400 underline decoration-red-400 decoration-dotted font-medium">{tok.text}</span>
-                  <span className="text-[9px] bg-red-900 text-red-300 px-1 rounded leading-none">누락</span>
-                </span>
-              )
-            }
-            return (
-              <span key={i} className="text-red-400 font-medium line-through decoration-red-400">{tok.text}</span>
-            )
-          })}
-          {insertions.map((w, i) => (
-            <span key={`ins-${i}`} className="text-amber-400 font-medium">[{w.word}]</span>
-          ))}
-        </div>
-        {recognized && (
-          <div className="flex flex-wrap gap-1 text-sm leading-relaxed">
-            <span className="text-xs text-text-muted mr-1 self-center shrink-0">내 발화:</span>
-            <span className="text-slate-300">{recognized}</span>
-          </div>
-        )}
-        {!hasErrors && (
-          <p className="text-xs text-emerald-500 italic">제시문과 발화가 대부분 일치합니다.</p>
-        )}
-        {hasErrors && (
-          <p className="text-[10px] text-text-muted italic">
-            음성 인식 결과와 제시문을 비교한 교정 포인트입니다.
-          </p>
-        )}
-      </div>
-    )
+    for (let i = ai; i < azureWords.length; i++) {
+      if (azureWords[i].errorType === 'Insertion') {
+        insertions.push({ word: azureWords[i].word, afterGlobalIdx: WORD_TOKENS.length - 1 })
+      }
+    }
+  } else {
+    const { refTokens } = computeEtriWordDiff(REFERENCE_LINES.join(' '), sttRecognized)
+    for (let i = 0; i < WORD_TOKENS.length; i++) {
+      const t = WORD_TOKENS[i]
+      const matched = refTokens[i]?.matched ?? false
+      out.push({
+        text: t.text,
+        lineIdx: t.lineIdx,
+        wordIdxInLine: t.wordIdxInLine,
+        globalIdx: t.globalIdx,
+        errorType: matched ? 'None' : 'Mispronunciation',
+      })
+    }
   }
+  return { words: out, insertions }
+}
 
-  // STT diff fallback
-  const { refTokens, recTokens } = computeEtriWordDiff(reference, recognized)
-  const hasAnyMismatch = refTokens.some(t => !t.matched) || recTokens.some(t => !t.matched)
+function getResultWordStyle(w: ResultPassageWord): CSSProperties {
+  // ErrorType priority over score
+  if (w.errorType === 'Omission') {
+    return { color: '#DC2626', textDecoration: 'line-through', textDecorationColor: '#DC2626' }
+  }
+  if (w.errorType === 'Mispronunciation') {
+    return { color: '#D97706', textDecoration: 'underline', textDecorationStyle: 'wavy' }
+  }
+  if (typeof w.accuracyScore === 'number' && w.accuracyScore < 80) {
+    return { color: '#D97706', textDecoration: 'underline' }
+  }
+  // 기본: 회색 (정상 단어)
+  return { color: 'var(--text-secondary)' }
+}
+
+function ReadingResultPassage({
+  sttRecognized,
+  azureWords,
+  audioCurrentWordIdx,
+  onWordClick,
+}: {
+  sttRecognized: string
+  azureWords: AzureWordResult[] | null
+  audioCurrentWordIdx?: number | null
+  onWordClick?: (globalIdx: number) => void
+}) {
+  const { words, insertions } = alignAzureWordsToReference(azureWords, sttRecognized)
+  const wordsByLine: ResultPassageWord[][] = REFERENCE_LINES.map(() => [])
+  for (const w of words) wordsByLine[w.lineIdx].push(w)
 
   return (
-    <div className="mt-2 space-y-2">
-      <div className="flex flex-wrap gap-1 text-lg leading-relaxed">
-        {refTokens.map((tok, i) => (
-          <span
-            key={i}
-            className={
-              tok.matched
-                ? 'text-emerald-400 font-medium'
-                : 'text-red-400 font-medium line-through decoration-red-400'
+    <article
+      data-testid="reading-result-passage"
+      className="mx-auto"
+      style={{
+        maxWidth: '720px',
+        padding: '32px 40px',
+        background: '#FAF9F5',
+        border: '0.5px solid var(--border)',
+        borderRadius: 'var(--radius-lg)',
+        fontSize: '1.25rem',
+        lineHeight: 2.0,
+        wordBreak: 'keep-all',
+        color: 'var(--text-primary)',
+      }}
+    >
+      {wordsByLine.map((lineWords, lineIdx) => (
+        <p
+          key={lineIdx}
+          style={{ marginBottom: lineIdx < REFERENCE_LINES.length - 1 ? '1.2em' : 0 }}
+          data-testid={`result-line-${lineIdx}`}
+        >
+          {lineWords.map((w, wi) => {
+            const isCurrent = audioCurrentWordIdx === w.globalIdx
+            const style: CSSProperties = {
+              ...getResultWordStyle(w),
+              padding: '2px 2px',
+              borderRadius: 4,
+              cursor: onWordClick ? 'pointer' : 'default',
+              transition: 'background 0.2s',
+              background: isCurrent ? '#FFF3CD' : 'transparent',
+              ...(isCurrent ? { color: '#1F2D3D' } : {}),
             }
-          >
-            {tok.text}
-          </span>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-1 text-sm leading-relaxed">
-        <span className="text-xs text-text-muted mr-1 self-center shrink-0">내 발화:</span>
-        {recTokens.length > 0 ? recTokens.map((tok, i) => (
-          <span
-            key={i}
-            className={tok.matched ? 'text-slate-300' : 'text-red-400 font-medium'}
-          >
-            {tok.text}
-          </span>
-        )) : (
-          <span className="text-text-muted italic text-xs">인식 결과 없음</span>
-        )}
-      </div>
-      {!hasAnyMismatch && (
-        <p className="text-xs text-emerald-500 italic">제시문과 발화가 대부분 일치합니다.</p>
-      )}
-      {hasAnyMismatch && (
-        <p className="text-[10px] text-text-muted italic">
-          음성 인식 결과와 제시문을 비교한 교정 포인트입니다.
+            return (
+              <span
+                key={wi}
+                data-word-index={w.globalIdx}
+                style={style}
+                onClick={() => onWordClick?.(w.globalIdx)}
+              >
+                {w.text}{wi < lineWords.length - 1 ? ' ' : ''}
+              </span>
+            )
+          })}
+        </p>
+      ))}
+      {insertions.length > 0 && (
+        <p style={{ marginTop: '0.8em', fontSize: '0.95em', color: '#7C3AED' }}>
+          <span style={{ color: 'var(--text-muted)' }}>추가된 단어: </span>
+          {insertions.map((ins, i) => (
+            <span key={i} style={{ marginRight: '0.4em' }}>
+              &ldquo;{ins.word}&rdquo;
+            </span>
+          ))}
         </p>
       )}
-    </div>
+    </article>
   )
 }
 
@@ -322,7 +380,7 @@ export function ReadingPracticeClient() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const seqRef = useRef(0)
   const speedRef = useRef<SpeedOption>(1.0)
-  const lineRefs = useRef<(HTMLDivElement | null)[]>([])
+  const lineRefs = useRef<(HTMLElement | null)[]>([])
 
   // Keep speedRef in sync
   useEffect(() => { speedRef.current = speed }, [speed])
@@ -532,15 +590,6 @@ export function ReadingPracticeClient() {
       setFinalScore(score)
     }
     setPhase('result')
-  }
-
-  // Distribute Azure word results per reference line
-  const getAzureWordsForLine = (lineIdx: number): AzureWordResult[] | undefined => {
-    if (!azureResult?.wordResults?.length) return undefined
-    const refWordCounts = REFERENCE_LINES.map(l => l.split(/\s+/).filter(Boolean).length)
-    let start = 0
-    for (let i = 0; i < lineIdx; i++) start += refWordCounts[i]
-    return azureResult.wordResults.slice(start, start + refWordCounts[lineIdx])
   }
 
   const reset = () => {
@@ -821,48 +870,70 @@ export function ReadingPracticeClient() {
             </CardBody>
           </Card>
 
-          {/* 지문 패널 */}
-          <Card className="bg-slate-900 border-slate-700">
+          {/* 지문 패널 — 기사문 형태 단일 흐르는 본문 */}
+          <Card>
             <CardHeader
               title="읽기 지문 — 도서관에 가는 날"
-              description="줄을 클릭하면 현재 줄이 바뀝니다 · 전체 듣기를 누르면 줄이 순서대로 강조됩니다"
+              description="문장을 클릭하면 현재 줄이 바뀝니다 · 전체 듣기를 누르면 줄이 순서대로 강조됩니다"
             />
-            <CardBody className="space-y-3" data-testid="reference-lines">
-              {REFERENCE_LINES.map((line, i) => {
-                const isPlaying = playingLineIdx === i
-                const isCurrent = currentLine === i && playingLineIdx === null
-                return (
-                  <div
-                    key={i}
-                    ref={el => { lineRefs.current[i] = el }}
-                    onClick={() => { if (playingLineIdx === null) setCurrentLine(i) }}
-                    className={`p-4 rounded-xl cursor-pointer transition-all ${
-                      isPlaying
-                        ? 'bg-primary-800 border-2 border-primary-400 ring-2 ring-primary-400/40 shadow-lg'
-                        : isCurrent
-                          ? 'bg-primary-900 border border-primary-600 ring-1 ring-primary-400/20'
-                          : 'bg-slate-800 border border-slate-700 hover:border-slate-500'
-                    }`}
-                    data-testid={`line-${i}`}
-                  >
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className={`text-xs font-mono ${isPlaying || isCurrent ? 'text-primary-400' : 'text-text-muted'}`}>
-                        {i + 1}행
-                      </span>
-                      {isPlaying && (
-                        <span className="flex items-center gap-1 text-xs text-primary-300 font-medium">
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse" />
-                          재생 중
+            <CardBody>
+              <article
+                data-testid="reference-lines"
+                className="mx-auto"
+                style={{
+                  maxWidth: '720px',
+                  padding: '32px 40px',
+                  background: '#FAF9F5',
+                  border: '0.5px solid var(--border)',
+                  borderRadius: 'var(--radius-lg)',
+                  fontSize: '1.25rem',
+                  lineHeight: 2.0,
+                  wordBreak: 'keep-all',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {REFERENCE_LINES.map((line, lineIdx) => {
+                  const isPlaying = playingLineIdx === lineIdx
+                  const isCurrent = currentLine === lineIdx && playingLineIdx === null
+                  const lineWords = line.split(/\s+/).filter(Boolean)
+                  let baseGlobal = 0
+                  for (let k = 0; k < lineIdx; k++) {
+                    baseGlobal += REFERENCE_LINES[k].split(/\s+/).filter(Boolean).length
+                  }
+                  return (
+                    <p
+                      key={lineIdx}
+                      ref={el => { lineRefs.current[lineIdx] = el }}
+                      onClick={() => { if (playingLineIdx === null) setCurrentLine(lineIdx) }}
+                      data-testid={`line-${lineIdx}`}
+                      data-line-idx={lineIdx}
+                      style={{
+                        marginBottom: lineIdx < REFERENCE_LINES.length - 1 ? '1.2em' : 0,
+                        cursor: playingLineIdx === null ? 'pointer' : 'default',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        margin: '-2px -8px',
+                        transition: 'background 0.2s',
+                        background: isPlaying
+                          ? 'rgba(212, 160, 86, 0.22)'
+                          : isCurrent
+                            ? 'rgba(212, 160, 86, 0.08)'
+                            : 'transparent',
+                      }}
+                    >
+                      {lineWords.map((w, wi) => (
+                        <span
+                          key={wi}
+                          data-word-index={baseGlobal + wi}
+                          data-line-word-index={wi}
+                        >
+                          {w}{wi < lineWords.length - 1 ? ' ' : ''}
                         </span>
-                      )}
-                      {isCurrent && (
-                        <span className="text-xs text-primary-400 font-medium">▶ 현재</span>
-                      )}
-                    </div>
-                    <p className="text-xl font-medium text-slate-100 leading-relaxed">{line}</p>
-                  </div>
-                )
-              })}
+                      ))}
+                    </p>
+                  )
+                })}
+              </article>
             </CardBody>
           </Card>
 
@@ -1014,34 +1085,23 @@ export function ReadingPracticeClient() {
             </CardBody>
           </Card>
 
-          {/* 줄별 첨삭 */}
-          <Card className="bg-slate-900 border-slate-700" data-testid="line-diff-panel">
+          {/* 본문 첨삭 — 단일 흐르는 본문 */}
+          <Card data-testid="line-diff-panel">
             <CardHeader
               title="제시문-발화 비교"
-              description="초록색: 제시문과 일치 · 빨간색: 다르게 인식된 부분 · 누락: 빠진 단어"
+              description="회색: 제시문 단어 · 주황+밑줄: 발음 부정확 · 빨강+취소선: 누락된 단어 · 보라: 추가된 단어"
             />
             <CardBody className="space-y-4">
-              {REFERENCE_LINES.map((refLine, i) => {
-                const recognized = sttLines[i] ?? ''
-                const azureWords = getAzureWordsForLine(i)
-                return (
-                  <div key={i} className="p-4 rounded-xl bg-slate-800 border border-slate-700">
-                    <p className="text-xs text-slate-400 mb-2 font-semibold uppercase tracking-wide">
-                      {i + 1}행 — 제시문
-                    </p>
-                    <p className="text-xl text-slate-100 leading-relaxed mb-1">{refLine}</p>
-                    {recognized ? (
-                      <LineDiff
-                        reference={refLine}
-                        recognized={recognized}
-                        azureWords={azureWords}
-                      />
-                    ) : (
-                      <p className="text-sm text-text-muted italic mt-2">인식 결과 없음</p>
-                    )}
-                  </div>
-                )
-              })}
+              <ReadingResultPassage
+                sttRecognized={sttLines.join(' ')}
+                azureWords={azureResult?.wordResults ?? null}
+              />
+              <div className="p-3 bg-surface border border-border rounded-lg">
+                <p className="text-xs text-text-muted mb-1 font-semibold uppercase tracking-wide">내 발화 (음성 인식)</p>
+                <p className="text-sm text-text-primary leading-relaxed">
+                  {sttLines.join(' ').trim() || <span className="italic text-text-muted">인식 결과 없음</span>}
+                </p>
+              </div>
             </CardBody>
           </Card>
 
