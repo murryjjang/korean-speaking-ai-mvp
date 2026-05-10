@@ -5,6 +5,9 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { computeEtriWordDiff } from '@/src/lib/etri-word-diff'
 import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
+import { useLanguageHelper } from '@/src/hooks/use-language-helper'
+import { FeedbackLanguageToggle } from '@/src/components/feedback/feedback-language-toggle'
+import { isRTL, L1_LABEL_KO } from '@/src/lib/feedback-language'
 
 // ── 지문 ────────────────────────────────────────────────────────────────────
 const REFERENCE_LINES = [
@@ -543,6 +546,8 @@ function ReadingResultPassage({
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 export function ReadingPracticeClient() {
+  // 4 모드 공통 보조 언어 토글 (ar/en/vi). 한국어 + 선택 언어 1개만 표시.
+  const { lang: helperLang, setLang: setHelperLang } = useLanguageHelper()
   const [phase, setPhase] = useState<'setup' | 'practice' | 'result'>('setup')
   const [nativeLang, setNativeLang] = useState('vi')
   const [speed, setSpeed] = useState<SpeedOption>(1.0)
@@ -1445,7 +1450,10 @@ export function ReadingPracticeClient() {
 
           {/* 피드백 카드 */}
           <Card data-testid="feedback-panel">
-            <CardHeader title="읽기 피드백" />
+            <CardHeader
+              title="읽기 피드백"
+              action={<FeedbackLanguageToggle value={helperLang} onChange={setHelperLang} />}
+            />
             <CardBody className="space-y-5">
               {/* 한국어 피드백 */}
               <div data-testid="feedback-korean">
@@ -1478,28 +1486,28 @@ export function ReadingPracticeClient() {
                 </div>
               </div>
 
-              {/* 모국어 피드백 — 베트남어 + 영어 stacked */}
-              {([
-                { code: 'vi', label: '베트남어 (Tiếng Việt)' },
-                { code: 'en', label: '영어 (English)' },
-              ] as const).map(({ code, label }, idx) => {
+              {/* 모국어 피드백 — 보조 언어 토글로 선택된 1개만 표시 (ar/en/vi) */}
+              {(() => {
                 const text = finalScore >= 80
-                  ? (NATIVE_FEEDBACK_GOOD[code] ?? NATIVE_FEEDBACK_GOOD['en'])
-                  : (NATIVE_FEEDBACK_IMPROVE[code] ?? NATIVE_FEEDBACK_IMPROVE['en'])
-                // First block keeps "feedback-native" testid for backward
-                // compatibility with smoke tests; second uses code-suffixed id.
-                const testId = idx === 0 ? 'feedback-native' : `feedback-${code}`
+                  ? (NATIVE_FEEDBACK_GOOD[helperLang] ?? NATIVE_FEEDBACK_GOOD['en'])
+                  : (NATIVE_FEEDBACK_IMPROVE[helperLang] ?? NATIVE_FEEDBACK_IMPROVE['en'])
+                const dir = isRTL(helperLang) ? 'rtl' : 'ltr'
                 return (
-                  <div key={code} data-testid={testId}>
+                  <div data-testid="feedback-native">
                     <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                      {label} 피드백
+                      {L1_LABEL_KO[helperLang]} 피드백
                     </p>
-                    <div className="p-4 bg-primary-50 border border-primary-100 rounded-lg">
+                    <div
+                      className="p-4 bg-primary-50 border border-primary-100 rounded-lg"
+                      dir={dir}
+                      lang={helperLang}
+                      style={isRTL(helperLang) ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+                    >
                       <p className="text-sm text-primary-800 leading-relaxed">{text}</p>
                     </div>
                   </div>
                 )
-              })}
+              })()}
             </CardBody>
           </Card>
 

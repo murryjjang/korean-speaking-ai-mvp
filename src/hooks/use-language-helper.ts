@@ -1,35 +1,36 @@
 'use client'
 
-// 23-i 추가-3: 학습자 보조 언어 토글 (영어/베트남어/OFF). localStorage 동기화.
-// 시연 4 모드(읽기·발표·생성형 대화·말하기 평가) 전체에서 같은 키를 읽어 일관 표시.
+// 4 모드(읽기·발표·생성형 대화·말하기 평가) 공통 보조 언어 토글.
+// localStorage로 지속, 동일 탭 EventTarget으로 컴포넌트 간 동기화.
+// 23-i 추가-3에서 'off'/'en'/'vi' 였으나, 데모 통일 작업 후 ar/en/vi 3개로 좁힘.
 
 import { useCallback, useSyncExternalStore } from 'react'
+import {
+  DEFAULT_FEEDBACK_LANGUAGE,
+  isFeedbackLanguage,
+  type FeedbackLanguage,
+} from '@/src/lib/feedback-language'
 
-export type LangHelper = 'off' | 'en' | 'vi'
+// 외부 호환을 위해 LangHelper alias 유지. 새 코드는 FeedbackLanguage 직접 사용 권장.
+export type LangHelper = FeedbackLanguage
 
 const STORAGE_KEY = 'kspai:lang:helper'
-const DEFAULT_LANG: LangHelper = 'en'
+const DEFAULT_LANG: FeedbackLanguage = DEFAULT_FEEDBACK_LANGUAGE
 
-const SUPPORTED: ReadonlyArray<LangHelper> = ['off', 'en', 'vi']
-function isLangHelper(v: string | null): v is LangHelper {
-  return v != null && (SUPPORTED as readonly string[]).includes(v)
-}
+const channel: EventTarget | null =
+  typeof window !== 'undefined' ? new EventTarget() : null
 
-// 동일 페이지 내 다른 컴포넌트가 같은 토글을 보도록 BroadcastChannel/storage 이벤트로 동기화.
-// (Browser storage 이벤트는 다른 탭에서만 발생하므로 동일 탭 동기화에는 부족 — 자체 EventTarget으로 보강.)
-const channel: EventTarget | null = typeof window !== 'undefined' ? new EventTarget() : null
-
-function getSnapshot(): LangHelper {
+function getSnapshot(): FeedbackLanguage {
   if (typeof window === 'undefined') return DEFAULT_LANG
   try {
     const v = window.localStorage.getItem(STORAGE_KEY)
-    return isLangHelper(v) ? v : DEFAULT_LANG
+    return isFeedbackLanguage(v) ? v : DEFAULT_LANG
   } catch {
     return DEFAULT_LANG
   }
 }
 
-function getServerSnapshot(): LangHelper {
+function getServerSnapshot(): FeedbackLanguage {
   return DEFAULT_LANG
 }
 
@@ -48,11 +49,12 @@ function subscribe(onStoreChange: () => void): () => void {
 }
 
 export function useLanguageHelper(): {
-  lang: LangHelper
-  setLang: (lang: LangHelper) => void
+  lang: FeedbackLanguage
+  setLang: (lang: FeedbackLanguage) => void
 } {
   const lang = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
-  const setLang = useCallback((next: LangHelper) => {
+  const setLang = useCallback((next: FeedbackLanguage) => {
+    if (!isFeedbackLanguage(next)) return
     try {
       window.localStorage.setItem(STORAGE_KEY, next)
     } catch { /* noop */ }

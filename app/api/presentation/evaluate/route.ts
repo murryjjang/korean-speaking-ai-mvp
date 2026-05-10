@@ -1,17 +1,20 @@
-// ── Presentation evaluation: LLM feedback in ko/vi/en ────────────────────
+// ── Presentation evaluation: LLM feedback in ko + helperLang(L1) ─────────
 //
-// 명세 23-c Phase 2: 학습자 발표 원고 + 교정문 + 실제 발화(STT)를 받아
-// LLM이 한국어/베트남어/영어 피드백(잘한 점 3 + 다음 목표 1~2)을 생성한다.
+// 데모 통일: 한국어 + 학습자가 토글로 선택한 보조 언어 1개(ar/en/vi)만 출력.
+// 학습자 발표 원고 + 교정문 + 실제 발화(STT)를 받아 LLM이 잘한 점 3 + 다음 목표 1~2를 생성한다.
 // q4·자유대화 패턴(OpenAI SDK 동적 import + JSON response_format)과 동일.
 //
 // OPENAI_API_KEY 미설정 또는 호출 실패 시 mock 폴백을 반환.
 
+import {
+  isFeedbackLanguage,
+  L1_NAME,
+  type FeedbackLanguage,
+} from '@/src/lib/feedback-language'
+
 type LangFeedback = { strengths: string[]; next_steps: string[] }
 
-// 명세 23-d Phase D: 학습자 발화(transcript)와 교정문(correctedScript)을 비교하여
-// 빠진 내용을 정확히 식별하도록 프롬프트 보강. 학습자가 발표 도중 멈춘 경우 ("빠진
-// 내용 없음"이라고 잘못 판단하던 회귀) 끝부분 누락을 next_steps에 반드시 명시한다.
-const SYSTEM_PROMPT = `당신은 한국어 발표 평가 전문가입니다.
+const SYSTEM_PROMPT_BASE = `당신은 한국어 발표 평가 전문가입니다.
 학습자가 작성한 원고, AI가 다듬은 교정문, 실제 발화(transcript) 결과를 받아 다음을 평가합니다:
 
 1. 잘한 점 3가지: 학습자 실제 발화에서 드러난 강점을 구체적으로. 가능하면 발화 표현을 짧게 인용.
@@ -23,17 +26,21 @@ const SYSTEM_PROMPT = `당신은 한국어 발표 평가 전문가입니다.
 - transcript 길이가 correctedScript의 70% 미만이면 반드시 빠진 내용이 있다고 판단합니다.
 - transcript의 마지막 문장이 교정문 마지막 문장과 다르면 끝부분 누락을 의심합니다.
 - 교정문의 각 문장을 transcript에서 찾아보며 누락 여부를 식별합니다.
-- 빠진 내용이 정말 없을 때(transcript와 교정문이 거의 일치)에만 누락 언급을 생략합니다.
+- 빠진 내용이 정말 없을 때(transcript와 교정문이 거의 일치)에만 누락 언급을 생략합니다.`
 
-한국어/베트남어(Tiếng Việt)/영어(English) 세 언어로 동시 출력합니다.
-세 언어 모두 같은 의미를 담되 자연스러운 표현으로 번역하세요. 빠진 내용 식별은 세 언어 모두 동일하게 적용합니다.
+function buildSystemPrompt(lang: FeedbackLanguage): string {
+  const l1 = L1_NAME[lang]
+  return `${SYSTEM_PROMPT_BASE}
+
+한국어와 ${l1} 두 언어로만 동시 출력합니다. 영어/베트남어/아랍어 외 다른 언어는 절대 포함하지 마세요.
+선택 언어가 ${l1}이 아닐 때는 해당 언어를 절대 출력하지 마세요. 두 언어 모두 같은 의미로 자연스럽게 표현하고, 빠진 내용 식별은 두 언어 모두 동일하게 적용합니다.
 
 반드시 다음 JSON만 출력 (다른 텍스트, 코드 블록 금지):
 {
   "feedback_ko": { "strengths": ["..."], "next_steps": ["..."] },
-  "feedback_vi": { "strengths": ["..."], "next_steps": ["..."] },
-  "feedback_en": { "strengths": ["..."], "next_steps": ["..."] }
+  "feedback_l1": { "strengths": ["..."], "next_steps": ["..."] }  // ${l1}
 }`
+}
 
 function buildUserContent({
   topic,
@@ -54,72 +61,84 @@ function buildUserContent({
   ].join('\n\n')
 }
 
-// 23-d Phase D: 길이 가드 — transcript가 correctedScript의 80% 미만이면
-// 학습자가 발표를 끝까지 진행하지 않은 것으로 간주. LLM이 또는 mock이
-// "빠진 내용 없음"이라고 잘못 판단해도 안전망으로 보충 안내를 강제 주입.
+// 길이 가드 — transcript가 correctedScript의 80% 미만이면 학습자가 발표를 끝까지
+// 진행하지 않은 것으로 간주, 안전망으로 보충 안내를 강제 주입.
 const MISSING_HINT_KO = '발표가 끝까지 진행되지 않은 것 같습니다. 교정문 끝부분을 다시 확인하여 빠진 내용을 보충해 주세요.'
-const MISSING_HINT_VI = 'Có vẻ như bài thuyết trình chưa hoàn tất. Hãy kiểm tra phần cuối của bản đã chỉnh sửa và bổ sung nội dung còn thiếu.'
-const MISSING_HINT_EN = 'It looks like the presentation did not finish. Please review the end of the corrected script and add the missing content.'
+const MISSING_HINT_L1: Record<FeedbackLanguage, string> = {
+  vi: 'Có vẻ như bài thuyết trình chưa hoàn tất. Hãy kiểm tra phần cuối của bản đã chỉnh sửa và bổ sung nội dung còn thiếu.',
+  en: 'It looks like the presentation did not finish. Please review the end of the corrected script and add the missing content.',
+  ar: 'يبدو أن العرض لم يكتمل. يرجى مراجعة نهاية النص المُصحَّح وإضافة المحتوى الناقص.',
+}
 
 function isPartialPresentation(correctedScript: string, transcript: string): boolean {
   const c = correctedScript.trim().length
   const t = transcript.trim().length
-  if (c < 20) return false // 교정문이 너무 짧으면 비교 신뢰도 낮음 → 가드 미적용
-  if (t === 0) return false // STT 자체 실패 케이스 — 별도 영역에서 처리
+  if (c < 20) return false
+  if (t === 0) return false
   return t / c < 0.8
 }
 
-function injectMissingHint(fb: LangFeedback, hint: string): LangFeedback {
-  const already = fb.next_steps.some(
-    (s) => s.includes('빠진') || s.includes('thiếu') || /missing/i.test(s) || s.includes('끝까지') || s.includes('hoàn tất') || /finish/i.test(s),
-  )
+function injectMissingHint(fb: LangFeedback, hint: string, lang: FeedbackLanguage | 'ko'): LangFeedback {
+  // 이미 빠진 내용 안내가 있으면 중복 주입 안 함. 언어별 키워드로 검사.
+  const already = fb.next_steps.some((s) => {
+    if (lang === 'ko') return s.includes('빠진') || s.includes('끝까지')
+    if (lang === 'vi') return s.includes('thiếu') || s.includes('hoàn tất')
+    if (lang === 'en') return /missing/i.test(s) || /finish/i.test(s)
+    if (lang === 'ar') return s.includes('ناقص') || s.includes('يكتمل')
+    return false
+  })
   if (already) return fb
   return { ...fb, next_steps: [hint, ...fb.next_steps] }
 }
 
-function mockFallback(opts?: { partial?: boolean }): Response {
+function nativeMockL1(lang: FeedbackLanguage, partial: boolean): LangFeedback {
+  if (lang === 'vi') {
+    return {
+      strengths: [
+        'Chủ đề bài nói rõ ràng.',
+        'Bạn đã trình bày nội dung theo thứ tự thời gian.',
+        partial ? 'Cách diễn đạt ở phần đầu khá tự nhiên.' : 'Nội dung bạn nói gần giống với bản đã chỉnh sửa.',
+      ],
+      next_steps: partial ? [MISSING_HINT_L1.vi] : ['Lần sau, hãy đọc câu cuối rõ hơn một chút.'],
+    }
+  }
+  if (lang === 'en') {
+    return {
+      strengths: [
+        'The topic of the presentation is clear.',
+        'You presented the content in chronological order.',
+        partial ? 'The opening expressions sound natural.' : 'Your speech closely matched the corrected version.',
+      ],
+      next_steps: partial ? [MISSING_HINT_L1.en] : ['Next time, try to pronounce the last sentence a bit more clearly.'],
+    }
+  }
+  // ar
+  return {
+    strengths: [
+      'موضوع العرض واضح.',
+      'لقد عرضت المحتوى بترتيب زمني.',
+      partial ? 'تعبيراتك في البداية تبدو طبيعية.' : 'كان كلامك مطابقًا تقريبًا للنص المُصحَّح.',
+    ],
+    next_steps: partial ? [MISSING_HINT_L1.ar] : ['في المرة القادمة، حاول نطق الجملة الأخيرة بوضوح أكبر.'],
+  }
+}
+
+function mockFallback(lang: FeedbackLanguage, opts?: { partial?: boolean }): Response {
   const partial = opts?.partial === true
   const ko: LangFeedback = {
     strengths: [
       '발표 주제가 분명합니다.',
       '내용을 시간 순서대로 말했습니다.',
-      partial
-        ? '시작 부분의 표현이 자연스럽습니다.'
-        : '교정문과 실제 발화가 대부분 일치합니다.',
+      partial ? '시작 부분의 표현이 자연스럽습니다.' : '교정문과 실제 발화가 대부분 일치합니다.',
     ],
     next_steps: partial
       ? [MISSING_HINT_KO]
       : ['다음에는 마지막 문장을 조금 더 또렷하게 말해 보세요.'],
   }
-  const vi: LangFeedback = {
-    strengths: [
-      'Chủ đề bài nói rõ ràng.',
-      'Bạn đã trình bày nội dung theo thứ tự thời gian.',
-      partial
-        ? 'Cách diễn đạt ở phần đầu khá tự nhiên.'
-        : 'Nội dung bạn nói gần giống với bản đã chỉnh sửa.',
-    ],
-    next_steps: partial
-      ? [MISSING_HINT_VI]
-      : ['Lần sau, hãy đọc câu cuối rõ hơn một chút.'],
-  }
-  const en: LangFeedback = {
-    strengths: [
-      'The topic of the presentation is clear.',
-      'You presented the content in chronological order.',
-      partial
-        ? 'The opening expressions sound natural.'
-        : 'Your speech closely matched the corrected version.',
-    ],
-    next_steps: partial
-      ? [MISSING_HINT_EN]
-      : ['Next time, try to pronounce the last sentence a bit more clearly.'],
-  }
   return Response.json({
     source: 'mock' as const,
     feedback_ko: ko,
-    feedback_vi: vi,
-    feedback_en: en,
+    feedback_l1: nativeMockL1(lang, partial),
   })
 }
 
@@ -154,6 +173,7 @@ export async function POST(request: Request) {
   const originalScript = typeof b.originalScript === 'string' ? b.originalScript.trim() : ''
   const correctedScript = typeof b.correctedScript === 'string' ? b.correctedScript.trim() : ''
   const transcript = typeof b.transcript === 'string' ? b.transcript.trim() : ''
+  const helperLang: FeedbackLanguage = isFeedbackLanguage(b.helperLang) ? b.helperLang : 'vi'
 
   if (originalScript.length < 5 && transcript.length < 5) {
     return Response.json({ error: 'missing_inputs' }, { status: 400 })
@@ -166,7 +186,7 @@ export async function POST(request: Request) {
 
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    return mockFallback({ partial })
+    return mockFallback(helperLang, { partial })
   }
 
   try {
@@ -183,37 +203,32 @@ export async function POST(request: Request) {
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildSystemPrompt(helperLang) },
         { role: 'user', content: userContent },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.4,
-      max_tokens: 1800,
+      max_tokens: 1200,
     })
 
     const raw = response.choices[0]?.message?.content ?? ''
     const parsed = JSON.parse(raw) as Record<string, unknown>
 
     let feedback_ko = safeFeedback(parsed, 'feedback_ko')
-    let feedback_vi = safeFeedback(parsed, 'feedback_vi')
-    let feedback_en = safeFeedback(parsed, 'feedback_en')
+    let feedback_l1 = safeFeedback(parsed, 'feedback_l1')
 
-    // 23-d Phase D: 길이 가드 폴백 — LLM이 또 빠진 내용을 못 잡았을 경우의 안전망.
     if (partial) {
-      feedback_ko = injectMissingHint(feedback_ko, MISSING_HINT_KO)
-      feedback_vi = injectMissingHint(feedback_vi, MISSING_HINT_VI)
-      feedback_en = injectMissingHint(feedback_en, MISSING_HINT_EN)
+      feedback_ko = injectMissingHint(feedback_ko, MISSING_HINT_KO, 'ko')
+      feedback_l1 = injectMissingHint(feedback_l1, MISSING_HINT_L1[helperLang], helperLang)
     }
 
     return Response.json({
       source: 'llm' as const,
       feedback_ko,
-      feedback_vi,
-      feedback_en,
+      feedback_l1,
     })
   } catch (err) {
     console.error('[presentation/evaluate] LLM error, falling back to mock:', err)
-    return mockFallback({ partial })
+    return mockFallback(helperLang, { partial })
   }
 }
-

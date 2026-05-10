@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
+import { FeedbackLanguageToggle } from '@/src/components/feedback/feedback-language-toggle'
+import { isRTL, L1_LABEL_KO } from '@/src/lib/feedback-language'
 
 // 클라이언트 마운트 후 speechSynthesis 지원 여부를 동기적으로 노출.
 // useEffect + setState 패턴은 React 19 react-hooks/set-state-in-effect 룰에 걸림.
@@ -41,11 +43,9 @@ type SummaryFeedback = { strengths: string[]; next_steps: string[] }
 type SummaryResult = {
   source: 'llm' | 'mock'
   summary_ko: string
-  summary_vi: string
-  summary_en: string
+  summary_l1: string
   feedback_ko: SummaryFeedback
-  feedback_vi: SummaryFeedback
-  feedback_en: SummaryFeedback
+  feedback_l1: SummaryFeedback
 }
 
 function formatTime(sec: number): string {
@@ -85,8 +85,8 @@ function diffWordsInline(original: string, corrected: string): DiffSeg[] {
 }
 
 export function FreeConversationClient() {
-  // 23-i 추가-3: 보조 언어 토글 — 'off' | 'en' | 'vi'.
-  const { lang: helperLang } = useLanguageHelper()
+  // 4 모드 공통 보조 언어 토글 — ar/en/vi.
+  const { lang: helperLang, setLang: setHelperLang } = useLanguageHelper()
 
   const [stage, setStage] = useState<Stage>('start')
   const [topic, setTopic] = useState('')
@@ -179,27 +179,43 @@ export function FreeConversationClient() {
       const res = await fetch('/api/conversation/free/summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: currentTopic, turns: apiTurns }),
+        body: JSON.stringify({ topic: currentTopic, turns: apiTurns, helperLang }),
       })
       if (!res.ok) throw new Error(`status_${res.status}`)
       const data = (await res.json()) as SummaryResult
       setSummary(data)
     } catch (err) {
       console.error('[free-conversation] summary error', err)
-      // 폴백: 최소한의 종료 안내
+      // 폴백: 한국어 + 보조 언어 1개 최소 안내.
+      const fallbackByLang: Record<typeof helperLang, { summary: string; strengths: string[]; next_steps: string[] }> = {
+        vi: {
+          summary: 'Cuộc trò chuyện đã kết thúc.',
+          strengths: ['Bạn đã tham gia cuộc trò chuyện đến cuối.'],
+          next_steps: ['Lần sau hãy thử dùng nhiều cách diễn đạt hơn.'],
+        },
+        en: {
+          summary: 'The conversation has ended.',
+          strengths: ['You stayed engaged through the whole chat.'],
+          next_steps: ['Next time try a wider variety of expressions.'],
+        },
+        ar: {
+          summary: 'انتهت المحادثة.',
+          strengths: ['لقد شاركت في المحادثة حتى النهاية.'],
+          next_steps: ['في المرة القادمة، جرّب استخدام تعبيرات أكثر تنوعًا.'],
+        },
+      }
+      const fb = fallbackByLang[helperLang]
       setSummary({
         source: 'mock',
         summary_ko: '대화가 종료되었습니다.',
-        summary_vi: 'Cuộc trò chuyện đã kết thúc.',
-        summary_en: 'The conversation has ended.',
+        summary_l1: fb.summary,
         feedback_ko: { strengths: ['대화에 끝까지 참여했습니다.'], next_steps: ['다음에 더 다양한 표현을 시도해 보세요.'] },
-        feedback_vi: { strengths: ['Bạn đã tham gia cuộc trò chuyện đến cuối.'], next_steps: ['Lần sau hãy thử dùng nhiều cách diễn đạt hơn.'] },
-        feedback_en: { strengths: ['You stayed engaged through the whole chat.'], next_steps: ['Next time try a wider variety of expressions.'] },
+        feedback_l1: { strengths: fb.strengths, next_steps: fb.next_steps },
       })
     } finally {
       setSummaryLoading(false)
     }
-  }, [stopTimer])
+  }, [stopTimer, helperLang])
 
   useEffect(() => {
     if (stage !== 'chat') return
@@ -904,9 +920,12 @@ export function FreeConversationClient() {
             <CardHeader
               title="대화 요약"
               action={
-                <Badge variant="info" size="sm">
-                  {summary.source === 'llm' ? 'AI 요약' : '샘플 요약'}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <FeedbackLanguageToggle value={helperLang} onChange={setHelperLang} />
+                  <Badge variant="info" size="sm">
+                    {summary.source === 'llm' ? 'AI 요약' : '샘플 요약'}
+                  </Badge>
+                </div>
               }
             />
             <CardBody className="space-y-3">
@@ -914,52 +933,54 @@ export function FreeConversationClient() {
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">한국어</p>
                 <p className="text-sm text-text-primary leading-relaxed">{summary.summary_ko}</p>
               </div>
-              {/* 23-i 추가-3: 보조 언어 토글에 따라 1개만 노출 */}
-              {helperLang === 'vi' && (
-                <div data-testid="summary-vi">
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">Tiếng Việt</p>
-                  <p className="text-sm text-text-primary leading-relaxed">{summary.summary_vi}</p>
-                </div>
-              )}
-              {helperLang === 'en' && (
-                <div data-testid="summary-en">
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">English</p>
-                  <p className="text-sm text-text-primary leading-relaxed">{summary.summary_en}</p>
-                </div>
-              )}
+              {/* 보조 언어 토글로 선택된 1개만 노출 (ar/en/vi) */}
+              <div
+                data-testid="summary-l1"
+                dir={isRTL(helperLang) ? 'rtl' : 'ltr'}
+                lang={helperLang}
+                style={isRTL(helperLang) ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+              >
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1" dir="ltr">
+                  {L1_LABEL_KO[helperLang]}
+                </p>
+                <p className="text-sm text-text-primary leading-relaxed">{summary.summary_l1}</p>
+              </div>
             </CardBody>
           </Card>
 
           <Card data-testid="conversation-feedback">
             <CardHeader title="학습 피드백" />
             <CardBody className="space-y-4">
-              {(['ko', 'vi', 'en'] as const)
-                .filter((lang) => lang === 'ko' || lang === helperLang)
-                .map((lang) => {
-                  const fb = summary[`feedback_${lang}`]
-                  const langLabel = lang === 'ko' ? '한국어' : lang === 'vi' ? 'Tiếng Việt' : 'English'
-                  return (
-                    <div key={lang} data-testid={`feedback-${lang}`}>
-                      <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">{langLabel}</p>
-                      {fb.strengths.length > 0 && (
-                        <div className="mb-2">
-                          <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
-                          <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
-                            {fb.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                          </ul>
-                        </div>
-                      )}
-                      {fb.next_steps.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-amber-700 mb-1">다음 연습 시</p>
-                          <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
-                            {fb.next_steps.map((s, i) => <li key={i}>{s}</li>)}
-                          </ul>
-                        </div>
-                      )}
+              {([
+                { key: 'ko' as const, label: '한국어', testId: 'feedback-korean', fb: summary.feedback_ko, dir: 'ltr' as const, code: 'ko' as const },
+                { key: 'l1' as const, label: L1_LABEL_KO[helperLang], testId: 'feedback-native', fb: summary.feedback_l1, dir: (isRTL(helperLang) ? 'rtl' : 'ltr') as 'rtl' | 'ltr', code: helperLang },
+              ]).map(({ key, label, testId, fb, dir, code }) => (
+                <div
+                  key={key}
+                  data-testid={testId}
+                  dir={dir}
+                  lang={code}
+                  style={dir === 'rtl' ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+                >
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2" dir="ltr">{label}</p>
+                  {fb.strengths.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-xs font-semibold text-emerald-700 mb-1" dir="ltr">잘한 점</p>
+                      <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
+                        {fb.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                      </ul>
                     </div>
-                  )
-                })}
+                  )}
+                  {fb.next_steps.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-amber-700 mb-1" dir="ltr">다음 연습 시</p>
+                      <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
+                        {fb.next_steps.map((s, i) => <li key={i}>{s}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
             </CardBody>
           </Card>
 

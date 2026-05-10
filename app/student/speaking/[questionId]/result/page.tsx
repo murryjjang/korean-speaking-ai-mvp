@@ -71,13 +71,14 @@ const PRONUNCIATION_CRITERIA = [
   { key: 'completeness', label: '완성도' },
 ] as const
 
-// q4 대화 미션 다국어 피드백 — 점수 + 미션 달성 비율로 톤 조정
-// LLM 호출 없이 정적 템플릿 사용. 학습자에게 동일한 정보를 모국어로 보조 전달.
+// q4 대화 미션 다국어 피드백 — 점수 + 미션 달성 비율로 톤 조정.
+// LLM 호출 없이 정적 템플릿 사용. ar/en/vi 모두 제공하고 보조 언어 토글로 선택.
+type DialogueLangFeedback = { strengths: string[]; nextSteps: string[] }
 function dialogueMultilingualFeedback(
   overallScore: number,
   achieved: number,
   total: number,
-): { vi: { strengths: string[]; nextSteps: string[] }; en: { strengths: string[]; nextSteps: string[] } } {
+): { vi: DialogueLangFeedback; en: DialogueLangFeedback; ar: DialogueLangFeedback } {
   const ratio = total > 0 ? achieved / total : overallScore / 100
   if (overallScore >= 80 && ratio >= 0.75) {
     return {
@@ -94,6 +95,13 @@ function dialogueMultilingualFeedback(
           'Your conversation flowed naturally and your Korean was easy to follow.',
         ],
         nextSteps: ['Next time, try varying your expressions to sound even more natural.'],
+      },
+      ar: {
+        strengths: [
+          'لقد أنجزت معظم أهداف المهمة.',
+          'كانت المحادثة طبيعية وكلامك بالكورية سهل الفهم.',
+        ],
+        nextSteps: ['في المرة القادمة، نوّع تعبيراتك ليكون كلامك أكثر طبيعية.'],
       },
     }
   }
@@ -113,6 +121,13 @@ function dialogueMultilingualFeedback(
           'When ordering, state the quantity and payment method clearly.',
         ],
       },
+      ar: {
+        strengths: ['لقد حققت بعض أهداف المهمة.'],
+        nextSteps: [
+          'تناول العناصر المتبقية المذكورة في "보완할 점" أعلاه.',
+          'عند الطلب، اذكر الكمية وطريقة الدفع بوضوح.',
+        ],
+      },
     }
   }
   return {
@@ -128,6 +143,13 @@ function dialogueMultilingualFeedback(
       nextSteps: [
         'Listen carefully to each NPC question and respond step by step.',
         'Cover every mission goal: order item, quantity, dine-in/takeout, and payment method.',
+      ],
+    },
+    ar: {
+      strengths: ['لقد حاولت التواصل مع الشخصية باللغة الكورية.'],
+      nextSteps: [
+        'استمع جيدًا إلى كل سؤال من الشخصية وأجِب خطوة بخطوة.',
+        'لا تُغفل أيًا من الأهداف: اختيار الطبق، الكمية، تناول داخلي أو سفري، وطريقة الدفع.',
       ],
     },
   }
@@ -1111,7 +1133,7 @@ export default async function SpeakingResultPage({
           </CardBody>
         </Card>
 
-        {/* q4 다국어 피드백 — 23-i 추가-3: 보조 언어 토글에 반응 (OFF → 비표시) */}
+        {/* q4 다국어 피드백 — 보조 언어 토글(ar/en/vi) 1개만 표시 */}
         {isDialogueMission && (() => {
           const ml = dialogueMultilingualFeedback(displayScore, achievedMissionGoals, totalMissionGoals)
           return (
@@ -1119,6 +1141,7 @@ export default async function SpeakingResultPage({
               testId="q4-multilingual-feedback"
               vi={ml.vi}
               en={ml.en}
+              ar={ml.ar}
               description="한국어 평가 내용을 보조 언어로 안내합니다."
             />
           )

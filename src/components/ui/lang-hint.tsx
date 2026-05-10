@@ -17,21 +17,13 @@ function getTextDir(lang: string): 'rtl' | 'ltr' {
   return RTL_LANG_CODES.has(lang.toUpperCase()) ? 'rtl' : 'ltr'
 }
 
-// 23-i 추가-3: 보조 언어 토글에 따라 표시할 lang 코드 결정.
-// 'off' → null (LangHint 자체 숨김), 'en' → 'EN', 'vi' → 'VI'.
-function langCodeFor(helper: 'off' | 'en' | 'vi'): string | null {
-  if (helper === 'off') return null
-  return helper.toUpperCase()
-}
-
 export function LangHint({ items, label = '도움말 보기' }: LangHintProps) {
   const [open, setOpen] = useState(false)
   const { lang: helper } = useLanguageHelper()
 
   if (items.length === 0) return null
-  const targetLang = langCodeFor(helper)
-  if (!targetLang) return null
-  // 선택 언어와 일치하는 항목만 표시. 없으면 EN 폴백 (Vietnamese 데이터 없는 페이지 보호).
+  const targetLang = helper.toUpperCase()
+  // 선택 언어와 일치하는 항목만 표시. 없으면 EN 폴백 (해당 언어 데이터 없는 페이지 보호).
   let visible = items.filter((it) => it.lang.toUpperCase() === targetLang)
   if (visible.length === 0) {
     const en = items.filter((it) => it.lang.toUpperCase() === 'EN')

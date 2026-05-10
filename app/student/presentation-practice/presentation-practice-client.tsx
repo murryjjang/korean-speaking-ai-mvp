@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type CSSProperties } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
+import { useLanguageHelper } from '@/src/hooks/use-language-helper'
+import { FeedbackLanguageToggle } from '@/src/components/feedback/feedback-language-toggle'
+import { isRTL, L1_LABEL_KO } from '@/src/lib/feedback-language'
 
 // ── Azure 단어 결과 타입 ──────────────────────────────────────────────────────
 interface AzureWordResult {
@@ -149,6 +152,14 @@ const NATIVE_FEEDBACK: Record<string, NativeFeedback> = {
       'เนื้อหาที่พูดใกล้เคียงกับฉบับที่แก้ไขแล้ว',
     ],
     improve: ['ครั้งหน้าลองออกเสียงประโยคสุดท้ายให้ชัดขึ้นอีกนิด'],
+  },
+  ar: {
+    good: [
+      'موضوع العرض واضح.',
+      'لقد عرضت أنشطة عطلة نهاية الأسبوع بترتيب زمني.',
+      'كان كلامك مطابقًا تقريبًا للنص المُصحَّح.',
+    ],
+    improve: ['في المرة القادمة، حاول نطق الجملة الأخيرة بوضوح أكبر.'],
   },
 }
 
@@ -501,6 +512,8 @@ function PresentationTimeGuide({ elapsedSec, targetSec }: { elapsedSec: number; 
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 export function PresentationPracticeClient() {
+  // 4 모드 공통 보조 언어 토글 (ar/en/vi). 한국어 + 선택 언어 1개만 표시.
+  const { lang: helperLang, setLang: setHelperLang } = useLanguageHelper()
   const [nativeLang, setNativeLang] = useState('vi')
   const [level, setLevel] = useState<(typeof LEVEL_OPTIONS)[number]>('초급')
   const [topic, setTopic] = useState(DEFAULT_TOPIC)
@@ -524,13 +537,12 @@ export function PresentationPracticeClient() {
   // 23-a: 차이점 보기 모드 (separate/inline)
   const [correctionViewMode, setCorrectionViewMode] = useState<'separate' | 'inline'>('separate')
   const [targetSec, setTargetSec] = useState(60)
-  // 명세 23-c Phase 2: LLM 발표 평가 (한국어/베트남어/영어)
+  // LLM 발표 평가. 한국어 + 선택 언어 1개만 출력 (helperLang으로 결정).
   type LangFeedback = { strengths: string[]; next_steps: string[] }
   type EvaluateResult = {
     source: 'llm' | 'mock'
     feedback_ko: LangFeedback
-    feedback_vi: LangFeedback
-    feedback_en: LangFeedback
+    feedback_l1: LangFeedback
   }
   const [evaluateResult, setEvaluateResult] = useState<EvaluateResult | null>(null)
   const feedbackSource: 'llm' | 'mock' = evaluateResult?.source ?? 'mock'
@@ -693,8 +705,8 @@ export function PresentationPracticeClient() {
       return
     }
     if (transcript === null) return
-    // 동일 transcript에 대해 중복 호출 방지
-    const sig = `${transcript.length}:${(script || '').length}`
+    // 동일 transcript+helperLang에 대해 중복 호출 방지. 토글이 바뀌면 자동 재평가.
+    const sig = `${helperLang}:${transcript.length}:${(script || '').length}`
     if (evaluateRequestedRef.current === sig) return
     evaluateRequestedRef.current = sig
 
@@ -711,23 +723,20 @@ export function PresentationPracticeClient() {
             originalScript,
             correctedScript,
             transcript,
+            helperLang,
           }),
         })
         if (cancelled.v) return
         if (!res.ok) throw new Error(`status_${res.status}`)
         const data = (await res.json()) as EvaluateResult
-        if (
-          !data ||
-          !data.feedback_ko ||
-          !data.feedback_vi ||
-          !data.feedback_en
-        ) {
+        if (!data || !data.feedback_ko || !data.feedback_l1) {
           throw new Error('invalid_shape')
         }
         setEvaluateResult(data)
       } catch (err) {
         console.error('[presentation/evaluate] error, keeping local fallback', err)
-        // 폴백: 로컬 mock 데이터로 채움
+        // 폴백: 한국어 + 보조 언어 1개만 채움.
+        const native = getNativeFeedback(helperLang)
         setEvaluateResult({
           source: 'mock',
           feedback_ko: {
@@ -738,31 +747,16 @@ export function PresentationPracticeClient() {
             ],
             next_steps: ['다음에는 마지막 문장을 조금 더 또렷하게 말해 보세요.'],
           },
-          feedback_vi: {
-            strengths: [
-              'Chủ đề bài nói rõ ràng.',
-              'Bạn đã trình bày các việc đã làm cuối tuần theo thứ tự thời gian.',
-              'Nội dung bạn nói gần giống với bản đã chỉnh sửa.',
-            ],
-            next_steps: ['Lần sau, hãy đọc câu cuối rõ hơn một chút.'],
-          },
-          feedback_en: {
-            strengths: [
-              'The topic of the presentation is clear.',
-              'You described your weekend activities in chronological order.',
-              'Your speech closely matched the corrected version.',
-            ],
-            next_steps: ['Next time, try to pronounce the last sentence a bit more clearly.'],
-          },
+          feedback_l1: { strengths: native.good, next_steps: native.improve },
         })
       }
     })()
     return () => {
       cancelled.v = true
     }
-  // 의존성: transcript와 recordingState. correctionResult/script/topic은 호출 시점 값으로 충분.
+  // 의존성: transcript, recordingState, helperLang. helperLang이 바뀌면 새 언어로 재평가.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordingState, transcript])
+  }, [recordingState, transcript, helperLang])
 
   function startTickingTimer() {
     recordingIntervalRef.current = setInterval(() => {
@@ -1679,21 +1673,23 @@ export function PresentationPracticeClient() {
         <CardHeader
           title="발표 피드백"
           action={
-            feedbackSource === 'mock' ? (
-              <Badge variant="warning" size="sm" data-testid="sample-feedback-badge">
-                참고 피드백
-              </Badge>
-            ) : (
-              <Badge variant="success" size="sm" data-testid="ai-feedback-badge">
-                AI 피드백
-              </Badge>
-            )
+            <div className="flex items-center gap-2">
+              <FeedbackLanguageToggle value={helperLang} onChange={setHelperLang} />
+              {feedbackSource === 'mock' ? (
+                <Badge variant="warning" size="sm" data-testid="sample-feedback-badge">
+                  참고 피드백
+                </Badge>
+              ) : (
+                <Badge variant="success" size="sm" data-testid="ai-feedback-badge">
+                  AI 피드백
+                </Badge>
+              )}
+            </div>
           }
         />
         <CardBody className="space-y-4">
           {(() => {
-            // 학습자 발화 기반 LLM 피드백이 도착하면 이를 보여주고, 도착 전 또는
-            // 폴백 시에는 mock 피드백을 동일 위치에 보여준다.
+            // 학습자 발화 기반 LLM 피드백이 도착하면 한국어 + 선택 언어 1개만 표시.
             const koFb = evaluateResult?.feedback_ko ?? {
               strengths: [
                 '발표 주제가 분명합니다.',
@@ -1702,27 +1698,30 @@ export function PresentationPracticeClient() {
               ],
               next_steps: ['다음에는 마지막 문장을 조금 더 또렷하게 말해 보세요.'],
             }
-            const viFb = evaluateResult?.feedback_vi ?? {
-              strengths: getNativeFeedback('vi').good,
-              next_steps: getNativeFeedback('vi').improve,
+            const native = getNativeFeedback(helperLang)
+            const l1Fb = evaluateResult?.feedback_l1 ?? {
+              strengths: native.good,
+              next_steps: native.improve,
             }
-            const enFb = evaluateResult?.feedback_en ?? {
-              strengths: getNativeFeedback('en').good,
-              next_steps: getNativeFeedback('en').improve,
-            }
-            const langs = [
-              { code: 'ko' as const, label: '한국어', testId: 'feedback-korean', fb: koFb },
-              { code: 'vi' as const, label: '베트남어 (Tiếng Việt)', testId: 'feedback-native', fb: viFb },
-              { code: 'en' as const, label: '영어 (English)', testId: 'feedback-en', fb: enFb },
+            const l1Dir = isRTL(helperLang) ? 'rtl' : 'ltr'
+            const blocks = [
+              { label: '한국어', testId: 'feedback-korean', fb: koFb, dir: 'ltr' as const, code: 'ko' },
+              { label: L1_LABEL_KO[helperLang], testId: 'feedback-native', fb: l1Fb, dir: l1Dir, code: helperLang },
             ]
-            return langs.map(({ code, label, testId, fb }) => (
-              <div key={code} data-testid={testId}>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+            return blocks.map(({ label, testId, fb, dir, code }) => (
+              <div
+                key={testId}
+                data-testid={testId}
+                dir={dir}
+                lang={code}
+                style={dir === 'rtl' ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+              >
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2" dir="ltr">
                   {label} 피드백
                 </p>
                 <div className="space-y-2">
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                    <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
+                    <p className="text-xs font-semibold text-emerald-700 mb-1" dir="ltr">잘한 점</p>
                     <ul className="text-sm text-emerald-700 space-y-1">
                       {fb.strengths.map((item, i) => (
                         <li key={i}>• {item}</li>
@@ -1730,7 +1729,7 @@ export function PresentationPracticeClient() {
                     </ul>
                   </div>
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-xs font-semibold text-amber-700 mb-1">다음 목표</p>
+                    <p className="text-xs font-semibold text-amber-700 mb-1" dir="ltr">다음 목표</p>
                     <ul className="text-sm text-amber-700 space-y-1">
                       {fb.next_steps.map((item, i) => (
                         <li key={i}>• {item}</li>
