@@ -155,6 +155,243 @@ function dialogueMultilingualFeedback(
   }
 }
 
+// q1 낭독: 점수 구간별 정적 다국어 피드백 (ar/en/vi). Topbar 보조 언어 토글로 1개 노출.
+function readingMultilingualFeedback(
+  overallScore: number,
+): { vi: DialogueLangFeedback; en: DialogueLangFeedback; ar: DialogueLangFeedback } {
+  if (overallScore >= 80) {
+    return {
+      vi: {
+        strengths: [
+          'Bạn đã đọc rõ ràng và đầy đủ toàn bộ đoạn văn.',
+          'Ngắt câu và tốc độ đọc tự nhiên.',
+        ],
+        nextSteps: ['Lần sau, hãy thử nhấn nhá ngữ điệu để đọc tự nhiên hơn.'],
+      },
+      en: {
+        strengths: [
+          'You read the entire passage clearly and without omissions.',
+          'Your pacing and pauses sounded natural.',
+        ],
+        nextSteps: ['Next time, vary your intonation a little more for an even more natural delivery.'],
+      },
+      ar: {
+        strengths: [
+          'قرأت النص كاملاً بوضوح ودون إغفال أي جزء.',
+          'كانت سرعة قراءتك وفواصلك طبيعية.',
+        ],
+        nextSteps: ['في المرة القادمة، نوّع نبرة صوتك قليلاً ليبدو الأداء أكثر طبيعية.'],
+      },
+    }
+  }
+  if (overallScore >= 60) {
+    return {
+      vi: {
+        strengths: ['Bạn đã đọc gần hết đoạn văn.'],
+        nextSteps: [
+          'Hãy đọc rõ từng âm tiết, đặc biệt là patchim và trợ từ.',
+          'Ngắt câu rõ ràng hơn ở dấu chấm và dấu phẩy.',
+        ],
+      },
+      en: {
+        strengths: ['You read most of the passage.'],
+        nextSteps: [
+          'Pronounce each syllable clearly, especially batchim and particles.',
+          'Pause more distinctly at commas and periods.',
+        ],
+      },
+      ar: {
+        strengths: ['لقد قرأت معظم النص.'],
+        nextSteps: [
+          'انطق كل مقطع بوضوح، خاصةً الباتشيم وأدوات النحو.',
+          'توقّف بشكل أوضح عند الفواصل والنقاط.',
+        ],
+      },
+    }
+  }
+  return {
+    vi: {
+      strengths: ['Bạn đã cố gắng đọc thành tiếng đoạn văn.'],
+      nextSteps: [
+        'Đọc chậm lại và phát âm rõ từng từ.',
+        'Cố gắng đọc hết đoạn văn, không bỏ sót câu nào.',
+      ],
+    },
+    en: {
+      strengths: ['You attempted to read the passage aloud.'],
+      nextSteps: [
+        'Slow down and pronounce each word clearly.',
+        'Make sure to read the entire passage without skipping sentences.',
+      ],
+    },
+    ar: {
+      strengths: ['لقد حاولت قراءة النص بصوتٍ عالٍ.'],
+      nextSteps: [
+        'اقرأ ببطء وانطق كل كلمة بوضوح.',
+        'احرص على قراءة النص كاملاً دون تجاوز أي جملة.',
+      ],
+    },
+  }
+}
+
+// q2 자료 설명: 점수 구간별 정적 다국어 피드백 (ar/en/vi).
+function materialDescMultilingualFeedback(
+  overallScore: number,
+): { vi: DialogueLangFeedback; en: DialogueLangFeedback; ar: DialogueLangFeedback } {
+  if (overallScore >= 80) {
+    return {
+      vi: {
+        strengths: [
+          'Bạn đã mô tả đầy đủ địa điểm, nhân vật và hành động.',
+          'Câu văn được kết nối tự nhiên.',
+        ],
+        nextSteps: ['Lần sau, hãy bổ sung thêm chi tiết về bầu không khí hoặc bối cảnh.'],
+      },
+      en: {
+        strengths: [
+          'You described the place, people, and actions clearly.',
+          'Your sentences flowed together naturally.',
+        ],
+        nextSteps: ['Next time, add a few more details about the atmosphere or background.'],
+      },
+      ar: {
+        strengths: [
+          'وصفت المكان والأشخاص والأفعال بوضوح.',
+          'تدفقت جملك بشكل طبيعي.',
+        ],
+        nextSteps: ['في المرة القادمة، أضف بعض التفاصيل عن الأجواء أو الخلفية.'],
+      },
+    }
+  }
+  if (overallScore >= 60) {
+    return {
+      vi: {
+        strengths: ['Bạn đã đề cập đến một số yếu tố chính của hình ảnh.'],
+        nextSteps: [
+          'Hãy bổ sung các yếu tố còn thiếu trong khung "빠진 요소" ở trên.',
+          'Mô tả thêm hành động cụ thể của từng người.',
+        ],
+      },
+      en: {
+        strengths: ['You mentioned some of the key elements in the material.'],
+        nextSteps: [
+          'Cover the items listed in "빠진 요소" above.',
+          'Describe what each person is doing in more detail.',
+        ],
+      },
+      ar: {
+        strengths: ['لقد ذكرت بعض العناصر الرئيسية في المادة.'],
+        nextSteps: [
+          'تناول العناصر المذكورة في "빠진 요소" أعلاه.',
+          'صف ما يفعله كل شخص بمزيد من التفصيل.',
+        ],
+      },
+    }
+  }
+  return {
+    vi: {
+      strengths: ['Bạn đã cố gắng mô tả hình ảnh bằng tiếng Hàn.'],
+      nextSteps: [
+        'Bắt đầu bằng việc nêu địa điểm hoặc bối cảnh.',
+        'Sau đó tả người và hành động của họ theo từng câu ngắn.',
+      ],
+    },
+    en: {
+      strengths: ['You attempted to describe the material in Korean.'],
+      nextSteps: [
+        'Start by stating the place or setting.',
+        'Then describe the people and their actions in short, clear sentences.',
+      ],
+    },
+    ar: {
+      strengths: ['لقد حاولت وصف المادة باللغة الكورية.'],
+      nextSteps: [
+        'ابدأ بذكر المكان أو السياق.',
+        'ثم صف الأشخاص وأفعالهم في جمل قصيرة وواضحة.',
+      ],
+    },
+  }
+}
+
+// q3 듣고 답하기: 점수 구간별 정적 다국어 피드백 (ar/en/vi).
+function listeningRespMultilingualFeedback(
+  overallScore: number,
+): { vi: DialogueLangFeedback; en: DialogueLangFeedback; ar: DialogueLangFeedback } {
+  if (overallScore >= 80) {
+    return {
+      vi: {
+        strengths: [
+          'Bạn đã nắm bắt đầy đủ thông tin chính từ đoạn nghe.',
+          'Câu trả lời ngắn gọn và phù hợp với câu hỏi.',
+        ],
+        nextSteps: ['Lần sau, hãy nối các thông tin bằng các liên từ tự nhiên hơn.'],
+      },
+      en: {
+        strengths: [
+          'You captured all the key information from the listening.',
+          'Your answer was concise and matched the question.',
+        ],
+        nextSteps: ['Next time, link the pieces of information with smoother connectors.'],
+      },
+      ar: {
+        strengths: [
+          'لقد التقطت جميع المعلومات الرئيسية من المقطع المسموع.',
+          'كانت إجابتك موجزة ومناسبة للسؤال.',
+        ],
+        nextSteps: ['في المرة القادمة، اربط المعلومات بأدوات ربط أكثر سلاسة.'],
+      },
+    }
+  }
+  if (overallScore >= 60) {
+    return {
+      vi: {
+        strengths: ['Bạn đã trả lời được một phần thông tin chính.'],
+        nextSteps: [
+          'Hãy bổ sung các thông tin còn thiếu được liệt kê trong "빠진 요소" ở trên.',
+          'Trả lời đúng trọng tâm câu hỏi, không lan man.',
+        ],
+      },
+      en: {
+        strengths: ['You included some of the key information.'],
+        nextSteps: [
+          'Add the items listed in "빠진 요소" above.',
+          'Stay focused on what the question asks; avoid unrelated content.',
+        ],
+      },
+      ar: {
+        strengths: ['لقد ضمّنت بعض المعلومات الرئيسية.'],
+        nextSteps: [
+          'أضف العناصر المذكورة في "빠진 요소" أعلاه.',
+          'ركّز على ما يطلبه السؤال وتجنّب المحتوى غير ذي الصلة.',
+        ],
+      },
+    }
+  }
+  return {
+    vi: {
+      strengths: ['Bạn đã cố gắng trả lời sau khi nghe.'],
+      nextSteps: [
+        'Hãy nghe kỹ và ghi lại các từ khóa chính trước khi nói.',
+        'Trả lời bằng câu ngắn, gọn vào trọng tâm câu hỏi.',
+      ],
+    },
+    en: {
+      strengths: ['You attempted to respond after listening.'],
+      nextSteps: [
+        'Listen carefully and note the key words before speaking.',
+        'Answer in short sentences that target the question directly.',
+      ],
+    },
+    ar: {
+      strengths: ['لقد حاولت الإجابة بعد الاستماع.'],
+      nextSteps: [
+        'استمع جيدًا ودوّن الكلمات الرئيسية قبل التحدث.',
+        'أجِب بجمل قصيرة تستهدف السؤال مباشرة.',
+      ],
+    },
+  }
+}
+
 // mock wordScores → 평가 기준 점수 정규화 헬퍼
 // ETRI 연동 시 criterion-level 데이터를 직접 사용하도록 확장 가능
 function normalizePronunciationDisplay(
@@ -1133,18 +1370,57 @@ export default async function SpeakingResultPage({
           </CardBody>
         </Card>
 
-        {/* q4 다국어 피드백 — 보조 언어 토글(ar/en/vi) 1개만 표시 */}
-        {isDialogueMission && (() => {
-          const ml = dialogueMultilingualFeedback(displayScore, achievedMissionGoals, totalMissionGoals)
-          return (
-            <MultilingualFeedback
-              testId="q4-multilingual-feedback"
-              vi={ml.vi}
-              en={ml.en}
-              ar={ml.ar}
-              description="한국어 평가 내용을 보조 언어로 안내합니다."
-            />
-          )
+        {/* q1~q4 다국어 피드백 — 페이지 상단 보조 언어 토글(ar/en/vi)이 단일 소스 */}
+        {(() => {
+          if (isDialogueMission) {
+            const ml = dialogueMultilingualFeedback(displayScore, achievedMissionGoals, totalMissionGoals)
+            return (
+              <MultilingualFeedback
+                testId="q4-multilingual-feedback"
+                vi={ml.vi}
+                en={ml.en}
+                ar={ml.ar}
+                description="한국어 평가 내용을 보조 언어로 안내합니다."
+              />
+            )
+          }
+          if (isReadingQuestion) {
+            const ml = readingMultilingualFeedback(displayScore)
+            return (
+              <MultilingualFeedback
+                testId="q1-multilingual-feedback"
+                vi={ml.vi}
+                en={ml.en}
+                ar={ml.ar}
+                description="한국어 평가 내용을 보조 언어로 안내합니다."
+              />
+            )
+          }
+          if (isQ2) {
+            const ml = materialDescMultilingualFeedback(displayScore)
+            return (
+              <MultilingualFeedback
+                testId="q2-multilingual-feedback"
+                vi={ml.vi}
+                en={ml.en}
+                ar={ml.ar}
+                description="한국어 평가 내용을 보조 언어로 안내합니다."
+              />
+            )
+          }
+          if (isQ3) {
+            const ml = listeningRespMultilingualFeedback(displayScore)
+            return (
+              <MultilingualFeedback
+                testId="q3-multilingual-feedback"
+                vi={ml.vi}
+                en={ml.en}
+                ar={ml.ar}
+                description="한국어 평가 내용을 보조 언어로 안내합니다."
+              />
+            )
+          }
+          return null
         })()}
 
         {/* STT 전사 결과 / q4: 대화 기록 */}

@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback, useMemo, type CSSProperties }
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
-import { FeedbackLanguageToggle } from '@/src/components/feedback/feedback-language-toggle'
 import { isRTL, L1_LABEL_KO } from '@/src/lib/feedback-language'
 
 // ── Azure 단어 결과 타입 ──────────────────────────────────────────────────────
@@ -512,8 +511,8 @@ function PresentationTimeGuide({ elapsedSec, targetSec }: { elapsedSec: number; 
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 export function PresentationPracticeClient() {
-  // 4 모드 공통 보조 언어 토글 (ar/en/vi). 한국어 + 선택 언어 1개만 표시.
-  const { lang: helperLang, setLang: setHelperLang } = useLanguageHelper()
+  // 4 모드 공통 보조 언어 토글 (ar/en/vi). 페이지 상단 LanguageHelperToggle이 단일 소스.
+  const { lang: helperLang } = useLanguageHelper()
   const [nativeLang, setNativeLang] = useState('vi')
   const [level, setLevel] = useState<(typeof LEVEL_OPTIONS)[number]>('초급')
   const [topic, setTopic] = useState(DEFAULT_TOPIC)
@@ -1673,18 +1672,15 @@ export function PresentationPracticeClient() {
         <CardHeader
           title="발표 피드백"
           action={
-            <div className="flex items-center gap-2">
-              <FeedbackLanguageToggle value={helperLang} onChange={setHelperLang} />
-              {feedbackSource === 'mock' ? (
-                <Badge variant="warning" size="sm" data-testid="sample-feedback-badge">
-                  참고 피드백
-                </Badge>
-              ) : (
-                <Badge variant="success" size="sm" data-testid="ai-feedback-badge">
-                  AI 피드백
-                </Badge>
-              )}
-            </div>
+            feedbackSource === 'mock' ? (
+              <Badge variant="warning" size="sm" data-testid="sample-feedback-badge">
+                참고 피드백
+              </Badge>
+            ) : (
+              <Badge variant="success" size="sm" data-testid="ai-feedback-badge">
+                AI 피드백
+              </Badge>
+            )
           }
         />
         <CardBody className="space-y-4">

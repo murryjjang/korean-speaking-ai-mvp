@@ -1,12 +1,11 @@
 'use client'
 
-// q4 말하기 평가 결과 페이지에서 정적 다국어 피드백을 보여주는 카드.
-// 데모 통일 작업 후 ar/en/vi 중 보조 언어 토글로 선택된 1개만 노출 (한국어는 페이지 본문에 별도 표기).
+// 말하기 평가 결과 페이지(q1~q4)에서 정적 다국어 피드백을 보여주는 카드.
+// ar/en/vi 중 페이지 상단 LanguageHelperToggle로 선택된 1개만 노출 (한국어는 페이지 본문에 별도 표기).
 // 새 코드는 src/components/feedback/bilingual-feedback.tsx 사용을 권장.
 
 import { Card, CardHeader, CardBody } from './card'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
-import { FeedbackLanguageToggle } from '@/src/components/feedback/feedback-language-toggle'
 import {
   isRTL,
   L1_LABEL_KO,
@@ -36,7 +35,7 @@ export function MultilingualFeedback({
   title = '모국어 피드백',
   description,
 }: Props) {
-  const { lang, setLang } = useLanguageHelper()
+  const { lang } = useLanguageHelper()
 
   const data: Record<FeedbackLanguage, MultilingualFeedbackData> = { vi, en, ar }
   const current = data[lang]
@@ -47,7 +46,6 @@ export function MultilingualFeedback({
       <CardHeader
         title={title}
         description={description ?? '한국어 평가 내용을 보조 언어로 안내합니다.'}
-        action={<FeedbackLanguageToggle value={lang} onChange={setLang} />}
       />
       <CardBody className="space-y-2">
         <p
