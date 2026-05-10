@@ -21,7 +21,6 @@ const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string }> = [
 
 const TOTAL_SECONDS = 600 // 10분
 const WARNING_AT = 480 // 8분 (남은 2분 경고)
-const VOICE_AUTO_SEND_SECONDS = 3 // 음성 입력 후 자동 전송 카운트다운 (취소 가능)
 
 type ChatTurn = {
   role: 'ai' | 'student'
@@ -59,6 +58,7 @@ export function FreeConversationClient() {
 
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [input, setInput] = useState('')
+  const inputRef = useRef('')
   const [sending, setSending] = useState(false)
   const [chatError, setChatError] = useState<string | null>(null)
 
@@ -92,13 +92,6 @@ export function FreeConversationClient() {
   const [ttsAutoPlay, setTtsAutoPlay] = useState(true)
   const [speakingTurnIdx, setSpeakingTurnIdx] = useState<number | null>(null)
 
-  // 명세 23-b 1-C / 23-d Phase C: 음성 입력 후 3초 카운트다운 자동 전송 (취소 가능).
-  // - autoSendTimerRef: 실제 전송 setTimeout (클로저로 text 캡처 → stale 안 됨).
-  // - visualTimerRef: 카운트다운 시각 표시 setInterval (전송 로직과 분리).
-  const [autoSendCountdown, setAutoSendCountdown] = useState<number | null>(null)
-  const autoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const visualTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
 
   // Auto-scroll on new turn
@@ -107,6 +100,12 @@ export function FreeConversationClient() {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
     }
   }, [turns])
+
+  // input 최신값을 ref에 동기화. STT onstop 클로저가 startVoiceRecording 재생성
+  // 시점의 stale input을 capture하는 문제를 회피한다.
+  useEffect(() => {
+    inputRef.current = input
+  }, [input])
 
   // Timer (only during chat stage)
   const stopTimer = useCallback(() => {
@@ -179,14 +178,6 @@ export function FreeConversationClient() {
         clearInterval(voiceTickRef.current)
         voiceTickRef.current = null
       }
-      if (autoSendTimerRef.current) {
-        clearTimeout(autoSendTimerRef.current)
-        autoSendTimerRef.current = null
-      }
-      if (visualTimerRef.current) {
-        clearInterval(visualTimerRef.current)
-        visualTimerRef.current = null
-      }
       const mr = mediaRecorderRef.current
       if (mr && mr.state === 'recording') {
         try { mr.stop() } catch { /* noop */ }
@@ -197,20 +188,7 @@ export function FreeConversationClient() {
     }
   }, [])
 
-  // ── 음성 입력 후 자동 전송 카운트다운 (Phase 1-C / 23-d Phase C) ────────────
-  const cancelAutoSend = useCallback(() => {
-    if (autoSendTimerRef.current) {
-      clearTimeout(autoSendTimerRef.current)
-      autoSendTimerRef.current = null
-    }
-    if (visualTimerRef.current) {
-      clearInterval(visualTimerRef.current)
-      visualTimerRef.current = null
-    }
-    setAutoSendCountdown(null)
-  }, [])
-
-  // 최신 sendMessageWithText 참조를 ref로 보관해 setTimeout 콜백에서 호출.
+  // 최신 sendMessageWithText 참조를 ref로 보관해 STT onstop 클로저에서 호출.
   // (text는 클로저로 캡처하므로 stale X — ref는 함수 참조 자체만 최신화.)
   const sendMessageWithTextRef = useRef<((text: string) => void | Promise<void>) | null>(null)
 
@@ -286,25 +264,33 @@ export function FreeConversationClient() {
     }
   }, [])
 
-  // 명세 23-d Phase B: 첫 NPC opener 자동 재생.
-  // 기존 sendMessageWithText 안의 자동 재생은 LLM 응답에만 적용되어, 주제 선택
-  // 직후 노출되는 opener 메시지가 음성으로 재생되지 않았다. voiceReady · stage ·
-  // ttsAutoPlay가 모두 충족된 시점에 opener를 한 번만 재생한다.
-  const openerSpokenRef = useRef(false)
+  // 명세 23-g Phase A: 모든 새 NPC 응답 자동 재생 (opener + LLM 응답).
+  // 23-d Phase B는 opener만 다뤘고, sendMessageWithText 내부 자동 재생은 voiceState
+  // 클로저가 'processing'으로 캡처돼 음성 입력 직후 LLM 응답이 재생되지 않는 문제가
+  // 있었다. 가장 최근 ai 턴 인덱스를 ref Set으로 추적해 메시지당 한 번만 재생한다.
+  const playedAiTurnIdxsRef = useRef<Set<number>>(new Set())
   useEffect(() => {
     if (stage !== 'chat') {
       // 다음 세션에서 다시 자동 재생되도록 리셋.
-      openerSpokenRef.current = false
+      playedAiTurnIdxsRef.current = new Set()
       return
     }
-    if (openerSpokenRef.current) return
     if (!ttsSupported || !ttsAutoPlay || !voiceReady) return
+    // 녹음·STT 처리 중에는 충돌 방지를 위해 재생 차단. voiceState가 idle로 전환되면
+    // 이 effect가 재실행되어 그 때 미재생 메시지가 있으면 재생된다.
     if (voiceState !== 'idle') return
-    const opener = turns[0]
-    if (!opener || opener.role !== 'ai') return
-    openerSpokenRef.current = true
+    let lastAiIdx = -1
+    for (let i = turns.length - 1; i >= 0; i--) {
+      if (turns[i].role === 'ai') {
+        lastAiIdx = i
+        break
+      }
+    }
+    if (lastAiIdx === -1) return
+    if (playedAiTurnIdxsRef.current.has(lastAiIdx)) return
+    playedAiTurnIdxsRef.current.add(lastAiIdx)
     // effect 본체에서의 setState 회피 — speakText 내부에서 setSpeakingTurnIdx 호출.
-    queueMicrotask(() => speakText(opener.text, 0))
+    queueMicrotask(() => speakText(turns[lastAiIdx].text, lastAiIdx))
   }, [stage, ttsSupported, ttsAutoPlay, voiceReady, voiceState, turns, speakText])
 
   // ── 시작 ──────────────────────────────────────────────────────────────────
@@ -330,7 +316,6 @@ export function FreeConversationClient() {
       setChatError('한 번에 1000자까지만 입력할 수 있어요.')
       return
     }
-    cancelAutoSend()
     setChatError(null)
     setSending(true)
 
@@ -362,15 +347,7 @@ export function FreeConversationClient() {
         { role: 'ai', text: data.npc_response },
       ]
       setTurns(finalTurns)
-      // NPC 응답 자동 재생: 학습자가 녹음 중이 아닐 때만 (충돌 방지).
-      if (
-        ttsAutoPlay &&
-        typeof window !== 'undefined' &&
-        'speechSynthesis' in window &&
-        voiceState === 'idle'
-      ) {
-        speakText(data.npc_response, finalTurns.length - 1)
-      }
+      // NPC 응답 자동 재생은 23-g Phase A 통합 effect(playedAiTurnIdxsRef)에서 처리.
     } catch (err) {
       console.error('[free-conversation] respond error', err)
       setChatError('잠시 후 다시 시도해주세요.')
@@ -381,58 +358,14 @@ export function FreeConversationClient() {
     } finally {
       setSending(false)
     }
-  }, [sending, turns, topic, cancelAutoSend, ttsAutoPlay, voiceState, speakText])
+  }, [sending, turns, topic])
 
   const sendMessage = useCallback(() => sendMessageWithText(input), [sendMessageWithText, input])
 
-  // 최신 sendMessageWithText를 ref에 동기화 — setInterval/setTimeout 콜백에서 호출.
+  // 최신 sendMessageWithText를 ref에 동기화 — STT onstop 클로저에서 호출.
   useEffect(() => {
     sendMessageWithTextRef.current = sendMessageWithText
   }, [sendMessageWithText])
-
-  // 명세 23-d Phase C: 자동 전송은 setTimeout 클로저로 직접 트리거 (아래 startAutoSendCountdown).
-  // useEffect / queueMicrotask / pending text ref 의존을 모두 제거 — 23-c 구현이 실제 환경에서
-  // 자동 전송이 발화되지 않는 회귀를 보였기 때문. 카운트다운 시각 표시는 별도 setInterval로 분리.
-  const startAutoSendCountdown = useCallback((text: string) => {
-    if (!text || !text.trim()) return
-    // 기존 타이머 정리.
-    if (autoSendTimerRef.current) {
-      clearTimeout(autoSendTimerRef.current)
-      autoSendTimerRef.current = null
-    }
-    if (visualTimerRef.current) {
-      clearInterval(visualTimerRef.current)
-      visualTimerRef.current = null
-    }
-
-    // 시각 카운트다운: 1초마다 감소 표시.
-    setAutoSendCountdown(VOICE_AUTO_SEND_SECONDS)
-    let n = VOICE_AUTO_SEND_SECONDS
-    visualTimerRef.current = setInterval(() => {
-      n -= 1
-      if (n <= 0) {
-        if (visualTimerRef.current) {
-          clearInterval(visualTimerRef.current)
-          visualTimerRef.current = null
-        }
-        setAutoSendCountdown(0)
-      } else {
-        setAutoSendCountdown(n)
-      }
-    }, 1000)
-
-    // 실제 전송: setTimeout 클로저로 text 캡처. ref 통해 최신 함수 호출.
-    autoSendTimerRef.current = setTimeout(() => {
-      autoSendTimerRef.current = null
-      if (visualTimerRef.current) {
-        clearInterval(visualTimerRef.current)
-        visualTimerRef.current = null
-      }
-      setAutoSendCountdown(null)
-      const fn = sendMessageWithTextRef.current
-      if (fn) void fn(text)
-    }, VOICE_AUTO_SEND_SECONDS * 1000)
-  }, [])
 
   // ── 음성 입력 (Phase C) ──────────────────────────────────────────────────
   // q4·발표 STT 패턴과 동일: MediaRecorder → Blob → POST /api/stt → transcript.
@@ -447,7 +380,6 @@ export function FreeConversationClient() {
   const startVoiceRecording = useCallback(async () => {
     if (voiceState !== 'idle' || sending) return
     setVoiceError(null)
-    cancelAutoSend()
     // 녹음과 NPC 음성 충돌 방지: 재생 중이면 즉시 중단
     stopSpeaking()
     try {
@@ -478,15 +410,12 @@ export function FreeConversationClient() {
           if (!transcript) {
             setVoiceError('음성을 인식하지 못했습니다. 다시 시도하거나 텍스트로 입력해 주세요.')
           } else {
-            // textarea에 표시 (기존 입력이 있으면 공백으로 이어붙임)
-            let nextText = ''
-            setInput((prev) => {
-              nextText = prev ? `${prev} ${transcript}` : transcript
-              return nextText
-            })
-            // 23-d Phase C: setTimeout 클로저 기반 자동 전송. text를 클로저로 캡처해
-            // stale 문제 회피, queueMicrotask·useEffect 의존성 모두 제거.
-            startAutoSendCountdown(nextText)
+            // 23-f: STT 결과 도착 즉시 전송 (카운트다운 없음).
+            const prev = inputRef.current
+            const nextText = prev ? `${prev} ${transcript}` : transcript
+            setInput(nextText)
+            const fn = sendMessageWithTextRef.current
+            if (fn) void fn(nextText)
           }
         } catch (err) {
           console.error('[free-conversation] STT error', err)
@@ -508,7 +437,7 @@ export function FreeConversationClient() {
       setVoiceError('마이크 권한이 필요합니다. 브라우저 권한을 확인해 주세요.')
       setVoiceState('idle')
     }
-  }, [voiceState, sending, stopVoiceTick, stopSpeaking, cancelAutoSend, startAutoSendCountdown])
+  }, [voiceState, sending, stopVoiceTick, stopSpeaking])
 
   const stopVoiceRecording = useCallback(() => {
     const mr = mediaRecorderRef.current
@@ -605,7 +534,6 @@ export function FreeConversationClient() {
           <button
             onClick={() => {
               stopSpeaking()
-              cancelAutoSend()
               void endConversation(turns, topic)
             }}
             className="px-3 py-1.5 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors"
@@ -740,37 +668,10 @@ export function FreeConversationClient() {
           {voiceError && (
             <p className="text-xs text-amber-700 mb-2" data-testid="voice-error">{voiceError}</p>
           )}
-          {autoSendCountdown !== null && autoSendCountdown > 0 && (
-            <div
-              className="mb-2 flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-amber-50 border border-amber-200"
-              data-testid="auto-send-countdown"
-            >
-              <div className="flex items-center gap-2 text-amber-800">
-                <span
-                  className="text-2xl font-bold tabular-nums leading-none"
-                  data-testid="auto-send-countdown-number"
-                >
-                  {autoSendCountdown}
-                </span>
-                <span className="text-xs">초 후 자동 전송됩니다.</span>
-              </div>
-              <button
-                onClick={() => cancelAutoSend()}
-                className="text-xs px-2.5 py-1 rounded bg-white border border-amber-300 text-amber-800 font-medium hover:bg-amber-100"
-                data-testid="btn-cancel-auto-send"
-              >
-                취소
-              </button>
-            </div>
-          )}
           <div className="flex items-end gap-2">
             <textarea
               value={input}
-              onChange={(e) => {
-                setInput(e.target.value)
-                // 카운트다운 중 학습자가 직접 편집하면 자동 취소
-                if (autoSendCountdown !== null) cancelAutoSend()
-              }}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -932,7 +833,6 @@ export function FreeConversationClient() {
         <button
           onClick={() => {
             stopSpeaking()
-            cancelAutoSend()
             setStage('start')
             setTopic('')
             setCustomTopic('')

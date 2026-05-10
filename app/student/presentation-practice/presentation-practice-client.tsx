@@ -1573,22 +1573,34 @@ export function PresentationPracticeClient() {
               </ul>
             </div>
 
-            <div data-testid="comparison-missing">
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                빠진 내용
-              </p>
-              {DEMO_COMPARISON.missing.length === 0 ? (
-                <p className="text-sm text-text-muted">없음</p>
-              ) : (
-                <ul className="space-y-1">
-                  {DEMO_COMPARISON.missing.map((item, i) => (
-                    <li key={i} className="text-sm text-red-600">
-                      • {item}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            {(() => {
+              // 23-e Phase B (옵션 2): 학습자가 도중에 멈췄을 때 "빠진 내용 없음"이
+              // 잘못 표시되는 문제 방지. 부분 발표(< 80%)일 때 빠진 내용 영역을 숨기고,
+              // 누락 안내는 발표 피드백의 next_steps에서 처리한다.
+              const corrected = (correctionDisplayText || '').trim()
+              const transcribed = (transcript ?? '').trim()
+              const isPartial =
+                corrected.length > 0 && transcribed.length < corrected.length * 0.8
+              if (isPartial) return null
+              return (
+                <div data-testid="comparison-missing">
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+                    빠진 내용
+                  </p>
+                  {DEMO_COMPARISON.missing.length === 0 ? (
+                    <p className="text-sm text-text-muted">없음</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {DEMO_COMPARISON.missing.map((item, i) => (
+                        <li key={i} className="text-sm text-red-600">
+                          • {item}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })()}
 
             <div data-testid="comparison-different">
               <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
@@ -1607,10 +1619,10 @@ export function PresentationPracticeClient() {
               )}
             </div>
 
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-xs font-semibold text-amber-700 mb-1">다시 연습할 문장</p>
-              <p className="text-sm text-amber-800 font-medium">{DEMO_COMPARISON.practice}</p>
-            </div>
+            {(() => {
+              // 23-f Phase B: 정적 "다시 연습할 문장" 영역 숨김 (시연 중 데이터 정리 전 임시 조치).
+              return null
+            })()}
           </CardBody>
         </Card>
       )}
