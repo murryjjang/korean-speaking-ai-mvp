@@ -1413,6 +1413,46 @@ export function PresentationPracticeClient() {
             } : undefined}
           />
 
+          {/* 23-h C-1: 색상 범례 — 녹음 후 Azure 결과 도착 시 표시. 읽기 연습 범례 패턴 일관. */}
+          {recordingState === 'done' && azureResult?.wordResults && azureResult.wordResults.length > 0 && (
+            <div
+              className="flex flex-wrap gap-x-4 gap-y-2 text-xs"
+              data-testid="shadowing-color-legend"
+              aria-label="섀도잉 색상 범례"
+            >
+              <span className="flex items-center gap-2">
+                <span style={{ color: '#888780', fontWeight: 600 }}>가나다</span>
+                <span className="text-text-muted">그대로 발화</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span style={{
+                  color: '#C8543C',
+                  backgroundColor: '#FFF3CD',
+                  padding: '2px 4px',
+                  borderRadius: 4,
+                  textDecoration: 'underline',
+                  textDecorationColor: '#C8543C',
+                  textDecorationThickness: '3px',
+                  fontWeight: 600,
+                }}>가나다</span>
+                <span className="text-text-muted">발음 부정확</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span style={{
+                  color: '#C8543C',
+                  backgroundColor: '#FFEEEE',
+                  padding: '2px 4px',
+                  borderRadius: 4,
+                  textDecoration: 'line-through',
+                  textDecorationColor: '#C8543C',
+                  textDecorationThickness: '3px',
+                  fontWeight: 600,
+                }}>가나다</span>
+                <span className="text-text-muted">발화 안 함</span>
+              </span>
+            </div>
+          )}
+
           {/* 시간 가이드 — 녹음 중 진행률 (읽기 패턴) */}
           {recordingState === 'recording' && (
             <PresentationTimeGuide
@@ -1482,6 +1522,12 @@ export function PresentationPracticeClient() {
           <p className="text-xs text-text-muted">
             ※ 이 단계는 섀도잉 연습입니다. STT 기반 발표 피드백과 함께 활용해 보세요.
           </p>
+          {/* 23-h C-2: Azure 출처 명시 — 녹음 후 Azure 결과가 있을 때만 표시 */}
+          {recordingState === 'done' && azureResult?.wordResults && azureResult.wordResults.length > 0 && (
+            <p className="text-xs text-text-muted" data-testid="azure-attribution">
+              Azure Speech 기반 발음 평가
+            </p>
+          )}
         </CardBody>
       </Card>
 

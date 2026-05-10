@@ -1165,8 +1165,15 @@ export function ReadingPracticeClient() {
             </CardBody>
           </Card>
 
-          {/* 녹음 컨트롤 */}
-          <Card>
+          {/* 23-h B-1: 녹음 컨트롤 — 본문 스크롤 시에도 항상 보이도록 sticky bottom 적용. */}
+          <Card
+            data-testid="reading-recording-controls"
+            className="sticky bottom-0 z-20"
+            style={{
+              backgroundColor: 'var(--color-background-primary, #FAF9F5)',
+              boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.04)',
+            }}
+          >
             <CardHeader title="읽기 녹음" description="지문을 처음부터 끝까지 읽은 뒤 완료 버튼을 누르세요" />
             <CardBody>
               <div className="flex flex-wrap gap-3 items-center">
@@ -1323,6 +1330,13 @@ export function ReadingPracticeClient() {
                 {finalScore >= 70 && finalScore < 80 && '일부 단어가 다르게 인식되었습니다. AI 음성을 다시 듣고 따라 읽어 보세요.'}
                 {finalScore < 70 && '일부 문장이 빠지거나 다르게 인식되었습니다. AI 음성을 다시 듣고 한 문장씩 따라 읽어 보세요.'}
               </div>
+
+              {/* 23-h B-2: Azure 출처 명시 */}
+              {azureResult && (
+                <p className="mt-3 text-xs text-text-muted" data-testid="azure-attribution">
+                  Azure Speech 기반 발음 평가
+                </p>
+              )}
             </CardBody>
           </Card>
 

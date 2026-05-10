@@ -19,6 +19,47 @@ function formatTime(sec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+// 23-h D-3: 카페 메뉴판 카테고리 섹션. 항목명-점선 leader-가격 정렬로
+// 실제 메뉴판에 가까운 시각을 만든다.
+function CafeMenuSection({
+  title,
+  items,
+}: {
+  title: string
+  items: Array<{ name: string; price: string }>
+}) {
+  return (
+    <div className="mb-3 last:mb-0">
+      <p
+        className="text-xs font-semibold mb-1.5 pb-0.5"
+        style={{ color: '#C49B4B', borderBottom: '1px dashed #D9C193' }}
+      >
+        {title}
+      </p>
+      <ul className="space-y-1">
+        {items.map((it, i) => (
+          <li
+            key={i}
+            className="flex items-baseline gap-2 text-sm"
+            style={{ color: '#1F2D3D' }}
+          >
+            <span>{it.name}</span>
+            <span
+              className="flex-1 mx-1"
+              style={{
+                borderBottom: '1px dotted #B5A584',
+                transform: 'translateY(-3px)',
+              }}
+              aria-hidden
+            />
+            <span className="font-medium tabular-nums">{it.price}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export type DialogueMissionPanelProps = {
   questionId: string
   questionSetId: string
@@ -166,6 +207,8 @@ export function DialogueMissionPanel({
   const handleStopRecording = useCallback(() => {
     recorder.stopRecording()
     // State transition to 'recorded' happens via the useEffect above
+    // 23-h D-4: 자동 전송 — handleSendTurn은 'recorded' state로 진입한 뒤
+    // 별도 effect에서 자동 호출된다.
   }, [recorder])
 
   const handleRetake = useCallback(() => {
@@ -246,9 +289,29 @@ export function DialogueMissionPanel({
     // Tag student turn intent — language questions are excluded from mission evidence
     const isLanguageQuestion = shouldAnswerLanguageQuestion(transcript)
 
-    // Add student turn
+    // 23-h D-6: 학습자 발화에 Azure PA 호출 — 정답 스크립트가 없는 자유 대화이므로
+    // 학습자 자신의 transcript를 referenceText로 사용한다. 결과 화면 평균 산출용.
+    // 비차단(별도 await): PA 실패해도 대화 흐름은 진행.
+    const studentTurnId = `turn-student-${Date.now()}`
+    const paPromise: Promise<number | null> = (async () => {
+      try {
+        const fd = new FormData()
+        fd.append('audio', audioBlob, 'recording.webm')
+        fd.append('referenceText', transcript)
+        const res = await fetch('/api/pronunciation-azure', { method: 'POST', body: fd })
+        if (!res.ok) return null
+        const data = await res.json()
+        if (typeof data?.pronScore === 'number') return Math.round(data.pronScore)
+        if (typeof data?.normalizedScore === 'number') return Math.round(data.normalizedScore)
+        return null
+      } catch {
+        return null
+      }
+    })()
+
+    // Add student turn (pronScore 비동기 부착)
     const studentTurn: DialogueTurn = {
-      id: `turn-student-${Date.now()}`,
+      id: studentTurnId,
       role: 'student',
       text: transcript,
       audioDurationSec: recorder.durationSec,
@@ -260,6 +323,12 @@ export function DialogueMissionPanel({
 
     const newTurns = [...turns, studentTurn]
     setTurns(newTurns)
+
+    // PA 결과가 도착하면 해당 turn에 pronScore를 비동기로 부착
+    void paPromise.then((score) => {
+      if (score == null) return
+      setTurns((prev) => prev.map((t) => (t.id === studentTurnId ? { ...t, pronScore: score } : t)))
+    })
 
     // Get AI response
     setProcessingMessage('AI 응답 생성 중...')
@@ -331,6 +400,25 @@ export function DialogueMissionPanel({
     setPanelStatus('completed')
   }, [canSubmit])
 
+  // 23-h D-4: 'recorded' state로 진입하면 자동 전송. 에러/짧은 녹음은 제외.
+  // blobSize가 비동기로 로드되므로 isInvalidAudio가 안정될 때까지 기다린 뒤 호출.
+  const autoSendTriggeredRef = useRef(false)
+  useEffect(() => {
+    if (panelStatus !== 'recorded') {
+      autoSendTriggeredRef.current = false
+      return
+    }
+    if (recorder.state === 'error') return
+    if (turnError) return
+    // blobSize가 아직 도착 전이면 다음 렌더에서 다시 시도
+    if (blobSize === null) return
+    if (isInvalidAudio) return
+    if (autoSendTriggeredRef.current) return
+    autoSendTriggeredRef.current = true
+    // queueMicrotask로 effect 본체에서 직접 setState 회피
+    queueMicrotask(() => { void handleSendTurn() })
+  }, [panelStatus, recorder.state, turnError, blobSize, isInvalidAudio, handleSendTurn])
+
   const handleSubmit = useCallback(async () => {
     if (!canSubmit) return
     setPanelStatus('submitting')
@@ -387,60 +475,89 @@ export function DialogueMissionPanel({
 
   return (
     <div className="space-y-4" data-testid="dialogue-mission-panel">
-      {/* Cafe menu board — beginner q4 카페 주문 미션 전용 */}
+      {/* 23-h D-3: 카페 메뉴판 — 청중에게 실제 카페 시뮬레이션처럼 보이도록 디자인 강화.
+          크림 배경 + 골드 테두리 + 헤더 + dot leader. */}
       {isCafeScenario && (
-        <Card data-testid="cafe-menu-board">
-          <CardBody>
-            <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+        <div
+          data-testid="cafe-menu-board"
+          className="rounded-xl border-2 shadow-sm"
+          style={{
+            backgroundColor: '#FBF8F3',
+            borderColor: '#C49B4B',
+            padding: '20px 24px',
+          }}
+        >
+          <div className="text-center mb-3">
+            <p
+              className="font-bold tracking-[0.3em]"
+              style={{ color: '#1F2D3D', fontSize: '1.25rem', letterSpacing: '0.3em' }}
+            >
+              MENU
+            </p>
+            <p className="text-[11px] uppercase tracking-widest" style={{ color: '#C49B4B' }}>
               메뉴판
             </p>
-            <div className="space-y-2">
-              <div>
-                <p className="text-xs font-medium text-text-primary mb-1">음료</p>
-                <ul className="space-y-0.5 text-xs text-text-secondary">
-                  <li className="flex justify-between"><span>아이스 아메리카노</span><span>3,000원</span></li>
-                  <li className="flex justify-between"><span>따뜻한 아메리카노</span><span>3,000원</span></li>
-                  <li className="flex justify-between"><span>아이스 라테</span><span>3,500원</span></li>
-                  <li className="flex justify-between"><span>따뜻한 라테</span><span>3,500원</span></li>
-                  <li className="flex justify-between"><span>오렌지 주스</span><span>4,000원</span></li>
-                </ul>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-text-primary mb-1">디저트</p>
-                <ul className="space-y-0.5 text-xs text-text-secondary">
-                  <li className="flex justify-between"><span>팥빙수</span><span>6,000원</span></li>
-                  <li className="flex justify-between"><span>조각 케이크</span><span>5,000원</span></li>
-                </ul>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+          </div>
+
+          <CafeMenuSection
+            title="☕ 음료"
+            items={[
+              { name: '아이스 아메리카노', price: '3,000원' },
+              { name: '따뜻한 아메리카노', price: '3,000원' },
+              { name: '아이스 라테', price: '3,500원' },
+              { name: '따뜻한 라테', price: '3,500원' },
+              { name: '오렌지 주스', price: '4,000원' },
+            ]}
+          />
+          <CafeMenuSection
+            title="🍰 디저트"
+            items={[
+              { name: '팥빙수', price: '6,000원' },
+              { name: '조각 케이크', price: '5,000원' },
+            ]}
+          />
+        </div>
       )}
 
-      {/* Mission goals tracker */}
-      <Card>
-        <CardBody>
-          <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
-            미션 목표
-          </p>
-          <ul className="space-y-1.5">
-            {goalResults.map((g) => (
-              <li key={g.goalIndex} className="flex items-center gap-2">
-                <span
-                  className={`shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold
-                    ${g.achieved ? 'bg-success-100 text-success-700' : 'bg-surface border border-border text-text-muted'}`}
-                  data-testid={g.achieved ? 'goal-achieved' : 'goal-pending'}
-                >
-                  {g.achieved ? '✓' : g.goalIndex + 1}
-                </span>
-                <span className={`text-xs ${g.achieved ? 'text-success-700 line-through' : 'text-text-secondary'}`}>
-                  {g.labelKo}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </CardBody>
-      </Card>
+      {/* 23-h D-2: 미션 목표 강조 박스 — 골드 테두리 + 큰 헤더 + 체크박스로 청중에게도 잘 보이게. */}
+      <div
+        data-testid="mission-emphasis-box"
+        className="rounded-lg border-2"
+        style={{
+          backgroundColor: '#FFFBEB',
+          borderColor: '#C49B4B',
+          padding: '16px 20px',
+        }}
+      >
+        <p
+          className="font-bold mb-3"
+          style={{ color: '#1F2D3D', fontSize: '1.125rem' }}
+        >
+          🎯 미션 목표
+        </p>
+        <ul className="space-y-2">
+          {goalResults.map((g) => (
+            <li key={g.goalIndex} className="flex items-start gap-2.5">
+              <span
+                className={`shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold mt-0.5
+                  ${g.achieved
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-white border-2 text-text-muted'}`}
+                style={!g.achieved ? { borderColor: '#C49B4B' } : undefined}
+                data-testid={g.achieved ? 'goal-achieved' : 'goal-pending'}
+              >
+                {g.achieved ? '✓' : g.goalIndex + 1}
+              </span>
+              <span
+                className={`text-sm leading-relaxed font-medium ${g.achieved ? 'line-through opacity-70' : ''}`}
+                style={{ color: '#1F2D3D' }}
+              >
+                {g.labelKo}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {/* Dialogue conversation area */}
       {panelStatus !== 'idle' && (
@@ -636,14 +753,17 @@ export function DialogueMissionPanel({
                 <Button variant="secondary" onClick={handleRetake}>
                   다시 녹음
                 </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleSendTurn}
-                  disabled={isInvalidAudio}
-                  data-testid="send-turn-button"
-                >
-                  AI에게 보내기
-                </Button>
+                {/* 23-h D-4: 자동 전송 활성. 검증 실패 시에만 수동 전송 버튼 노출. */}
+                {isInvalidAudio && (
+                  <Button
+                    variant="primary"
+                    onClick={handleSendTurn}
+                    disabled
+                    data-testid="send-turn-button"
+                  >
+                    AI에게 보내기
+                  </Button>
+                )}
               </div>
             </div>
           )}

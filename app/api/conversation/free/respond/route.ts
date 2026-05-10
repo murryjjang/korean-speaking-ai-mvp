@@ -21,10 +21,10 @@ function buildSystemPrompt(topic: string): string {
 - 주제에 깊이 들어가는 후속 질문을 한 번에 하나씩
 - 1~3문장으로 짧게 응답
 
-[교정 역할]
-- 매 턴 학습자 발화를 점검합니다
-- 자연스럽고 정확하면 corrected는 original과 같게, reason은 "자연스럽게 잘 말씀하셨어요" 같은 짧은 칭찬
-- 어색하거나 비표준 표현이면 corrected는 자연스러운 표현, reason은 한 문장 이내 안내
+[교정 역할 — 매우 중요]
+- 학습자 발화가 한국어 모어 화자에게 자연스럽게 들리면 절대로 교정하지 마세요. 이때 corrected는 original과 글자까지 100% 동일하게 두고, reason은 "자연스럽게 잘 말씀하셨어요." 같은 짧은 칭찬으로 채웁니다.
+- 작은 차이(조사 1개 차이, 어미 살짝 어색, 띄어쓰기)도 교정하지 않습니다. 큰 변경(명백한 비표준 표현, 명확한 문법 오류, 단어 자체가 잘못된 경우)에서만 corrected를 변경합니다.
+- 의심스러우면 교정하지 마세요.
 
 [출력 형식]
 반드시 다음 JSON만 출력 (다른 텍스트, 코드 블록 금지):
@@ -36,6 +36,27 @@ function buildSystemPrompt(topic: string): string {
     "reason": "교정 이유 또는 칭찬 (한 문장)"
   }
 }`
+}
+
+// 23-h A-2: 단어 일치율 가드.
+// LLM이 작은 차이도 교정 결과로 만드는 경향이 있어, 일치율 ≥ 0.85일 때
+// 클라이언트 후처리에서 corrected를 original로 되돌리고 자연스러움 안내로 대체한다.
+function wordMatchRatio(original: string, corrected: string): number {
+  const tokenize = (s: string) =>
+    s.replace(/[.,!?。、·"'""''\s]+/g, ' ').trim().split(/\s+/).filter(Boolean)
+  const a = tokenize(original)
+  const b = tokenize(corrected)
+  if (a.length === 0 || b.length === 0) return 0
+  // 양방향 매칭 — 원문 단어 중 교정문에 포함된 비율의 max
+  const setA = new Set(a)
+  const setB = new Set(b)
+  let matchedA = 0
+  for (const w of b) if (setA.has(w)) matchedA++
+  let matchedB = 0
+  for (const w of a) if (setB.has(w)) matchedB++
+  const ratioA = matchedA / b.length
+  const ratioB = matchedB / a.length
+  return Math.min(ratioA, ratioB)
 }
 
 function formatHistory(turns: Turn[]): string {
@@ -142,6 +163,19 @@ export async function POST(request: Request) {
         typeof c.reason === 'string'
       ) {
         safeCorrection = { original: c.original, corrected: c.corrected, reason: c.reason }
+      }
+    }
+
+    // 23-h A-2: 단어 일치율 ≥ 0.85이면서 corrected !== original이면, 미세한 LLM
+    // 노이즈일 가능성이 높으므로 교정 표시를 누른다(자연스러움 안내로 변환).
+    if (safeCorrection.corrected.trim() !== safeCorrection.original.trim()) {
+      const ratio = wordMatchRatio(safeCorrection.original, safeCorrection.corrected)
+      if (ratio >= 0.85) {
+        safeCorrection = {
+          original: safeCorrection.original,
+          corrected: safeCorrection.original,
+          reason: '자연스럽게 잘 말씀하셨어요.',
+        }
       }
     }
 

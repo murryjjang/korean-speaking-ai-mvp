@@ -88,16 +88,31 @@ export async function submitDialogue(
     requiredElementAliases: (question as { requiredElementAliases?: Record<string, string[]> })?.requiredElementAliases,
   })
 
-  // Dialogue missions do not run ETRI pronunciation evaluation — no real WAV audio available.
-  // A mock result is used so the result page shows a quiet notice rather than an error card.
-  const pronunciationResult: PronunciationResult = {
-    normalizedScore: 0,
-    wordScores: [],
-    feedback: '대화형 미션 평가에서는 발음평가 API가 별도 적용되지 않습니다.',
-    providerName: 'mock',
-    providerVersion: '1.0.0',
-    latencyMs: 0,
-  }
+  // 23-h D-6: 학습자 발화별 Azure PA 점수가 있으면 평균을 종합 발음 점수로 사용.
+  // 없으면 종전과 같이 안내성 mock 결과로 폴백.
+  const studentPronScores = turns
+    .filter((t) => t.role === 'student' && typeof t.pronScore === 'number')
+    .map((t) => t.pronScore as number)
+  const pronunciationResult: PronunciationResult =
+    studentPronScores.length > 0
+      ? {
+          normalizedScore: Math.round(
+            studentPronScores.reduce((a, b) => a + b, 0) / studentPronScores.length,
+          ),
+          wordScores: [],
+          feedback: 'Azure Speech 기반 발음 평가 — 학습자 발화별 점수의 평균입니다.',
+          providerName: 'azure',
+          providerVersion: '1.0.0',
+          latencyMs: 0,
+        }
+      : {
+          normalizedScore: 0,
+          wordScores: [],
+          feedback: '대화형 미션 평가에서는 발음평가 API가 별도 적용되지 않습니다.',
+          providerName: 'mock',
+          providerVersion: '1.0.0',
+          latencyMs: 0,
+        }
 
   const llmEvalRaw = await llmEvalPromise
 
@@ -245,6 +260,12 @@ export async function submitDialogue(
       dialogueHybridScore: hybridResult.hybridScore ?? undefined,
       dialogueEvalSource: hybridResult.source,
       dialogueConversationProvider,
+      // 23-h D-5: 결과 화면 화자별 말풍선 렌더링용 turn 기록
+      dialogueTurnRecords: turns.map((t) => ({
+        role: t.role,
+        text: t.text,
+        pronScore: typeof t.pronScore === 'number' ? t.pronScore : undefined,
+      })),
     },
   }
 

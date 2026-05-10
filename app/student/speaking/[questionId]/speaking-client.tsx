@@ -269,25 +269,39 @@ export function SpeakingClient({
       if (audioBlob) {
         const blob = audioBlob
 
-        // Run STT, Storage upload, and Pronunciation evaluation in parallel — all non-blocking.
+        // 23-h D-6: q2/q3 결과에도 Azure PA 점수를 표시. q1 낭독은 prompt를
+        // referenceText로, q2/q3 자유 발화는 STT transcript를 referenceText로 사용.
+        // STT가 PA의 referenceText를 결정하므로 STT를 먼저 실행하고 그 후 PA + Storage 병렬.
+        try {
+          const fd = new FormData()
+          fd.append('audio', blob, 'recording.webm')
+          fd.append('questionId', question.id)
+          const res = await fetch('/api/stt', { method: 'POST', body: fd })
+          if (res.ok) {
+            const data = await res.json()
+            if (typeof data?.transcript === 'string') sttTranscript = data.transcript
+            if (typeof data?.providerName === 'string') sttProviderName = data.providerName
+            if (data?.warning === 'stt_hallucination_filtered') sttHallucinationDetected = true
+          }
+        } catch {
+          // STT failure is non-blocking — submitSpeaking uses mock fallback
+        }
+
+        // q1 낭독은 prompt에서 referenceText를 추출, q2/q3는 STT transcript를 사용.
+        const isReadingType = question.typeId === 'qt-reading'
+        let referenceText = ''
+        if (isReadingType && question.prompt) {
+          referenceText = question.prompt
+          const idx = question.prompt.indexOf('\n\n')
+          if (idx !== -1) {
+            const candidate = question.prompt.slice(idx + 2).trim()
+            if (candidate) referenceText = candidate
+          }
+        } else if (sttTranscript) {
+          referenceText = sttTranscript.trim()
+        }
+
         await Promise.allSettled([
-          // STT via /api/stt
-          (async () => {
-            try {
-              const fd = new FormData()
-              fd.append('audio', blob, 'recording.webm')
-              fd.append('questionId', question.id)
-              const res = await fetch('/api/stt', { method: 'POST', body: fd })
-              if (res.ok) {
-                const data = await res.json()
-                if (typeof data?.transcript === 'string') sttTranscript = data.transcript
-                if (typeof data?.providerName === 'string') sttProviderName = data.providerName
-                if (data?.warning === 'stt_hallucination_filtered') sttHallucinationDetected = true
-              }
-            } catch {
-              // STT failure is non-blocking — submitSpeaking uses mock fallback
-            }
-          })(),
           // Storage upload via /api/storage/upload
           (async () => {
             try {
@@ -305,21 +319,10 @@ export function SpeakingClient({
               // Storage upload failure is non-blocking — submit proceeds without audio_url
             }
           })(),
-          // Pronunciation evaluation via /api/pronunciation-azure — qt-reading only.
-          // q2/q3/q4 free-speech questions skip pronunciation API entirely; submitSpeaking uses demo fallback.
-          // Azure Pronunciation Assessment: referenceText 기반 scripted 낭독 평가.
+          // Azure Pronunciation Assessment — q1 낭독 + q2/q3 자유발화 (transcript 기준)
           (async () => {
-            if (question.typeId !== 'qt-reading') return
+            if (!referenceText) return
             try {
-              // Extract only the reading text after the first blank line.
-              // The prompt format is: "지시문\n\n<reading text to be assessed>"
-              let referenceText = question.prompt
-              const idx = question.prompt.indexOf('\n\n')
-              if (idx !== -1) {
-                const candidate = question.prompt.slice(idx + 2).trim()
-                if (candidate) referenceText = candidate
-              }
-
               const fd = new FormData()
               fd.append('audio', blob, 'recording.webm')
               fd.append('referenceText', referenceText)
@@ -337,7 +340,6 @@ export function SpeakingClient({
                     providerName: typeof data.providerName === 'string' ? data.providerName : 'demo',
                     latencyMs: typeof data.latencyMs === 'number' ? data.latencyMs : 0,
                     fallbackReason: typeof data.fallbackReason === 'string' ? data.fallbackReason : undefined,
-                    // Azure-specific
                     pronScore: typeof data.pronScore === 'number' ? data.pronScore : null,
                     accuracyScore: typeof data.accuracyScore === 'number' ? data.accuracyScore : null,
                     fluencyScore: typeof data.fluencyScore === 'number' ? data.fluencyScore : null,
@@ -483,11 +485,38 @@ export function SpeakingClient({
             </div>
           )}
           {question.typeId === 'qt-listening-resp' && question.learnerVisibleElements && question.learnerVisibleElements.length > 0 && (
-            <div className="mt-4 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-xs font-medium text-blue-800 mb-1">답변에 포함할 내용:</p>
-              <ul className="flex flex-wrap gap-1.5">
+            // 23-h D-2: q3 미션 강조 박스 — 골드 테두리 + 큰 헤더 + 체크박스로 청중에게도 잘 보이게.
+            <div
+              data-testid="q3-mission-emphasis"
+              className="mt-4 rounded-lg border-2"
+              style={{
+                backgroundColor: '#FFFBEB',
+                borderColor: '#C49B4B',
+                padding: '16px 20px',
+              }}
+            >
+              <p
+                className="font-bold mb-3"
+                style={{ color: '#1F2D3D', fontSize: '1.125rem' }}
+              >
+                🎯 답변에 포함할 내용
+              </p>
+              <ul className="space-y-2">
                 {question.learnerVisibleElements.map((el, i) => (
-                  <li key={i} className="text-xs bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-0.5">{el}</li>
+                  <li key={i} className="flex items-start gap-2.5">
+                    <span
+                      className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold mt-0.5 bg-white border-2"
+                      style={{ borderColor: '#C49B4B', color: '#C49B4B' }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span
+                      className="text-sm leading-relaxed font-medium"
+                      style={{ color: '#1F2D3D' }}
+                    >
+                      {el}
+                    </span>
+                  </li>
                 ))}
               </ul>
             </div>
@@ -587,9 +616,16 @@ export function SpeakingClient({
         </Card>
       )}
 
-      {/* Recording phase */}
+      {/* Recording phase — 23-h D-1: sticky bottom으로 본문 스크롤 시에도 항상 표시 */}
       {!isDialogueMission && phase === 'recording' && (
-        <Card>
+        <Card
+          data-testid="speaking-recording-controls"
+          className="sticky bottom-0 z-20"
+          style={{
+            backgroundColor: 'var(--color-background-primary, #FAF9F5)',
+            boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.04)',
+          }}
+        >
           <CardBody>
             <div className="text-center py-8">
               {/* Requesting mic permission */}
@@ -646,9 +682,16 @@ export function SpeakingClient({
         </Card>
       )}
 
-      {/* Review phase */}
+      {/* Review phase — 23-h D-1: sticky bottom으로 다시 녹음/제출 버튼 항상 표시 */}
       {!isDialogueMission && phase === 'review' && (
-        <Card>
+        <Card
+          data-testid="speaking-review-controls"
+          className="sticky bottom-0 z-20"
+          style={{
+            backgroundColor: 'var(--color-background-primary, #FAF9F5)',
+            boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.04)',
+          }}
+        >
           <CardBody>
             <div className="text-center py-6">
               {submitError && (

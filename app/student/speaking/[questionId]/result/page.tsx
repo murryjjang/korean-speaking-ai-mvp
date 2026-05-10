@@ -530,6 +530,8 @@ export default async function SpeakingResultPage({
   const dialogueHybridScore = evalRecord.meta?.dialogueHybridScore
   const dialogueEvalSource = evalRecord.meta?.dialogueEvalSource
   const dialogueConversationProvider = evalRecord.meta?.dialogueConversationProvider
+  // 23-h D-5: q4 결과 화면 화자별 말풍선 렌더링용
+  const dialogueTurnRecords = evalRecord.meta?.dialogueTurnRecords ?? []
 
   // Azure: providerName === 'azure' && pronScore != null
   const isAzureSuccess = pronunciationResult.providerName === 'azure' && pronunciationResult.pronScore != null
@@ -1166,11 +1168,43 @@ export default async function SpeakingResultPage({
                 </p>
               </div>
             )}
-            <p className="text-sm text-text-primary leading-relaxed bg-surface border border-border rounded-md p-4">
-              {sttResult.transcript ? `“${sttResult.transcript}”` : (
-                <span className="text-text-muted italic">음성이 인식되지 않았습니다.</span>
-              )}
-            </p>
+            {/* 23-h D-5: q4 (dialogue) — 화자별 말풍선으로 대화 기록 표시 */}
+            {isDialogueMission && dialogueTurnRecords.length > 0 ? (
+              <div className="space-y-2.5" data-testid="dialogue-turns-bubbles">
+                {dialogueTurnRecords.map((t, i) => (
+                  <div
+                    key={i}
+                    className={t.role === 'ai' ? 'flex justify-start' : 'flex justify-end'}
+                    data-testid={`dialogue-turn-bubble-${i}`}
+                  >
+                    <div
+                      className={t.role === 'ai' ? 'rounded-2xl px-4 py-2 max-w-[80%] text-sm leading-relaxed border border-border' : 'rounded-2xl px-4 py-2 max-w-[80%] text-sm leading-relaxed'}
+                      style={
+                        t.role === 'ai'
+                          ? { backgroundColor: '#FBF8F3', color: '#1F2D3D' }
+                          : { backgroundColor: '#1F2D3D', color: '#FFFFFF' }
+                      }
+                    >
+                      <p className="whitespace-pre-wrap">{t.text}</p>
+                      {/* 학습자 발화에 PA 점수 (D-6) — 표시되면 청중에게도 점수 가시화 */}
+                      {t.role === 'student' && typeof t.pronScore === 'number' && (
+                        <div className="mt-1 flex justify-end">
+                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">
+                            발음 {t.pronScore}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-text-primary leading-relaxed bg-surface border border-border rounded-md p-4">
+                {sttResult.transcript ? `“${sttResult.transcript}”` : (
+                  <span className="text-text-muted italic">음성이 인식되지 않았습니다.</span>
+                )}
+              </p>
+            )}
             {sttResult.wordTimings && sttResult.wordTimings.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {sttResult.wordTimings.map((wt, i) => (
@@ -1215,6 +1249,13 @@ export default async function SpeakingResultPage({
                   data-testid="pronunciation-fallback-notice"
                 >
                   실시간 발음평가 연결을 확인 중입니다. 현재는 음성 인식 결과와 제시문 비교를 바탕으로 한 참고평가가 표시됩니다.
+                </p>
+              )}
+
+              {/* 23-h D-6 (q1): Azure 출처 명시 — Azure 성공 시 작은 글씨로 표기 */}
+              {isAzureSuccess && (
+                <p className="mb-3 text-xs text-text-muted" data-testid="azure-attribution-q1">
+                  Azure Speech 기반 발음 평가
                 </p>
               )}
 
@@ -1466,34 +1507,112 @@ export default async function SpeakingResultPage({
             </CardBody>
           </Card>
         ) : !isDialogueMission ? (
-          /* q2/q3: 학습자 친화적 평가 안내 */
-          <Card>
-            <CardBody>
-              <p
-                className="text-xs text-text-secondary"
-                data-testid="pronunciation-scope-notice"
-              >
-                {isQ2
-                  ? '이 문항은 사진의 상황과 핵심 정보를 설명하는 능력을 중심으로 평가됩니다.'
-                  : isQ3
-                    ? '이 문항은 들은 내용을 이해하고 질문에 맞게 답하는 능력을 중심으로 평가됩니다.'
-                    : '이 문항은 말하기 능력을 중심으로 평가됩니다.'
-                }
-              </p>
-              <p className="mt-1 text-xs text-text-muted italic">
-                발음 세부 평가는 교사 검토 시 함께 확인됩니다.
-              </p>
-              {isQ2 && (
-                <p
-                  className="mt-2 text-xs text-text-muted italic"
-                  data-testid="image-placeholder-result-notice"
-                >
-                  * 이 문항의 자료 이미지는 임시 placeholder이며 파일럿 전 교체 예정입니다.
+          /* 23-h D-6: q2/q3 — Azure PA 결과가 있으면 점수 카드 표시, 없으면 기존 안내 유지. */
+          isAzureSuccess ? (
+            <Card data-testid="q2q3-pron-card">
+              <CardHeader
+                title="발음 평가 결과"
+                action={<Badge variant="success" size="sm">실시간 발음평가</Badge>}
+              />
+              <CardBody>
+                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3 mb-3">
+                  <div>
+                    <span className="text-xs text-text-secondary block mb-0.5">발음 종합점수</span>
+                    <span
+                      className="text-3xl font-bold tabular-nums"
+                      style={{
+                        color: (pronunciationResult.pronScore ?? 0) >= 80 ? '#16a34a'
+                          : (pronunciationResult.pronScore ?? 0) >= 60 ? '#d97706' : '#dc2626'
+                      }}
+                      data-testid="q2q3-pron-score"
+                    >
+                      {Math.round(pronunciationResult.pronScore!)}
+                    </span>
+                    <span className="text-sm text-text-muted ml-0.5">/ 100</span>
+                  </div>
+                  {pronunciationResult.accuracyScore != null && (
+                    <div>
+                      <span className="text-xs text-text-secondary block mb-0.5">정확도</span>
+                      <span className="text-xl font-semibold tabular-nums text-text-primary">
+                        {Math.round(pronunciationResult.accuracyScore)}
+                      </span>
+                    </div>
+                  )}
+                  {pronunciationResult.fluencyScore != null && (
+                    <div>
+                      <span className="text-xs text-text-secondary block mb-0.5">유창성</span>
+                      <span className="text-xl font-semibold tabular-nums text-text-primary">
+                        {Math.round(pronunciationResult.fluencyScore)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary">
+                  자유 발화 발음 평가는 학습자 발화 자체를 기준으로 산출됩니다.
                 </p>
-              )}
-            </CardBody>
-          </Card>
-        ) : null /* q4 dialogue: 발음 카드 숨김 */}
+                <p className="mt-1 text-xs text-text-muted">
+                  Azure Speech 기반 발음 평가
+                </p>
+              </CardBody>
+            </Card>
+          ) : (
+            <Card>
+              <CardBody>
+                <p
+                  className="text-xs text-text-secondary"
+                  data-testid="pronunciation-scope-notice"
+                >
+                  {isQ2
+                    ? '이 문항은 사진의 상황과 핵심 정보를 설명하는 능력을 중심으로 평가됩니다.'
+                    : isQ3
+                      ? '이 문항은 들은 내용을 이해하고 질문에 맞게 답하는 능력을 중심으로 평가됩니다.'
+                      : '이 문항은 말하기 능력을 중심으로 평가됩니다.'
+                  }
+                </p>
+                <p className="mt-1 text-xs text-text-muted italic">
+                  발음 세부 평가는 교사 검토 시 함께 확인됩니다.
+                </p>
+                {isQ2 && (
+                  <p
+                    className="mt-2 text-xs text-text-muted italic"
+                    data-testid="image-placeholder-result-notice"
+                  >
+                    * 이 문항의 자료 이미지는 임시 placeholder이며 파일럿 전 교체 예정입니다.
+                  </p>
+                )}
+              </CardBody>
+            </Card>
+          )
+        ) : (
+          /* 23-h D-6: q4 dialogue — 학습자 발화별 PA 점수 평균 표시 */
+          pronunciationResult.providerName === 'azure' && pronunciationResult.normalizedScore > 0 ? (
+            <Card data-testid="q4-pron-card">
+              <CardHeader
+                title="발음 평가 결과 (평균)"
+                action={<Badge variant="success" size="sm">실시간 발음평가</Badge>}
+              />
+              <CardBody>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span
+                    className="text-3xl font-bold tabular-nums"
+                    style={{
+                      color: pronunciationResult.normalizedScore >= 80 ? '#16a34a'
+                        : pronunciationResult.normalizedScore >= 60 ? '#d97706' : '#dc2626'
+                    }}
+                    data-testid="q4-pron-score"
+                  >
+                    {pronunciationResult.normalizedScore}
+                  </span>
+                  <span className="text-sm text-text-muted">/ 100</span>
+                </div>
+                <p className="text-xs text-text-secondary">{pronunciationResult.feedback}</p>
+                <p className="mt-1 text-xs text-text-muted">
+                  Azure Speech 기반 발음 평가
+                </p>
+              </CardBody>
+            </Card>
+          ) : null
+        )}
 
         {/* 다음 추천 활동 placeholder */}
         <Card>

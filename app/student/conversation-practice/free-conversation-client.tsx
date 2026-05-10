@@ -19,13 +19,19 @@ const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'family', label: '가족 이야기' },
 ]
 
-const TOTAL_SECONDS = 600 // 10분
-const WARNING_AT = 480 // 8분 (남은 2분 경고)
+// 23-h A-4: 시연용 3분 (이전 10분에서 단축)
+const TOTAL_SECONDS = 180 // 3분
+const WARNING_AT = 150 // 2:30 (남은 30초 경고)
+
+// 23-h A-3: 발음 평가 토글 localStorage 키
+const PRON_EVAL_TOGGLE_KEY = 'kspai:free-conv:pron-eval'
 
 type ChatTurn = {
+  id: string
   role: 'ai' | 'student'
   text: string
   correction?: { original: string; corrected: string; reason: string }
+  pronScore?: number // 23-h A-3: 토글 ON 시 학습자 발화의 Azure PA 점수
 }
 
 type Stage = 'start' | 'chat' | 'end'
@@ -49,6 +55,32 @@ function formatTime(sec: number): string {
 
 function buildOpener(topic: string): string {
   return `"${topic}"이라는 주제로 이야기해볼까요? 어떻게 시작할까요?`
+}
+
+// 23-h A-2: 단어 단위 LCS 기반 inline diff. 교정 표시 시 전체 삭선이 아니라
+// 변경된 단어만 강조해서 학습자 시선이 차이점에 집중되도록 한다.
+type DiffSeg = { type: 'same' | 'del' | 'add'; text: string }
+function diffWordsInline(original: string, corrected: string): DiffSeg[] {
+  const a = original.trim().split(/\s+/).filter(Boolean)
+  const b = corrected.trim().split(/\s+/).filter(Boolean)
+  const m = a.length, n = b.length
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      if (a[i] === b[j]) dp[i][j] = dp[i + 1][j + 1] + 1
+      else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1])
+    }
+  }
+  const segs: DiffSeg[] = []
+  let i = 0, j = 0
+  while (i < m && j < n) {
+    if (a[i] === b[j]) { segs.push({ type: 'same', text: a[i] }); i++; j++ }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { segs.push({ type: 'del', text: a[i++] }) }
+    else { segs.push({ type: 'add', text: b[j++] }) }
+  }
+  while (i < m) segs.push({ type: 'del', text: a[i++] })
+  while (j < n) segs.push({ type: 'add', text: b[j++] })
+  return segs
 }
 
 export function FreeConversationClient() {
@@ -91,6 +123,23 @@ export function FreeConversationClient() {
   )
   const [ttsAutoPlay, setTtsAutoPlay] = useState(true)
   const [speakingTurnIdx, setSpeakingTurnIdx] = useState<number | null>(null)
+
+  // 23-h A-3: 발음 평가 토글 (기본 OFF, localStorage 동기화)
+  // React 19 set-state-in-effect 룰 회피: useEffect 본체에서 직접 setState 대신
+  // queueMicrotask로 마이크로태스크 큐에 미루어 cascading render를 방지한다.
+  const [pronEvalEnabled, setPronEvalEnabled] = useState(false)
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem(PRON_EVAL_TOGGLE_KEY)
+      if (v === '1') queueMicrotask(() => setPronEvalEnabled(true))
+    } catch { /* noop */ }
+  }, [])
+  const togglePronEval = useCallback((enabled: boolean) => {
+    setPronEvalEnabled(enabled)
+    try {
+      window.localStorage.setItem(PRON_EVAL_TOGGLE_KEY, enabled ? '1' : '0')
+    } catch { /* noop */ }
+  }, [])
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -190,7 +239,7 @@ export function FreeConversationClient() {
 
   // 최신 sendMessageWithText 참조를 ref로 보관해 STT onstop 클로저에서 호출.
   // (text는 클로저로 캡처하므로 stale X — ref는 함수 참조 자체만 최신화.)
-  const sendMessageWithTextRef = useRef<((text: string) => void | Promise<void>) | null>(null)
+  const sendMessageWithTextRef = useRef<((text: string, studentTurnId?: string) => Promise<string | null>) | null>(null)
 
   // ── NPC TTS (Phase 1-B) ──────────────────────────────────────────────────
   // 학습자 녹음 중에는 음성 출력 안 함 (충돌 방지). 종료 화면(stage='end')에서도 재생 안 함.
@@ -298,7 +347,7 @@ export function FreeConversationClient() {
     const t = selectedTopic.trim()
     if (!t) return
     setTopic(t)
-    setTurns([{ role: 'ai', text: buildOpener(t) }])
+    setTurns([{ id: crypto.randomUUID(), role: 'ai', text: buildOpener(t) }])
     elapsedRef.current = 0
     setElapsed(0)
     setWarned(false)
@@ -309,17 +358,23 @@ export function FreeConversationClient() {
   }, [])
 
   // ── 발화 전송 ─────────────────────────────────────────────────────────────
-  const sendMessageWithText = useCallback(async (rawText: string) => {
+  // 23-h A-3: studentTurnId 옵션 추가 — STT 경로에서 발화한 학습자 turn 식별 후
+  // Azure PA 응답이 도착하면 해당 turn에 pronScore를 비동기로 부착할 수 있게 함.
+  const sendMessageWithText = useCallback(async (rawText: string, studentTurnId?: string): Promise<string | null> => {
     const trimmed = rawText.trim()
-    if (!trimmed || sending) return
+    if (!trimmed || sending) return null
     if (trimmed.length > 1000) {
       setChatError('한 번에 1000자까지만 입력할 수 있어요.')
-      return
+      return null
     }
     setChatError(null)
     setSending(true)
 
-    const studentTurn: ChatTurn = { role: 'student', text: trimmed }
+    const studentTurn: ChatTurn = {
+      id: studentTurnId ?? crypto.randomUUID(),
+      role: 'student',
+      text: trimmed,
+    }
     const nextTurns = [...turns, studentTurn]
     setTurns(nextTurns)
     setInput('')
@@ -341,23 +396,30 @@ export function FreeConversationClient() {
         npc_response: string
         learner_correction?: { original: string; corrected: string; reason: string }
       }
-      const finalTurns: ChatTurn[] = [
-        ...nextTurns.slice(0, -1),
-        { ...studentTurn, correction: data.learner_correction },
-        { role: 'ai', text: data.npc_response },
-      ]
-      setTurns(finalTurns)
+      // setState updater: PA 응답이 먼저 도착해 pronScore가 set됐을 수 있으므로,
+      // 직접 turns로 finalTurns를 구성하지 말고 함수형 업데이터로 병합한다.
+      setTurns((prev) =>
+        prev
+          .map((t) =>
+            t.id === studentTurn.id
+              ? { ...t, correction: data.learner_correction }
+              : t,
+          )
+          .concat({ id: crypto.randomUUID(), role: 'ai', text: data.npc_response }),
+      )
       // NPC 응답 자동 재생은 23-g Phase A 통합 effect(playedAiTurnIdxsRef)에서 처리.
     } catch (err) {
       console.error('[free-conversation] respond error', err)
       setChatError('잠시 후 다시 시도해주세요.')
-      setTurns([
-        ...nextTurns,
-        { role: 'ai', text: '죄송해요, 잠시 연결이 어려웠어요. 다시 한 번 말씀해 주실래요?' },
-      ])
+      setTurns((prev) => prev.concat({
+        id: crypto.randomUUID(),
+        role: 'ai',
+        text: '죄송해요, 잠시 연결이 어려웠어요. 다시 한 번 말씀해 주실래요?',
+      }))
     } finally {
       setSending(false)
     }
+    return studentTurn.id
   }, [sending, turns, topic])
 
   const sendMessage = useCallback(() => sendMessageWithText(input), [sendMessageWithText, input])
@@ -415,7 +477,36 @@ export function FreeConversationClient() {
             const nextText = prev ? `${prev} ${transcript}` : transcript
             setInput(nextText)
             const fn = sendMessageWithTextRef.current
-            if (fn) void fn(nextText)
+            // 23-h A-3: 발음 평가 토글 ON 시, Azure PA를 병렬 호출하고 응답이
+            // 도착하면 해당 student turn에 pronScore를 부착한다. transcript를
+            // referenceText로 사용 (자유 대화는 정답 스크립트가 없으므로 자기 발화 기준).
+            if (fn) {
+              const studentTurnId = crypto.randomUUID()
+              void fn(nextText, studentTurnId)
+              if (pronEvalEnabled) {
+                void (async () => {
+                  try {
+                    const fd = new FormData()
+                    fd.append('audio', blob, 'recording.webm')
+                    fd.append('referenceText', transcript)
+                    const paRes = await fetch('/api/pronunciation-azure', { method: 'POST', body: fd })
+                    if (!paRes.ok) return
+                    const paData = await paRes.json()
+                    const score = typeof paData?.pronScore === 'number'
+                      ? paData.pronScore
+                      : typeof paData?.normalizedScore === 'number'
+                        ? paData.normalizedScore
+                        : null
+                    if (score == null) return
+                    setTurns((prev) => prev.map((t) =>
+                      t.id === studentTurnId ? { ...t, pronScore: Math.round(score) } : t,
+                    ))
+                  } catch (err) {
+                    console.warn('[free-conversation] pron eval error', err)
+                  }
+                })()
+              }
+            }
           }
         } catch (err) {
           console.error('[free-conversation] STT error', err)
@@ -437,7 +528,7 @@ export function FreeConversationClient() {
       setVoiceError('마이크 권한이 필요합니다. 브라우저 권한을 확인해 주세요.')
       setVoiceState('idle')
     }
-  }, [voiceState, sending, stopVoiceTick, stopSpeaking])
+  }, [voiceState, sending, stopVoiceTick, stopSpeaking, pronEvalEnabled])
 
   const stopVoiceRecording = useCallback(() => {
     const mr = mediaRecorderRef.current
@@ -543,8 +634,8 @@ export function FreeConversationClient() {
           </button>
         </div>
 
-        {ttsSupported && (
-          <div className="mt-2 flex items-center gap-2" data-testid="tts-toggle-row">
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5" data-testid="tts-toggle-row">
+          {ttsSupported && (
             <label className="inline-flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -558,24 +649,35 @@ export function FreeConversationClient() {
               />
               <span>NPC 음성 자동 재생</span>
             </label>
-            {speakingTurnIdx !== null && (
-              <button
-                onClick={() => stopSpeaking()}
-                className="text-xs px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
-                data-testid="tts-stop-button"
-              >
-                ⏸ 중지
-              </button>
-            )}
-          </div>
-        )}
+          )}
+          {/* 23-h A-3: 발음 평가 토글 (기본 OFF, 비용 절약) */}
+          <label className="inline-flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={pronEvalEnabled}
+              onChange={(e) => togglePronEval(e.target.checked)}
+              className="rounded border-border"
+              data-testid="pron-eval-toggle"
+            />
+            <span>발음 평가 (Azure)</span>
+          </label>
+          {ttsSupported && speakingTurnIdx !== null && (
+            <button
+              onClick={() => stopSpeaking()}
+              className="text-xs px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
+              data-testid="tts-stop-button"
+            >
+              ⏸ 중지
+            </button>
+          )}
+        </div>
 
         {warned && !timeUp && (
           <div
             className="mt-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800"
             data-testid="time-warning"
           >
-            남은 시간 2분입니다. 마무리 발화를 준비해보세요.
+            남은 시간 30초입니다. 마무리 발화를 준비해보세요.
           </div>
         )}
         {timeUp && (
@@ -595,19 +697,31 @@ export function FreeConversationClient() {
         >
           {turns.map((t, i) => (
             <div
-              key={i}
+              key={t.id}
               className={t.role === 'ai' ? 'flex justify-start' : 'flex justify-end'}
               data-testid={`turn-${i}`}
             >
               <div
                 className={[
                   'rounded-2xl px-4 py-2 max-w-[80%] text-sm leading-relaxed',
-                  t.role === 'ai'
-                    ? 'bg-surface border border-border text-text-primary'
-                    : 'bg-primary-600 text-white',
+                  t.role === 'ai' ? 'border border-border' : '',
                 ].join(' ')}
+                style={
+                  t.role === 'ai'
+                    // 23-h A-1: NPC 말풍선 — 크림색 배경 + 다크 네이비 텍스트로 페이지/학습자 말풍선과 명확히 구분.
+                    ? { backgroundColor: '#FBF8F3', color: '#1F2D3D' }
+                    : { backgroundColor: '#1F2D3D', color: '#FFFFFF' }
+                }
               >
                 <p className="whitespace-pre-wrap">{t.text}</p>
+                {/* 23-h A-3: 발음 평가 점수 (토글 ON 시 학습자 발화에만 표시) */}
+                {t.role === 'student' && typeof t.pronScore === 'number' && (
+                  <div className="mt-1 flex justify-end" data-testid={`pron-score-${i}`}>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">
+                      발음 {t.pronScore}
+                    </span>
+                  </div>
+                )}
                 {t.role === 'ai' && ttsSupported && (
                   <div className="mt-1.5 -mb-0.5 flex justify-end">
                     {speakingTurnIdx === i ? (
@@ -634,9 +748,35 @@ export function FreeConversationClient() {
                 )}
                 {t.role === 'student' && t.correction && t.correction.corrected !== t.correction.original && (
                   <div className="mt-2 pt-2 border-t border-white/30 text-xs">
-                    <p className="opacity-90">
-                      ✏️ <span className="line-through opacity-70">{t.correction.original}</span>
-                      {' '}→ <span className="font-semibold">{t.correction.corrected}</span>
+                    {/* 23-h A-2: 변경 부분만 강조 — LCS 기반 단어 단위 diff */}
+                    <p className="leading-relaxed">
+                      <span className="opacity-80 mr-1">✏️</span>
+                      {diffWordsInline(t.correction.original, t.correction.corrected).map((seg, k) => {
+                        if (seg.type === 'same') {
+                          return <span key={k}>{seg.text} </span>
+                        }
+                        if (seg.type === 'del') {
+                          return (
+                            <span
+                              key={k}
+                              className="line-through opacity-60 mr-1"
+                              style={{ textDecorationColor: '#FECACA' }}
+                            >
+                              {seg.text}
+                            </span>
+                          )
+                        }
+                        // add
+                        return (
+                          <span
+                            key={k}
+                            className="font-semibold mr-1 px-1 rounded"
+                            style={{ backgroundColor: 'rgba(254, 240, 138, 0.35)' }}
+                          >
+                            {seg.text}
+                          </span>
+                        )
+                      })}
                     </p>
                     <p className="opacity-80 mt-0.5">{t.correction.reason}</p>
                   </div>

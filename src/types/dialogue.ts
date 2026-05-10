@@ -25,6 +25,8 @@ export type DialogueTurn = {
   ttsStatus?: 'idle' | 'playing' | 'error'
   ttsProvider?: 'browser' | 'mock' | 'azure' | 'openai'
   ttsAudioUrl?: string | null
+  // 23-h D-6: 학습자 발화 turn의 Azure PA 점수 (0-100). q4 결과 화면 평균 산출용.
+  pronScore?: number
 }
 
 export type MissionGoalResult = {

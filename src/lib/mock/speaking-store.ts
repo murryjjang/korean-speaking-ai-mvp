@@ -37,6 +37,12 @@ export type SpeakingEvalRecord = {
     dialogueEvalSource?: 'llm' | 'rule'
     /** q4 대화 provider — 'openai'면 LLM 대화, 그 외('mock'/'fallback')면 mock provider. */
     dialogueConversationProvider?: 'openai' | 'mock' | 'fallback'
+    /** 23-h D-5: q4 결과 화면 화자별 말풍선 렌더링용 turn 기록 (학습자 + AI). */
+    dialogueTurnRecords?: Array<{
+      role: 'ai' | 'student' | 'system'
+      text: string
+      pronScore?: number
+    }>
   }
 }
 
