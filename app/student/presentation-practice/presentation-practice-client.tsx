@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, type CSSProperties }
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
-import { isRTL, L1_LABEL_KO } from '@/src/lib/feedback-language'
+import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
 
 // ── Azure 단어 결과 타입 ──────────────────────────────────────────────────────
 interface AzureWordResult {
@@ -27,20 +27,6 @@ interface AzureResult {
   wordResults: AzureWordResult[]
   latencyMs?: number
 }
-
-// ── 언어 ────────────────────────────────────────────────────────────────────
-const NATIVE_LANGS = [
-  { code: 'vi', label: '베트남어 (Tiếng Việt)' },
-  { code: 'en', label: '영어 (English)' },
-  { code: 'th', label: '태국어 (ภาษาไทย)' },
-  { code: 'lo', label: '라오어 (ພາສາລາວ)' },
-  { code: 'ar', label: '아랍어 (العربية)' },
-  { code: 'zh', label: '중국어 (中文)' },
-  { code: 'ja', label: '일본어 (日本語)' },
-  { code: 'mn', label: '몽골어 (Монгол)' },
-  { code: 'ru', label: '러시아어 (Русский)' },
-  { code: 'uz', label: "우즈베크어 (O'zbek)" },
-]
 
 const SPEED_OPTIONS = [0.75, 0.9, 1.0, 1.1, 1.25] as const
 type SpeedOption = (typeof SPEED_OPTIONS)[number]
@@ -98,27 +84,14 @@ const DEMO_CORRECTIONS: CorrectionPoint[] = [
 ]
 
 // ── 모국어 교정 설명 ─────────────────────────────────────────────────────────
-const NATIVE_CORRECTION_NOTE: Record<string, string> = {
+// helperLang(ar/en/vi) 기준. 페이지 상단 LanguageHelperToggle이 단일 소스.
+const NATIVE_CORRECTION_NOTE: Record<FeedbackLanguage, string> = {
   vi:
     '• "카페에 갔습니다" và "아이스 아메리카노를 마셨습니다" được nối bằng "-아서/어서", nên câu tự nhiên hơn.\n• Thay vì lặp lại "그리고", dùng "그 후" sẽ giúp bài nói mạch lạc hơn.\n• Thêm "매우" giúp diễn đạt cảm xúc rõ hơn.\n• Bài nói này phù hợp với trình độ sơ cấp và có thể dùng để luyện nói.',
   en:
     '• Connect "카페에 갔습니다" and "아이스 아메리카노를 마셨습니다" with "-아서/어서" for a more natural flow.\n• Use "그 후" instead of repeating "그리고" to smooth the presentation.\n• Adding "매우" makes the feeling more expressive.\n• Overall, this is appropriate for a beginner-level presentation.',
-  th:
-    '• เชื่อม "카페에 갔습니다" และ "아이스 아메리카노를 마셨습니다" ด้วย "-아서/어서" เพื่อให้ประโยคเป็นธรรมชาติขึ้น\n• ใช้ "그 후" แทนการซ้ำ "그리고" เพื่อให้การนำเสนอราบรื่น\n• เพิ่ม "매우" เพื่อแสดงความรู้สึกชัดเจนขึ้น',
-  lo:
-    '• ເຊື່ອມ "카페에 갔습니다" ກັບ "아이스 아메리카노를 마셨습니다" ດ້ວຍ "-아서/어서" ໃຫ້ປະໂຫຍກເປັນທຳມະຊາດ\n• ໃຊ້ "그 후" ແທນ "그리고" ໃຫ້ການສະເໜີດຳເນີນໄດ້ດີ',
   ar:
     '• ربط "카페에 갔습니다" و"아이스 아메리카노를 마셨습니다" باستخدام "-아서/어서" يجعل الجملة أكثر طبيعية\n• استخدم "그 후" بدلاً من تكرار "그리고" لتحسين تدفق العرض\n• إضافة "매우" تجعل التعبير عن المشاعر أوضح',
-  zh:
-    '• 用"-아서/어서"连接"카페에 갔습니다"和"아이스 아메리카노를 마셨습니다"，句子更自然\n• 用"그 후"代替重复的"그리고"，发表更流畅\n• 加上"매우"能更清楚地表达感受',
-  ja:
-    '• "카페에 갔습니다"と"아이스 아메리카노를 마셨습니다"を"-아서/어서"でつなぐと自然な文になります\n• "그리고"を繰り返すより"그 후"を使うと発表の流れがスムーズになります\n• "매우"を加えると感情がより明確に伝わります',
-  mn:
-    '• "카페에 갔습니다"-г "-아서/어서"-аар "아이스 아메리카노를 마셨습니다"-тай холбоход илүү байгалийн өгүүлбэр болно\n• "그리고"-г давтахын оронд "그 후"-г ашиглаарай\n• "매우"-г нэмснээр мэдрэмжийг тодорхой илэрхийлнэ',
-  ru:
-    '• Соединив "카페에 갔습니다" и "아이스 아메리카노를 마셨습니다" с "-아서/어서", предложение станет более естественным\n• Используйте "그 후" вместо повтора "그리고" для плавного изложения\n• Добавление "매우" делает выражение чувств более выразительным',
-  uz:
-    "• \"카페에 갔습니다\" va \"아이스 아메리카노를 마셨습니다\"ni \"-아서/어서\" bilan bog'lash jumlani tabiiylroq qiladi\n• \"그리고\"ni takrorlash o'rniga \"그 후\"dan foydalanish nutqni ravonroq qiladi\n• \"매우\" qo'shish hissiyotni aniqroq ifodalaydi",
 }
 
 // ── 모국어 피드백 ─────────────────────────────────────────────────────────────
@@ -127,7 +100,7 @@ interface NativeFeedback {
   improve: string[]
 }
 
-const NATIVE_FEEDBACK: Record<string, NativeFeedback> = {
+const NATIVE_FEEDBACK: Record<FeedbackLanguage, NativeFeedback> = {
   vi: {
     good: [
       'Chủ đề bài nói rõ ràng.',
@@ -144,14 +117,6 @@ const NATIVE_FEEDBACK: Record<string, NativeFeedback> = {
     ],
     improve: ['Next time, try to pronounce the last sentence a bit more clearly.'],
   },
-  th: {
-    good: [
-      'หัวข้อการนำเสนอชัดเจน',
-      'คุณเล่าเรื่องที่ทำในวันหยุดตามลำดับเวลา',
-      'เนื้อหาที่พูดใกล้เคียงกับฉบับที่แก้ไขแล้ว',
-    ],
-    improve: ['ครั้งหน้าลองออกเสียงประโยคสุดท้ายให้ชัดขึ้นอีกนิด'],
-  },
   ar: {
     good: [
       'موضوع العرض واضح.',
@@ -162,7 +127,7 @@ const NATIVE_FEEDBACK: Record<string, NativeFeedback> = {
   },
 }
 
-function getNativeFeedback(code: string): NativeFeedback {
+function getNativeFeedback(code: FeedbackLanguage): NativeFeedback {
   return NATIVE_FEEDBACK[code] ?? NATIVE_FEEDBACK['en']
 }
 
@@ -513,7 +478,6 @@ function PresentationTimeGuide({ elapsedSec, targetSec }: { elapsedSec: number; 
 export function PresentationPracticeClient() {
   // 4 모드 공통 보조 언어 토글 (ar/en/vi). 페이지 상단 LanguageHelperToggle이 단일 소스.
   const { lang: helperLang } = useLanguageHelper()
-  const [nativeLang, setNativeLang] = useState('vi')
   const [level, setLevel] = useState<(typeof LEVEL_OPTIONS)[number]>('초급')
   const [topic, setTopic] = useState(DEFAULT_TOPIC)
   const [script, setScript] = useState(DEFAULT_SCRIPT)
@@ -856,7 +820,7 @@ export function PresentationPracticeClient() {
     }
   }
 
-  const nativeCorrectionNote = NATIVE_CORRECTION_NOTE[nativeLang] ?? NATIVE_CORRECTION_NOTE['en']
+  const nativeCorrectionNote = NATIVE_CORRECTION_NOTE[helperLang] ?? NATIVE_CORRECTION_NOTE['en']
 
   const recordingDone = recordingState === 'done'
   const showTimerFeedback = recordingDone && recordingElapsedAtStop > 0
@@ -1020,44 +984,24 @@ export function PresentationPracticeClient() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                학습자 모국어
-              </label>
-              <select
-                value={nativeLang}
-                onChange={e => setNativeLang(e.target.value)}
-                className="w-full rounded-md border border-border bg-surface text-text-primary text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400"
-                data-testid="native-lang-select"
-              >
-                {NATIVE_LANGS.map(l => (
-                  <option key={l.code} value={l.code}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                발표 수준
-              </label>
-              <div className="flex gap-2" data-testid="level-options">
-                {LEVEL_OPTIONS.map(lv => (
-                  <button
-                    key={lv}
-                    onClick={() => setLevel(lv)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                      level === lv
-                        ? 'bg-primary-600 text-white border-primary-600'
-                        : 'bg-surface text-text-secondary border-border hover:border-primary-400'
-                    }`}
-                  >
-                    {lv}
-                  </button>
-                ))}
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+              발표 수준
+            </label>
+            <div className="flex gap-2" data-testid="level-options">
+              {LEVEL_OPTIONS.map(lv => (
+                <button
+                  key={lv}
+                  onClick={() => setLevel(lv)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    level === lv
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-surface text-text-secondary border-border hover:border-primary-400'
+                  }`}
+                >
+                  {lv}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1364,9 +1308,13 @@ export function PresentationPracticeClient() {
             </div>
 
             {correctionResult.source === 'mock' && (
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                  {NATIVE_LANGS.find(l => l.code === nativeLang)?.label ?? '모국어'} 설명
+              <div
+                dir={isRTL(helperLang) ? 'rtl' : 'ltr'}
+                lang={helperLang}
+                style={isRTL(helperLang) ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+              >
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2" dir="ltr">
+                  {L1_LABEL_KO[helperLang]} 설명
                 </p>
                 <div
                   className="p-3 bg-primary-50 border border-primary-100 rounded-lg"

@@ -17,20 +17,6 @@ const REFERENCE_LINES = [
   '이렇게 친구와 함께 공부하면 한국어 실력이 더욱 빨리 늘 것 같아서 정말 기대가 됩니다.',
 ]
 
-// ── 언어 ────────────────────────────────────────────────────────────────────
-const NATIVE_LANGS = [
-  { code: 'vi', label: '베트남어 (Tiếng Việt)' },
-  { code: 'en', label: '영어 (English)' },
-  { code: 'th', label: '태국어 (ภาษาไทย)' },
-  { code: 'lo', label: '라오어 (ພາສາລາວ)' },
-  { code: 'ar', label: '아랍어 (العربية)' },
-  { code: 'zh', label: '중국어 (中文)' },
-  { code: 'ja', label: '일본어 (日本語)' },
-  { code: 'mn', label: '몽골어 (Монгол)' },
-  { code: 'ru', label: '러시아어 (Русский)' },
-  { code: 'uz', label: '우즈베크어 (O\'zbek)' },
-]
-
 // ── 속도 ────────────────────────────────────────────────────────────────────
 const SPEED_OPTIONS = [0.75, 0.9, 1.0, 1.1, 1.25] as const
 type SpeedOption = typeof SPEED_OPTIONS[number]
@@ -548,7 +534,6 @@ export function ReadingPracticeClient() {
   // 4 모드 공통 보조 언어 토글 (ar/en/vi). 페이지 상단 LanguageHelperToggle이 단일 소스.
   const { lang: helperLang } = useLanguageHelper()
   const [phase, setPhase] = useState<'setup' | 'practice' | 'result'>('setup')
-  const [nativeLang, setNativeLang] = useState('vi')
   const [speed, setSpeed] = useState<SpeedOption>(1.0)
   const [difficulty, setDifficulty] = useState('easy')
   const [currentLine, setCurrentLine] = useState(0)
@@ -937,22 +922,6 @@ export function ReadingPracticeClient() {
             <CardBody className="space-y-5">
               <div>
                 <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                  학습자 모국어
-                </label>
-                <select
-                  value={nativeLang}
-                  onChange={e => setNativeLang(e.target.value)}
-                  className="w-full rounded-md border border-border bg-surface text-text-primary text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400"
-                  data-testid="native-lang-select"
-                >
-                  {NATIVE_LANGS.map(l => (
-                    <option key={l.code} value={l.code}>{l.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
                   지문 난이도
                 </label>
                 <div className="flex gap-2">
@@ -1010,7 +979,7 @@ export function ReadingPracticeClient() {
         <>
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant="info" size="sm">
-              {NATIVE_LANGS.find(l => l.code === nativeLang)?.label ?? nativeLang}
+              {L1_LABEL_KO[helperLang]}
             </Badge>
             <Badge variant="default" size="sm">속도 {speed}x</Badge>
             <button

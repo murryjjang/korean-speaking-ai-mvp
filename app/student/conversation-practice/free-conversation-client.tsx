@@ -116,6 +116,10 @@ export function FreeConversationClient() {
   const audioChunksRef = useRef<Blob[]>([])
   const voiceTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // 텍스트 입력 (Enter 전송, Shift+Enter 줄바꿈, IME 조합 중 Enter 무시)
+  const [input, setInput] = useState('')
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
+
   // 명세 23-b 1-B: NPC 음성 출력 (브라우저 TTS)
   const ttsSupported = useSyncExternalStore(
     subscribeNoop,
@@ -806,7 +810,7 @@ export function FreeConversationClient() {
           )}
         </div>
 
-        {/* 입력 영역 */}
+        {/* 입력 영역 — 좌측 텍스트(Enter 전송) + 우측 녹음 버튼 */}
         <div className="sticky bottom-0 -mx-4 px-4 py-4 bg-surface-raised border-t border-border" data-testid="conversation-input-area">
           {chatError && (
             <p className="text-xs text-red-600 mb-2 text-center" data-testid="conversation-error">{chatError}</p>
@@ -814,34 +818,55 @@ export function FreeConversationClient() {
           {voiceError && (
             <p className="text-xs text-amber-700 mb-2 text-center" data-testid="voice-error">{voiceError}</p>
           )}
-          <div className="flex items-center justify-center">
+          <div className="flex items-center gap-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                // 한글 IME 조합 중 Enter는 글자 확정용 — 전송 금지.
+                if (e.nativeEvent.isComposing) return
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  const text = input.trim()
+                  if (!text || sending || timeUp) return
+                  if (voiceState !== 'idle') return
+                  setInput('')
+                  void sendMessageWithText(text)
+                }
+              }}
+              disabled={sending || timeUp || voiceState !== 'idle'}
+              rows={1}
+              placeholder="한국어로 입력하거나 🎤 버튼으로 말하세요 (Enter로 전송)"
+              className="flex-1 resize-none rounded-md border border-border bg-surface text-text-primary text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ minHeight: 44, maxHeight: 128 }}
+              data-testid="conversation-text-input"
+            />
             {voiceState === 'idle' && (
               <button
                 onClick={() => void startVoiceRecording()}
                 disabled={sending || timeUp}
                 title={timeUp ? '시간이 종료되어 녹음할 수 없습니다.' : '음성으로 발화하기'}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shrink-0"
                 data-testid="btn-voice-start"
               >
                 <span aria-hidden className="text-lg">🎤</span>
-                <span>녹음 시작</span>
               </button>
             )}
             {voiceState === 'recording' && (
               <button
                 onClick={() => stopVoiceRecording()}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm shrink-0"
                 data-testid="btn-voice-stop"
                 title="녹음 중지"
               >
                 <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" aria-hidden />
                 <span className="font-mono tabular-nums">{formatTime(voiceElapsed)}</span>
-                <span>중지</span>
               </button>
             )}
             {voiceState === 'processing' && (
               <span
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-surface border border-border text-text-secondary text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-surface border border-border text-text-secondary text-sm font-medium shrink-0"
                 data-testid="voice-processing"
               >
                 <span className="inline-block w-3.5 h-3.5 border-2 border-text-muted border-t-transparent rounded-full animate-spin" />
@@ -849,9 +874,6 @@ export function FreeConversationClient() {
               </span>
             )}
           </div>
-          <p className="mt-2 text-[11px] text-text-muted text-center">
-            🎤 버튼을 눌러 한국어로 말하면 자동으로 전송됩니다.
-          </p>
         </div>
       </div>
     )
