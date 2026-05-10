@@ -11,6 +11,114 @@ import type { DialogueTurn, MissionGoalResult } from '@/src/types/dialogue'
 import { generateAggregatedTranscript } from '@/src/lib/dialogue-mission'
 import { evaluateDialogueMissionHybrid } from '@/src/lib/dialogue-mission-llm'
 
+// 23-i 추가-1: 학습자 발화 자연스러움 교정 일괄 생성. q4 결과 화면 inline diff 표시용.
+// OPENAI_API_KEY 없거나 실패 시 빈 Map 반환 — 결과 화면에서 교정 표시는 생략된다.
+type CorrectionEntry = { correctedText: string; correctionReason: string }
+
+function dialogueCorrectionWordMatchRatio(original: string, corrected: string): number {
+  const tokenize = (s: string) =>
+    s.replace(/[.,!?。、·"'""''\s]+/g, ' ').trim().split(/\s+/).filter(Boolean)
+  const a = tokenize(original)
+  const b = tokenize(corrected)
+  if (a.length === 0 || b.length === 0) return 0
+  const setA = new Set(a)
+  const setB = new Set(b)
+  let matchedA = 0
+  for (const w of b) if (setA.has(w)) matchedA++
+  let matchedB = 0
+  for (const w of a) if (setB.has(w)) matchedB++
+  return Math.min(matchedA / b.length, matchedB / a.length)
+}
+
+async function generateDialogueCorrections(
+  studentTurns: DialogueTurn[],
+): Promise<Map<string, CorrectionEntry>> {
+  const result = new Map<string, CorrectionEntry>()
+  if (studentTurns.length === 0) return result
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) return result
+
+  try {
+    const { OpenAI } = await import('openai')
+    const client = new OpenAI({ apiKey })
+    const model =
+      process.env.OPENAI_DIALOGUE_CORRECTION_MODEL
+      ?? process.env.OPENAI_FREE_CONVERSATION_MODEL
+      ?? process.env.OPENAI_DIALOGUE_MODEL
+      ?? process.env.OPENAI_EVAL_MODEL
+      ?? 'gpt-4o-mini'
+
+    const numbered = studentTurns.map((t, i) => `${i + 1}. ${t.text}`).join('\n')
+    const systemPrompt = `당신은 한국어 학습자 발화의 자연스러움 교정 전문가입니다.
+
+[규칙]
+- 한국어 모어 화자에게 자연스러우면 절대 교정하지 마세요. corrected를 original과 100% 동일하게 두고 reason은 "자연스럽게 잘 말씀하셨어요." 같은 짧은 칭찬.
+- 작은 차이(조사 1개, 어미 살짝 어색, 띄어쓰기)는 교정하지 않음.
+- 명백한 비표준 표현, 명확한 문법 오류, 단어가 잘못된 경우에만 corrected 변경.
+- 의심스러우면 교정하지 않음.
+
+[출력 형식]
+반드시 다음 JSON만 출력 (다른 텍스트, 코드 블록 금지):
+{
+  "corrections": [
+    { "index": 1, "original": "...", "corrected": "...", "reason": "..." },
+    ...
+  ]
+}
+배열 길이는 입력 발화 수와 동일해야 합니다.`
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+    const response = await client.chat.completions.create(
+      {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `[학습자 발화 ${studentTurns.length}개]\n${numbered}` },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+        max_tokens: 1500,
+      },
+      { signal: controller.signal },
+    )
+    clearTimeout(timeout)
+
+    const raw = response.choices[0]?.message?.content ?? ''
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const arr = Array.isArray(parsed.corrections) ? parsed.corrections : []
+    for (const entry of arr) {
+      if (!entry || typeof entry !== 'object') continue
+      const e = entry as Record<string, unknown>
+      const idx = typeof e.index === 'number' ? e.index - 1 : -1
+      const original = typeof e.original === 'string' ? e.original : ''
+      const corrected = typeof e.corrected === 'string' ? e.corrected : ''
+      const reason = typeof e.reason === 'string' ? e.reason : ''
+      if (idx < 0 || idx >= studentTurns.length) continue
+      if (!corrected) continue
+      const turn = studentTurns[idx]
+      // 단어 일치율 ≥ 0.85이고 변경 있으면 LLM 노이즈로 간주 — 교정 표시 누름.
+      if (corrected.trim() !== original.trim()) {
+        const ratio = dialogueCorrectionWordMatchRatio(original, corrected)
+        if (ratio >= 0.85) {
+          result.set(turn.id, {
+            correctedText: original,
+            correctionReason: '자연스럽게 잘 말씀하셨어요.',
+          })
+          continue
+        }
+      }
+      result.set(turn.id, {
+        correctedText: corrected,
+        correctionReason: reason || '자연스러운 표현으로 교정했어요.',
+      })
+    }
+  } catch (err) {
+    console.warn('[submitDialogue] correction generation failed:', err)
+  }
+  return result
+}
+
 export interface DialogueSubmitMeta {
   turns: DialogueTurn[]
   goalResults: MissionGoalResult[]
@@ -88,6 +196,9 @@ export async function submitDialogue(
     requiredElementAliases: (question as { requiredElementAliases?: Record<string, string[]> })?.requiredElementAliases,
   })
 
+  // 23-i 추가-1: 학습자 발화 자연스러움 교정 (병렬, 비차단). 실패해도 제출 흐름 영향 X.
+  const correctionsPromise = generateDialogueCorrections(studentTurns)
+
   // 23-h D-6: 학습자 발화별 Azure PA 점수가 있으면 평균을 종합 발음 점수로 사용.
   // 없으면 종전과 같이 안내성 mock 결과로 폴백.
   const studentPronScores = turns
@@ -115,6 +226,7 @@ export async function submitDialogue(
         }
 
   const llmEvalRaw = await llmEvalPromise
+  const corrections = await correctionsPromise
 
   // Log provider event for LLM eval
   try {
@@ -260,12 +372,18 @@ export async function submitDialogue(
       dialogueHybridScore: hybridResult.hybridScore ?? undefined,
       dialogueEvalSource: hybridResult.source,
       dialogueConversationProvider,
-      // 23-h D-5: 결과 화면 화자별 말풍선 렌더링용 turn 기록
-      dialogueTurnRecords: turns.map((t) => ({
-        role: t.role,
-        text: t.text,
-        pronScore: typeof t.pronScore === 'number' ? t.pronScore : undefined,
-      })),
+      // 23-h D-5 + 23-i 추가-1: 결과 화면 화자별 말풍선 렌더링용 turn 기록
+      // (학습자 turn에 LLM 자연스러움 교정 결과 부착)
+      dialogueTurnRecords: turns.map((t) => {
+        const corr = t.role === 'student' ? corrections.get(t.id) : undefined
+        return {
+          role: t.role,
+          text: t.text,
+          pronScore: typeof t.pronScore === 'number' ? t.pronScore : undefined,
+          correctedText: corr?.correctedText,
+          correctionReason: corr?.correctionReason,
+        }
+      }),
     },
   }
 

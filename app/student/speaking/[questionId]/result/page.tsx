@@ -5,10 +5,36 @@ import questionsJson from '@/src/content/questions.json'
 import questionSetsJson from '@/src/content/question-sets.json'
 import questionTypesJson from '@/src/content/question-types.json'
 import rubricsJson from '@/src/content/rubrics.json'
-import { PageHeader, Card, CardHeader, CardBody, Badge, ScoreBar } from '@/src/components/ui'
+import { PageHeader, Card, CardHeader, CardBody, Badge, ScoreBar, MultilingualFeedback } from '@/src/components/ui'
 import type { AzureWordResult } from '@/src/types/providers'
 
 const rubric = rubricsJson.find((r) => r.id === 'rubric-speaking-01')!
+
+// 23-i 추가-1: 단어 단위 LCS 기반 inline diff (free-conversation-client.tsx와 동일 패턴).
+// q4 결과 화면 학습자 말풍선의 교정 강조에 사용.
+type DiffSeg = { type: 'same' | 'del' | 'add'; text: string }
+function diffWordsInline(original: string, corrected: string): DiffSeg[] {
+  const a = original.trim().split(/\s+/).filter(Boolean)
+  const b = corrected.trim().split(/\s+/).filter(Boolean)
+  const m = a.length, n = b.length
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      if (a[i] === b[j]) dp[i][j] = dp[i + 1][j + 1] + 1
+      else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1])
+    }
+  }
+  const segs: DiffSeg[] = []
+  let i = 0, j = 0
+  while (i < m && j < n) {
+    if (a[i] === b[j]) { segs.push({ type: 'same', text: a[i] }); i++; j++ }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { segs.push({ type: 'del', text: a[i++] }) }
+    else { segs.push({ type: 'add', text: b[j++] }) }
+  }
+  while (i < m) segs.push({ type: 'del', text: a[i++] })
+  while (j < n) segs.push({ type: 'add', text: b[j++] })
+  return segs
+}
 
 // 낭독(qt-reading) 문항 AI 참고평가 기준 (rubric-reading-01 기반 정성 기준)
 const READING_CRITERIA = [
@@ -532,6 +558,12 @@ export default async function SpeakingResultPage({
   const dialogueConversationProvider = evalRecord.meta?.dialogueConversationProvider
   // 23-h D-5: q4 결과 화면 화자별 말풍선 렌더링용
   const dialogueTurnRecords = evalRecord.meta?.dialogueTurnRecords ?? []
+  // 23-i 추가-2: 시나리오별 NPC 라벨. 카페 q4 → "직원". 그 외 dialogue → "AI".
+  const isCafeScenario = isDialogueMission
+    && typeof question?.id === 'string'
+    && question.id.includes('beginner')
+    && question.id.includes('q4')
+  const npcRoleLabel = isCafeScenario ? '직원' : 'AI'
 
   // Azure: providerName === 'azure' && pronScore != null
   const isAzureSuccess = pronunciationResult.providerName === 'azure' && pronunciationResult.pronScore != null
@@ -1079,56 +1111,16 @@ export default async function SpeakingResultPage({
           </CardBody>
         </Card>
 
-        {/* q4 다국어 피드백 — 베트남어 + 영어 */}
+        {/* q4 다국어 피드백 — 23-i 추가-3: 보조 언어 토글에 반응 (OFF → 비표시) */}
         {isDialogueMission && (() => {
           const ml = dialogueMultilingualFeedback(displayScore, achievedMissionGoals, totalMissionGoals)
           return (
-            <Card data-testid="q4-multilingual-feedback">
-              <CardHeader
-                title="모국어 피드백"
-                description="한국어 평가 내용을 베트남어와 영어로 보조 안내합니다."
-              />
-              <CardBody className="space-y-5">
-                <div data-testid="q4-feedback-vi">
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                    베트남어 (Tiếng Việt)
-                  </p>
-                  <div className="space-y-2">
-                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                      <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
-                      <ul className="text-sm text-emerald-700 space-y-1">
-                        {ml.vi.strengths.map((t, i) => <li key={i}>• {t}</li>)}
-                      </ul>
-                    </div>
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <p className="text-xs font-semibold text-amber-700 mb-1">다음 목표</p>
-                      <ul className="text-sm text-amber-700 space-y-1">
-                        {ml.vi.nextSteps.map((t, i) => <li key={i}>• {t}</li>)}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-                <div data-testid="q4-feedback-en">
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                    영어 (English)
-                  </p>
-                  <div className="space-y-2">
-                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                      <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
-                      <ul className="text-sm text-emerald-700 space-y-1">
-                        {ml.en.strengths.map((t, i) => <li key={i}>• {t}</li>)}
-                      </ul>
-                    </div>
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <p className="text-xs font-semibold text-amber-700 mb-1">다음 목표</p>
-                      <ul className="text-sm text-amber-700 space-y-1">
-                        {ml.en.nextSteps.map((t, i) => <li key={i}>• {t}</li>)}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
+            <MultilingualFeedback
+              testId="q4-multilingual-feedback"
+              vi={ml.vi}
+              en={ml.en}
+              description="한국어 평가 내용을 보조 언어로 안내합니다."
+            />
           )
         })()}
 
@@ -1174,9 +1166,16 @@ export default async function SpeakingResultPage({
                 {dialogueTurnRecords.map((t, i) => (
                   <div
                     key={i}
-                    className={t.role === 'ai' ? 'flex justify-start' : 'flex justify-end'}
+                    className={t.role === 'ai' ? 'flex flex-col items-start gap-1' : 'flex flex-col items-end gap-1'}
                     data-testid={`dialogue-turn-bubble-${i}`}
                   >
+                    {/* 23-i 추가-2: 화자 라벨 (직원/나) */}
+                    <span
+                      className="text-[11px] font-semibold text-text-muted px-1"
+                      data-testid={t.role === 'ai' ? 'turn-label-ai' : 'turn-label-student'}
+                    >
+                      {t.role === 'ai' ? npcRoleLabel : '나'}
+                    </span>
                     <div
                       className={t.role === 'ai' ? 'rounded-2xl px-4 py-2 max-w-[80%] text-sm leading-relaxed border border-border' : 'rounded-2xl px-4 py-2 max-w-[80%] text-sm leading-relaxed'}
                       style={
@@ -1186,6 +1185,42 @@ export default async function SpeakingResultPage({
                       }
                     >
                       <p className="whitespace-pre-wrap">{t.text}</p>
+                      {/* 23-i 추가-1: 학습자 발화 inline diff 교정 (변경 있을 때만) */}
+                      {t.role === 'student' && t.correctedText && t.correctedText !== t.text && (
+                        <div className="mt-2 pt-2 border-t border-white/30 text-xs">
+                          <p className="leading-relaxed">
+                            <span className="opacity-80 mr-1">✏️</span>
+                            {diffWordsInline(t.text, t.correctedText).map((seg, k) => {
+                              if (seg.type === 'same') {
+                                return <span key={k}>{seg.text} </span>
+                              }
+                              if (seg.type === 'del') {
+                                return (
+                                  <span
+                                    key={k}
+                                    className="line-through opacity-60 mr-1"
+                                    style={{ textDecorationColor: '#FECACA' }}
+                                  >
+                                    {seg.text}
+                                  </span>
+                                )
+                              }
+                              return (
+                                <span
+                                  key={k}
+                                  className="font-semibold mr-1 px-1 rounded"
+                                  style={{ backgroundColor: 'rgba(254, 240, 138, 0.35)' }}
+                                >
+                                  {seg.text}
+                                </span>
+                              )
+                            })}
+                          </p>
+                          {t.correctionReason && (
+                            <p className="opacity-80 mt-0.5">{t.correctionReason}</p>
+                          )}
+                        </div>
+                      )}
                       {/* 학습자 발화에 PA 점수 (D-6) — 표시되면 청중에게도 점수 가시화 */}
                       {t.role === 'student' && typeof t.pronScore === 'number' && (
                         <div className="mt-1 flex justify-end">

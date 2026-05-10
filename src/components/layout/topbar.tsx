@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Badge } from "@/src/components/ui/badge";
+import { LanguageHelperToggle } from "@/src/components/ui/language-helper-toggle";
 import type { UserRole } from "./app-shell";
 
 interface TopbarProps {
@@ -41,6 +42,8 @@ export function Topbar({ role, userName }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* 23-i 추가-3: 보조 언어 토글 — 학습자에게만 노출 (교수자/관리자 화면은 유지). */}
+        {role === "student" && <LanguageHelperToggle />}
         {userName && (
           <span className="hidden sm:inline text-xs text-text-secondary truncate max-w-[12rem]">
             {userName}

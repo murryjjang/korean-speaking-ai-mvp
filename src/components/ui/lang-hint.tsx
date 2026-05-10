@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 
 export type LangHintItem = { lang: string; text: string }
 
@@ -16,10 +17,27 @@ function getTextDir(lang: string): 'rtl' | 'ltr' {
   return RTL_LANG_CODES.has(lang.toUpperCase()) ? 'rtl' : 'ltr'
 }
 
+// 23-i 추가-3: 보조 언어 토글에 따라 표시할 lang 코드 결정.
+// 'off' → null (LangHint 자체 숨김), 'en' → 'EN', 'vi' → 'VI'.
+function langCodeFor(helper: 'off' | 'en' | 'vi'): string | null {
+  if (helper === 'off') return null
+  return helper.toUpperCase()
+}
+
 export function LangHint({ items, label = '도움말 보기' }: LangHintProps) {
   const [open, setOpen] = useState(false)
+  const { lang: helper } = useLanguageHelper()
 
   if (items.length === 0) return null
+  const targetLang = langCodeFor(helper)
+  if (!targetLang) return null
+  // 선택 언어와 일치하는 항목만 표시. 없으면 EN 폴백 (Vietnamese 데이터 없는 페이지 보호).
+  let visible = items.filter((it) => it.lang.toUpperCase() === targetLang)
+  if (visible.length === 0) {
+    const en = items.filter((it) => it.lang.toUpperCase() === 'EN')
+    if (en.length === 0) return null
+    visible = en
+  }
 
   return (
     <div className="mt-3">
@@ -34,7 +52,7 @@ export function LangHint({ items, label = '도움말 보기' }: LangHintProps) {
       </button>
       {open && (
         <div className="mt-2 rounded-md bg-surface border border-slate-100 px-3 py-2.5 space-y-1.5">
-          {items.map((item) => {
+          {visible.map((item) => {
             const dir = getTextDir(item.lang)
             return (
               <p

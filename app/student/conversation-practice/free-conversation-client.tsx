@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
+import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 
 // 클라이언트 마운트 후 speechSynthesis 지원 여부를 동기적으로 노출.
 // useEffect + setState 패턴은 React 19 react-hooks/set-state-in-effect 룰에 걸림.
@@ -84,6 +85,9 @@ function diffWordsInline(original: string, corrected: string): DiffSeg[] {
 }
 
 export function FreeConversationClient() {
+  // 23-i 추가-3: 보조 언어 토글 — 'off' | 'en' | 'vi'.
+  const { lang: helperLang } = useLanguageHelper()
+
   const [stage, setStage] = useState<Stage>('start')
   const [topic, setTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
@@ -124,14 +128,15 @@ export function FreeConversationClient() {
   const [ttsAutoPlay, setTtsAutoPlay] = useState(true)
   const [speakingTurnIdx, setSpeakingTurnIdx] = useState<number | null>(null)
 
-  // 23-h A-3: 발음 평가 토글 (기본 OFF, localStorage 동기화)
+  // 23-i 보정-1: 발음 평가 토글 기본값 ON (시연·운영). localStorage 미설정 시 ON.
   // React 19 set-state-in-effect 룰 회피: useEffect 본체에서 직접 setState 대신
   // queueMicrotask로 마이크로태스크 큐에 미루어 cascading render를 방지한다.
-  const [pronEvalEnabled, setPronEvalEnabled] = useState(false)
+  const [pronEvalEnabled, setPronEvalEnabled] = useState(true)
   useEffect(() => {
     try {
       const v = window.localStorage.getItem(PRON_EVAL_TOGGLE_KEY)
-      if (v === '1') queueMicrotask(() => setPronEvalEnabled(true))
+      // 명시적 OFF만 false로 반영 — null(미설정)은 기본값 ON 유지.
+      if (v === '0') queueMicrotask(() => setPronEvalEnabled(false))
     } catch { /* noop */ }
   }, [])
   const togglePronEval = useCallback((enabled: boolean) => {
@@ -909,45 +914,52 @@ export function FreeConversationClient() {
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">한국어</p>
                 <p className="text-sm text-text-primary leading-relaxed">{summary.summary_ko}</p>
               </div>
-              <div data-testid="summary-vi">
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">Tiếng Việt</p>
-                <p className="text-sm text-text-primary leading-relaxed">{summary.summary_vi}</p>
-              </div>
-              <div data-testid="summary-en">
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">English</p>
-                <p className="text-sm text-text-primary leading-relaxed">{summary.summary_en}</p>
-              </div>
+              {/* 23-i 추가-3: 보조 언어 토글에 따라 1개만 노출 */}
+              {helperLang === 'vi' && (
+                <div data-testid="summary-vi">
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">Tiếng Việt</p>
+                  <p className="text-sm text-text-primary leading-relaxed">{summary.summary_vi}</p>
+                </div>
+              )}
+              {helperLang === 'en' && (
+                <div data-testid="summary-en">
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">English</p>
+                  <p className="text-sm text-text-primary leading-relaxed">{summary.summary_en}</p>
+                </div>
+              )}
             </CardBody>
           </Card>
 
           <Card data-testid="conversation-feedback">
             <CardHeader title="학습 피드백" />
             <CardBody className="space-y-4">
-              {(['ko', 'vi', 'en'] as const).map((lang) => {
-                const fb = summary[`feedback_${lang}`]
-                const langLabel = lang === 'ko' ? '한국어' : lang === 'vi' ? 'Tiếng Việt' : 'English'
-                return (
-                  <div key={lang} data-testid={`feedback-${lang}`}>
-                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">{langLabel}</p>
-                    {fb.strengths.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
-                        <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
-                          {fb.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                    {fb.next_steps.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-amber-700 mb-1">다음 연습 시</p>
-                        <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
-                          {fb.next_steps.map((s, i) => <li key={i}>{s}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+              {(['ko', 'vi', 'en'] as const)
+                .filter((lang) => lang === 'ko' || lang === helperLang)
+                .map((lang) => {
+                  const fb = summary[`feedback_${lang}`]
+                  const langLabel = lang === 'ko' ? '한국어' : lang === 'vi' ? 'Tiếng Việt' : 'English'
+                  return (
+                    <div key={lang} data-testid={`feedback-${lang}`}>
+                      <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">{langLabel}</p>
+                      {fb.strengths.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
+                          <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
+                            {fb.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {fb.next_steps.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-amber-700 mb-1">다음 연습 시</p>
+                          <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
+                            {fb.next_steps.map((s, i) => <li key={i}>{s}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
             </CardBody>
           </Card>
 

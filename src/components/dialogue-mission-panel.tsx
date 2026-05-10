@@ -472,6 +472,8 @@ export function DialogueMissionPanel({
   }, [timeUp, panelStatus, canSubmit, handleSubmit, recorder])
 
   const isCafeScenario = questionId.includes('beginner') && questionId.includes('q4')
+  // 23-i 추가-2: 시나리오별 NPC 라벨. 카페 미션 → "직원". 그 외는 "AI" 유지.
+  const npcRoleLabel = isCafeScenario ? '직원' : 'AI'
 
   return (
     <div className="space-y-4" data-testid="dialogue-mission-panel">
@@ -601,10 +603,10 @@ export function DialogueMissionPanel({
                   className={`flex gap-2 ${turn.role === 'student' ? 'flex-row-reverse' : ''}`}
                 >
                   <div
-                    className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold
+                    className={`shrink-0 px-1.5 h-6 min-w-6 rounded-full flex items-center justify-center text-[10px] font-bold
                       ${turn.role === 'ai' ? 'bg-purple-100 text-purple-700' : 'bg-primary-100 text-primary-700'}`}
                   >
-                    {turn.role === 'ai' ? 'AI' : '나'}
+                    {turn.role === 'ai' ? npcRoleLabel : '나'}
                   </div>
                   <div
                     className={`max-w-[80%] rounded-lg px-3 py-2 text-xs leading-relaxed
@@ -645,8 +647,15 @@ export function DialogueMissionPanel({
         </Card>
       )}
 
-      {/* Controls */}
-      <Card>
+      {/* Controls — 23-i 보정-2: sticky bottom으로 메뉴판/대화 스크롤 시에도 항상 보이게 */}
+      <Card
+        data-testid="dialogue-controls"
+        className="sticky bottom-0 z-20"
+        style={{
+          backgroundColor: 'var(--color-background-primary, #FAF9F5)',
+          boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.04)',
+        }}
+      >
         <CardBody>
           {/* idle */}
           {panelStatus === 'idle' && (

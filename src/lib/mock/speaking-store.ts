@@ -42,6 +42,9 @@ export type SpeakingEvalRecord = {
       role: 'ai' | 'student' | 'system'
       text: string
       pronScore?: number
+      /** 23-i 추가-1: 학습자 발화 LLM 자연스러움 교정. 변경 없으면 undefined. */
+      correctedText?: string
+      correctionReason?: string
     }>
   }
 }
