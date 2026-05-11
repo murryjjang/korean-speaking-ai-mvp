@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
-import { isRTL, L1_LABEL_KO } from '@/src/lib/feedback-language'
+import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
 
 // 클라이언트 마운트 후 speechSynthesis 지원 여부를 동기적으로 노출.
 // useEffect + setState 패턴은 React 19 react-hooks/set-state-in-effect 룰에 걸림.
@@ -57,6 +57,37 @@ function buildOpener(topic: string): string {
   return `"${topic}"이라는 주제로 이야기해볼까요? 어떻게 시작할까요?`
 }
 
+// 폴백 — /api/conversation/free/summary 첫 호출 실패 시 최소 안내. 보조 언어 토글
+// 재호출이 실패한 경우에는 폴백을 적용하지 않고 기존 summary를 그대로 유지한다.
+const FALLBACK_SUMMARY_L1: Record<FeedbackLanguage, { summary: string; strengths: string[]; next_steps: string[] }> = {
+  vi: {
+    summary: 'Cuộc trò chuyện đã kết thúc.',
+    strengths: ['Bạn đã tham gia cuộc trò chuyện đến cuối.'],
+    next_steps: ['Lần sau hãy thử dùng nhiều cách diễn đạt hơn.'],
+  },
+  en: {
+    summary: 'The conversation has ended.',
+    strengths: ['You stayed engaged through the whole chat.'],
+    next_steps: ['Next time try a wider variety of expressions.'],
+  },
+  ar: {
+    summary: 'انتهت المحادثة.',
+    strengths: ['لقد شاركت في المحادثة حتى النهاية.'],
+    next_steps: ['في المرة القادمة، جرّب استخدام تعبيرات أكثر تنوعًا.'],
+  },
+}
+
+function fallbackSummaryFor(lang: FeedbackLanguage): SummaryResult {
+  const fb = FALLBACK_SUMMARY_L1[lang]
+  return {
+    source: 'mock',
+    summary_ko: '대화가 종료되었습니다.',
+    summary_l1: fb.summary,
+    feedback_ko: { strengths: ['대화에 끝까지 참여했습니다.'], next_steps: ['다음에 더 다양한 표현을 시도해 보세요.'] },
+    feedback_l1: { strengths: fb.strengths, next_steps: fb.next_steps },
+  }
+}
+
 // 23-h A-2: 단어 단위 LCS 기반 inline diff. 교정 표시 시 전체 삭선이 아니라
 // 변경된 단어만 강조해서 학습자 시선이 차이점에 집중되도록 한다.
 type DiffSeg = { type: 'same' | 'del' | 'add'; text: string }
@@ -106,6 +137,12 @@ export function FreeConversationClient() {
   // Summary
   const [summary, setSummary] = useState<SummaryResult | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
+  // 보조 언어 토글로 재호출이 실패한 경우 노출하는 inline 알림.
+  const [summaryReloadError, setSummaryReloadError] = useState<string | null>(null)
+  // 진행 중 fetch를 abort해 helperLang을 빠르게 전환해도 race가 없도록 한다.
+  const summaryAbortRef = useRef<AbortController | null>(null)
+  // 첫 fetch 식별 — 첫 호출 실패에서만 폴백을 채우고, 재호출 실패에서는 기존 데이터를 보존한다.
+  const summaryFetchedRef = useRef(false)
 
   // Phase C: 음성 입력 (q4·발표 STT 패턴 재사용)
   type VoiceState = 'idle' | 'recording' | 'processing'
@@ -164,53 +201,83 @@ export function FreeConversationClient() {
     }
   }, [])
 
-  // ── 종료: LLM 요약 호출 + end 단계 진입 ───────────────────────────────────
-  const endConversation = useCallback(async (currentTurns: ChatTurn[], currentTopic: string) => {
-    stopTimer()
-    setStage('end')
+  // ── 요약 fetch: 첫 진입 + helperLang 토글 시 공통 진입점 ────────────────
+  // 이전 호출은 AbortController로 무효화한다. 토글을 빠르게 연속해 누르더라도
+  // 마지막 helperLang에 대한 응답만 반영된다.
+  const fetchSummary = useCallback(async (
+    currentTurns: ChatTurn[],
+    currentTopic: string,
+    lang: FeedbackLanguage,
+  ) => {
+    summaryAbortRef.current?.abort()
+    const controller = new AbortController()
+    summaryAbortRef.current = controller
+    const isRefresh = summaryFetchedRef.current
+
     setSummaryLoading(true)
+    setSummaryReloadError(null)
     try {
       const apiTurns = currentTurns.map((t) => ({ role: t.role, text: t.text }))
       const res = await fetch('/api/conversation/free/summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: currentTopic, turns: apiTurns, helperLang }),
+        body: JSON.stringify({ topic: currentTopic, turns: apiTurns, helperLang: lang }),
+        signal: controller.signal,
       })
+      if (controller.signal.aborted) return
       if (!res.ok) throw new Error(`status_${res.status}`)
       const data = (await res.json()) as SummaryResult
+      if (controller.signal.aborted) return
       setSummary(data)
+      summaryFetchedRef.current = true
     } catch (err) {
+      if (controller.signal.aborted) return
+      if ((err as { name?: string })?.name === 'AbortError') return
       console.error('[free-conversation] summary error', err)
-      // 폴백: 한국어 + 보조 언어 1개 최소 안내.
-      const fallbackByLang: Record<typeof helperLang, { summary: string; strengths: string[]; next_steps: string[] }> = {
-        vi: {
-          summary: 'Cuộc trò chuyện đã kết thúc.',
-          strengths: ['Bạn đã tham gia cuộc trò chuyện đến cuối.'],
-          next_steps: ['Lần sau hãy thử dùng nhiều cách diễn đạt hơn.'],
-        },
-        en: {
-          summary: 'The conversation has ended.',
-          strengths: ['You stayed engaged through the whole chat.'],
-          next_steps: ['Next time try a wider variety of expressions.'],
-        },
-        ar: {
-          summary: 'انتهت المحادثة.',
-          strengths: ['لقد شاركت في المحادثة حتى النهاية.'],
-          next_steps: ['في المرة القادمة، جرّب استخدام تعبيرات أكثر تنوعًا.'],
-        },
+      if (isRefresh) {
+        // 보조 언어 토글 재호출 실패 — 기존 summary는 그대로 두고 알림만.
+        setSummaryReloadError('보조 언어 새로고침에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+      } else {
+        // 최초 호출 실패 — 폴백 데이터로 화면을 채운다.
+        setSummary(fallbackSummaryFor(lang))
+        summaryFetchedRef.current = true
       }
-      const fb = fallbackByLang[helperLang]
-      setSummary({
-        source: 'mock',
-        summary_ko: '대화가 종료되었습니다.',
-        summary_l1: fb.summary,
-        feedback_ko: { strengths: ['대화에 끝까지 참여했습니다.'], next_steps: ['다음에 더 다양한 표현을 시도해 보세요.'] },
-        feedback_l1: { strengths: fb.strengths, next_steps: fb.next_steps },
-      })
     } finally {
-      setSummaryLoading(false)
+      if (summaryAbortRef.current === controller) {
+        summaryAbortRef.current = null
+        setSummaryLoading(false)
+      }
     }
-  }, [stopTimer, helperLang])
+  }, [])
+
+  // ── 종료 버튼: 타이머만 멈추고 end 단계로 전환 ────────────────────────────
+  // 실제 fetch는 아래 useEffect가 stage/helperLang 변화에 따라 일괄 처리한다.
+  const endConversation = useCallback(() => {
+    stopTimer()
+    setStage('end')
+  }, [stopTimer])
+
+  // stage === 'end' 진입 또는 helperLang 변경 시 요약/피드백 재요청.
+  // turns, topic은 stage='end' 전환 시점에 이미 확정되어 있으므로 deps에서 제외하고
+  // stage·helperLang 변화에만 반응한다.
+  useEffect(() => {
+    if (stage !== 'end') {
+      summaryFetchedRef.current = false
+      summaryAbortRef.current?.abort()
+      summaryAbortRef.current = null
+      return
+    }
+    if (turns.length === 0) return
+    // React 19 set-state-in-effect 룰: fetchSummary가 본체에서 setState를 호출하므로
+    // 마이크로태스크에 미뤄 cascading render를 회피한다.
+    queueMicrotask(() => {
+      void fetchSummary(turns, topic, helperLang)
+    })
+    return () => {
+      summaryAbortRef.current?.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, helperLang])
 
   useEffect(() => {
     if (stage !== 'chat') return
@@ -635,7 +702,7 @@ export function FreeConversationClient() {
           <button
             onClick={() => {
               stopSpeaking()
-              void endConversation(turns, topic)
+              endConversation()
             }}
             className="px-3 py-1.5 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors"
             data-testid="btn-end-conversation"
@@ -899,6 +966,14 @@ export function FreeConversationClient() {
 
       {summary && (
         <>
+          {summaryReloadError && (
+            <div
+              className="px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800"
+              data-testid="summary-reload-error"
+            >
+              {summaryReloadError}
+            </div>
+          )}
           <Card data-testid="conversation-summary">
             <CardHeader
               title="대화 요약"
@@ -913,15 +988,24 @@ export function FreeConversationClient() {
                 <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">한국어</p>
                 <p className="text-sm text-text-primary leading-relaxed">{summary.summary_ko}</p>
               </div>
-              {/* 보조 언어 토글로 선택된 1개만 노출 (ar/en/vi) */}
+              {/* 보조 언어 토글로 선택된 1개만 노출 (ar/en/vi) — 토글 재호출 중에는 dim 처리. */}
               <div
                 data-testid="summary-l1"
                 dir={isRTL(helperLang) ? 'rtl' : 'ltr'}
                 lang={helperLang}
                 style={isRTL(helperLang) ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+                className={summaryLoading ? 'opacity-50 transition-opacity' : 'transition-opacity'}
+                aria-busy={summaryLoading || undefined}
               >
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1" dir="ltr">
-                  {L1_LABEL_KO[helperLang]}
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1 flex items-center gap-1.5" dir="ltr">
+                  <span>{L1_LABEL_KO[helperLang]}</span>
+                  {summaryLoading && (
+                    <span
+                      className="inline-block w-3 h-3 border-2 border-text-muted border-t-transparent rounded-full animate-spin"
+                      data-testid="summary-l1-spinner"
+                      aria-hidden="true"
+                    />
+                  )}
                 </p>
                 <p className="text-sm text-text-primary leading-relaxed">{summary.summary_l1}</p>
               </div>
@@ -934,13 +1018,17 @@ export function FreeConversationClient() {
               {([
                 { key: 'ko' as const, label: '한국어', testId: 'feedback-korean', fb: summary.feedback_ko, dir: 'ltr' as const, code: 'ko' as const },
                 { key: 'l1' as const, label: L1_LABEL_KO[helperLang], testId: 'feedback-native', fb: summary.feedback_l1, dir: (isRTL(helperLang) ? 'rtl' : 'ltr') as 'rtl' | 'ltr', code: helperLang },
-              ]).map(({ key, label, testId, fb, dir, code }) => (
+              ]).map(({ key, label, testId, fb, dir, code }) => {
+                const dimmed = key === 'l1' && summaryLoading
+                return (
                 <div
                   key={key}
                   data-testid={testId}
                   dir={dir}
                   lang={code}
                   style={dir === 'rtl' ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+                  className={dimmed ? 'opacity-50 transition-opacity' : 'transition-opacity'}
+                  aria-busy={dimmed || undefined}
                 >
                   <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2" dir="ltr">{label}</p>
                   {fb.strengths.length > 0 && (
@@ -960,7 +1048,8 @@ export function FreeConversationClient() {
                     </div>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </CardBody>
           </Card>
 
@@ -991,6 +1080,7 @@ export function FreeConversationClient() {
             setCustomTopic('')
             setTurns([])
             setSummary(null)
+            setSummaryReloadError(null)
             elapsedRef.current = 0
             setElapsed(0)
             setWarned(false)
