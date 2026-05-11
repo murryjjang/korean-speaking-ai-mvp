@@ -137,6 +137,28 @@ const MOCK_MODEL_ANSWERS_BY_TYPE: Record<string, string> = {
   'qt-opinion': '저는 이 주제에 대해 [의견]을 가지고 있습니다. 왜냐하면 [이유1]이기 때문입니다. 그래서 [결론]이 필요하다고 생각합니다.',
 }
 
+// Negation markers — a keyword hit with one of these within ±NEG_WINDOW chars
+// (excluding the hit itself) is treated as negated, e.g. "교재 안 가져가요",
+// "필기구 못 챙겼어요", "교재가 없어요", "가지 않아요".
+const NEGATION_MARKERS = ['안 ', '않', '못 ', '아니', '없']
+const NEG_WINDOW = 7
+
+/** True if a negation marker sits within ±NEG_WINDOW chars around [start, end). */
+function isNegatedHit(text: string, start: number, end: number): boolean {
+  const before = text.slice(Math.max(0, start - NEG_WINDOW), start)
+  const after = text.slice(end, end + NEG_WINDOW)
+  return NEGATION_MARKERS.some((m) => before.includes(m) || after.includes(m))
+}
+
+/** True if `kw` occurs in `text` at least once without an adjacent negation marker. */
+function hasCleanMatch(text: string, kw: string): boolean {
+  if (!kw) return false
+  for (let idx = text.indexOf(kw); idx !== -1; idx = text.indexOf(kw, idx + 1)) {
+    if (!isNegatedHit(text, idx, idx + kw.length)) return true
+  }
+  return false
+}
+
 // Keyword-based element detection for mock fallback
 // Returns { found: string[], missing: string[] }
 function detectRequiredElements(
@@ -218,7 +240,7 @@ function detectRequiredElements(
     const keywords = (aliases && aliases[el]) ? aliases[el] : (elementKeywords[el] ?? [])
     const matched = keywords.length === 0
       ? false
-      : keywords.some((kw) => t.includes(kw.toLowerCase()))
+      : keywords.some((kw) => hasCleanMatch(t, kw.toLowerCase()))
     if (matched) {
       found.push(el)
     } else {
