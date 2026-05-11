@@ -25,10 +25,10 @@ export function Topbar({ role, userName }: TopbarProps) {
       <div className="flex items-center gap-3">
         <div className="inline-flex items-center justify-center bg-white rounded-lg px-2 py-1">
           <Image
-            src="/images/kdli-logo.jpg"
+            src="/logos/kdli-logo-256.png"
             alt="KDLI"
-            width={120}
-            height={36}
+            width={160}
+            height={120}
             priority
             className="h-7 w-auto"
           />
