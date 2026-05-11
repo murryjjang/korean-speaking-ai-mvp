@@ -508,6 +508,11 @@ export function PresentationPracticeClient() {
     feedback_l1: LangFeedback
   }
   const [evaluateResult, setEvaluateResult] = useState<EvaluateResult | null>(null)
+  // 보조 언어 토글 재호출 진행 중 표시 + 실패 알림 — 응답 대기 동안 이전 언어
+  // 텍스트가 그대로 노출되어 "토글했는데 안 바뀐다"는 인상을 주는 문제를 막는다.
+  const [evaluateLoading, setEvaluateLoading] = useState(false)
+  const [evaluateReloadError, setEvaluateReloadError] = useState<string | null>(null)
+  const evaluateAbortRef = useRef<AbortController | null>(null)
   const feedbackSource: 'llm' | 'mock' = evaluateResult?.source ?? 'mock'
   const [customSec, setCustomSec] = useState('')
   const [useCustom, setUseCustom] = useState(false)
@@ -660,7 +665,8 @@ export function PresentationPracticeClient() {
 
   // 명세 23-c Phase 2: STT 결과(또는 fallback transcript)가 도착하면 LLM 평가 호출.
   // recordingState === 'done' && transcript !== null 일 때 한 번 호출하고,
-  // 호출 실패 시 mock 폴백을 받아 화면을 채운다.
+  // 호출 실패 시 mock 폴백을 받아 화면을 채운다. helperLang 토글 시에는 AbortController로
+  // 진행 중 요청을 무효화한 뒤 새 언어로 재요청하고, 응답 대기 동안 보조 언어 영역을 dim 처리한다.
   const evaluateRequestedRef = useRef<string | null>(null)
   useEffect(() => {
     if (recordingState !== 'done') {
@@ -668,14 +674,21 @@ export function PresentationPracticeClient() {
       return
     }
     if (transcript === null) return
-    // 동일 transcript+helperLang에 대해 중복 호출 방지. 토글이 바뀌면 자동 재평가.
     const sig = `${helperLang}:${transcript.length}:${(script || '').length}`
     if (evaluateRequestedRef.current === sig) return
+    const isRefresh = evaluateRequestedRef.current !== null
     evaluateRequestedRef.current = sig
+
+    const controller = new AbortController()
+    evaluateAbortRef.current = controller
+    // setState 동기 호출은 react-hooks/set-state-in-effect 룰 위반 → 마이크로태스크로 미룬다.
+    queueMicrotask(() => {
+      setEvaluateLoading(true)
+      setEvaluateReloadError(null)
+    })
 
     const correctedScript = correctionResult?.corrected_text ?? DEFAULT_CORRECTED
     const originalScript = (script || DEFAULT_SCRIPT).trim()
-    const cancelled = { v: false }
     ;(async () => {
       try {
         const res = await fetch('/api/presentation/evaluate', {
@@ -688,34 +701,48 @@ export function PresentationPracticeClient() {
             transcript,
             helperLang,
           }),
+          signal: controller.signal,
         })
-        if (cancelled.v) return
+        if (controller.signal.aborted) return
         if (!res.ok) throw new Error(`status_${res.status}`)
         const data = (await res.json()) as EvaluateResult
         if (!data || !data.feedback_ko || !data.feedback_l1) {
           throw new Error('invalid_shape')
         }
+        if (controller.signal.aborted) return
         setEvaluateResult(data)
       } catch (err) {
+        if (controller.signal.aborted) return
+        if ((err as { name?: string })?.name === 'AbortError') return
         console.error('[presentation/evaluate] error, keeping local fallback', err)
-        // 폴백: 한국어 + 보조 언어 1개만 채움.
-        const native = getNativeFeedback(helperLang)
-        setEvaluateResult({
-          source: 'mock',
-          feedback_ko: {
-            strengths: [
-              '발표 주제가 분명합니다.',
-              '내용을 시간 순서대로 말했습니다.',
-              '교정문과 실제 발화가 대부분 일치합니다.',
-            ],
-            next_steps: ['다음에는 마지막 문장을 조금 더 또렷하게 말해 보세요.'],
-          },
-          feedback_l1: { strengths: native.good, next_steps: native.improve },
-        })
+        if (isRefresh) {
+          // 보조 언어 토글 재호출 실패 — 기존 evaluateResult는 그대로 두고 인라인 알림.
+          setEvaluateReloadError('보조 언어 새로고침에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+        } else {
+          // 최초 평가 실패 — 한국어 + 보조 언어 1개 폴백.
+          const native = getNativeFeedback(helperLang)
+          setEvaluateResult({
+            source: 'mock',
+            feedback_ko: {
+              strengths: [
+                '발표 주제가 분명합니다.',
+                '내용을 시간 순서대로 말했습니다.',
+                '교정문과 실제 발화가 대부분 일치합니다.',
+              ],
+              next_steps: ['다음에는 마지막 문장을 조금 더 또렷하게 말해 보세요.'],
+            },
+            feedback_l1: { strengths: native.good, next_steps: native.improve },
+          })
+        }
+      } finally {
+        if (evaluateAbortRef.current === controller) {
+          evaluateAbortRef.current = null
+          setEvaluateLoading(false)
+        }
       }
     })()
     return () => {
-      cancelled.v = true
+      controller.abort()
     }
   // 의존성: transcript, recordingState, helperLang. helperLang이 바뀌면 새 언어로 재평가.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1632,6 +1659,14 @@ export function PresentationPracticeClient() {
           }
         />
         <CardBody className="space-y-4">
+          {evaluateReloadError && (
+            <div
+              className="px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800"
+              data-testid="evaluate-reload-error"
+            >
+              {evaluateReloadError}
+            </div>
+          )}
           {(() => {
             // 학습자 발화 기반 LLM 피드백이 도착하면 한국어 + 선택 언어 1개만 표시.
             const koFb = evaluateResult?.feedback_ko ?? {
@@ -1649,40 +1684,52 @@ export function PresentationPracticeClient() {
             }
             const l1Dir = isRTL(helperLang) ? 'rtl' : 'ltr'
             const blocks = [
-              { label: '한국어', testId: 'feedback-korean', fb: koFb, dir: 'ltr' as const, code: 'ko' },
-              { label: L1_LABEL_KO[helperLang], testId: 'feedback-native', fb: l1Fb, dir: l1Dir, code: helperLang },
+              { label: '한국어', testId: 'feedback-korean', fb: koFb, dir: 'ltr' as const, code: 'ko', isL1: false },
+              { label: L1_LABEL_KO[helperLang], testId: 'feedback-native', fb: l1Fb, dir: l1Dir, code: helperLang, isL1: true },
             ]
-            return blocks.map(({ label, testId, fb, dir, code }) => (
-              <div
-                key={testId}
-                data-testid={testId}
-                dir={dir}
-                lang={code}
-                style={dir === 'rtl' ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
-              >
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2" dir="ltr">
-                  {label} 피드백
-                </p>
-                <div className="space-y-2">
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                    <p className="text-xs font-semibold text-emerald-700 mb-1" dir="ltr">잘한 점</p>
-                    <ul className="text-sm text-emerald-700 space-y-1">
-                      {fb.strengths.map((item, i) => (
-                        <li key={i}>• {item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-xs font-semibold text-amber-700 mb-1" dir="ltr">다음 목표</p>
-                    <ul className="text-sm text-amber-700 space-y-1">
-                      {fb.next_steps.map((item, i) => (
-                        <li key={i}>• {item}</li>
-                      ))}
-                    </ul>
+            return blocks.map(({ label, testId, fb, dir, code, isL1 }) => {
+              const dimmed = isL1 && evaluateLoading
+              return (
+                <div
+                  key={testId}
+                  data-testid={testId}
+                  dir={dir}
+                  lang={code}
+                  style={dir === 'rtl' ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+                  className={dimmed ? 'opacity-50 transition-opacity' : 'transition-opacity'}
+                  aria-busy={dimmed || undefined}
+                >
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1.5" dir="ltr">
+                    <span>{label} 피드백</span>
+                    {dimmed && (
+                      <span
+                        className="inline-block w-3 h-3 border-2 border-text-muted border-t-transparent rounded-full animate-spin"
+                        data-testid="evaluate-l1-spinner"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </p>
+                  <div className="space-y-2">
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <p className="text-xs font-semibold text-emerald-700 mb-1" dir="ltr">잘한 점</p>
+                      <ul className="text-sm text-emerald-700 space-y-1">
+                        {fb.strengths.map((item, i) => (
+                          <li key={i}>• {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-xs font-semibold text-amber-700 mb-1" dir="ltr">다음 목표</p>
+                      <ul className="text-sm text-amber-700 space-y-1">
+                        {fb.next_steps.map((item, i) => (
+                          <li key={i}>• {item}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           })()}
 
           <p className="text-xs text-text-muted italic" data-testid="pronunciation-upgrade-notice">
