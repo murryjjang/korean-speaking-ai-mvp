@@ -43,7 +43,7 @@ export function LangHint({ items, label = '도움말 보기' }: LangHintProps) {
         <span>{open ? '도움말 닫기' : label}</span>
       </button>
       {open && (
-        <div className="mt-2 rounded-md bg-surface border border-slate-100 px-3 py-2.5 space-y-1.5">
+        <div className="mt-2 rounded-md bg-surface border border-slate-300 px-3 py-2.5 space-y-1.5">
           {visible.map((item) => {
             const dir = getTextDir(item.lang)
             return (
