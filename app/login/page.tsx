@@ -14,14 +14,14 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center gap-4 mb-8">
-          <div className="inline-flex items-center justify-center bg-white rounded-2xl p-6 shadow-sm">
+          <div className="flex justify-center">
             <Image
               src="/logos/kdli-seal-512.png"
               alt="KDLI - Korea Defense Language Institute"
-              width={240}
-              height={240}
+              width={384}
+              height={384}
               priority
-              className="h-24 w-24"
+              className="h-40 w-40"
             />
           </div>
           <h1 className="text-2xl font-semibold text-text-primary tracking-tight">
@@ -54,7 +54,7 @@ export default function LoginPage() {
               type="email"
               autoComplete="email"
               required
-              className="w-full border border-border rounded-md px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full border border-border rounded-md px-3 py-2 text-sm bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="이메일 주소"
             />
           </div>
@@ -69,7 +69,7 @@ export default function LoginPage() {
               type="password"
               autoComplete="current-password"
               required
-              className="w-full border border-border rounded-md px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full border border-border rounded-md px-3 py-2 text-sm bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="비밀번호"
             />
           </div>
