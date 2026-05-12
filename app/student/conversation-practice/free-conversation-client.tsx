@@ -12,14 +12,40 @@ const getTtsSupportedSnapshot = () =>
   typeof window !== 'undefined' && 'speechSynthesis' in window
 const getTtsSupportedServerSnapshot = () => false
 
-// 추천 주제 5개
+// 추천 주제 9개 (페르소나 메타데이터 없음 — 페르소나는 별도 단계에서 선택)
 const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'weekend-place', label: '주말에 가볼 만한 명소 추천' },
   { id: 'korean-food', label: '한국 음식 추천' },
   { id: 'movies', label: '좋아하는 영화 이야기' },
   { id: 'korea-trip', label: '한국 여행 계획' },
   { id: 'family', label: '가족 이야기' },
+  { id: 'weather-today', label: '오늘 날씨와 외출 계획' },
+  { id: 'find-cafe', label: '맛집·카페 찾기' },
+  { id: 'find-address', label: '주소 찾기·길안내' },
+  { id: 'find-facility', label: '편의시설(약국·병원) 찾기' },
 ]
+
+// 선택 가능한 페르소나 (v1.1). id는 src/lib/personas.ts의 personaId와 일치.
+const AVAILABLE_PERSONAS: ReadonlyArray<{ id: string; label: string; description: string; emoji: string }> = [
+  {
+    id: 'friend_casual',
+    label: '친구',
+    description: '반말·친근체. 일상 대화·취미·여행 추천에 적합',
+    emoji: '😊',
+  },
+  {
+    id: 'korean_life_helper',
+    label: '한국 생활 도우미',
+    description: '존댓말·정중체. 정보 조회·실생활 안내에 적합',
+    emoji: '👋',
+  },
+]
+
+const DEFAULT_PERSONA_ID = 'friend_casual'
+
+function personaMeta(id: string): { id: string; label: string; description: string; emoji: string } {
+  return AVAILABLE_PERSONAS.find((p) => p.id === id) ?? AVAILABLE_PERSONAS[0]
+}
 
 // 23-h A-4: 시연용 3분 (이전 10분에서 단축)
 const TOTAL_SECONDS = 180 // 3분
@@ -53,8 +79,12 @@ function formatTime(sec: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-function buildOpener(topic: string): string {
-  return `"${topic}"이라는 주제로 이야기해볼까요? 어떻게 시작할까요?`
+function buildOpener(topic: string, personaId: string): string {
+  if (personaId === 'korean_life_helper') {
+    return `안녕하세요! "${topic}" 관련해서 도와드릴게요. 무엇이 궁금하세요?`
+  }
+  // friend_casual 등 친근체 기본
+  return `"${topic}" 얘기해볼까? 편하게 시작해 봐!`
 }
 
 // 폴백 — /api/conversation/free/summary 첫 호출 실패 시 최소 안내. 보조 언어 토글
@@ -121,6 +151,14 @@ export function FreeConversationClient() {
   const [stage, setStage] = useState<Stage>('start')
   const [topic, setTopic] = useState('')
   const [customTopic, setCustomTopic] = useState('')
+
+  // v1.1: 2단계 시작 화면 — (1) 주제 선택 (2) 페르소나 선택
+  const [startSubstep, setStartSubstep] = useState<'select-topic' | 'select-persona'>('select-topic')
+  const [selectedCardLabel, setSelectedCardLabel] = useState<string | null>(null)
+  const [pendingTopic, setPendingTopic] = useState('')
+  const [pendingPersonaId, setPendingPersonaId] = useState<string>(DEFAULT_PERSONA_ID)
+  // 현재 대화 중인 페르소나 (chat 단계에서 확정)
+  const [personaId, setPersonaId] = useState<string>(DEFAULT_PERSONA_ID)
 
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [sending, setSending] = useState(false)
@@ -426,11 +464,13 @@ export function FreeConversationClient() {
   }, [stage, ttsSupported, ttsAutoPlay, voiceReady, voiceState, turns, speakText])
 
   // ── 시작 ──────────────────────────────────────────────────────────────────
-  const startConversation = useCallback((selectedTopic: string) => {
+  const startConversation = useCallback((selectedTopic: string, selectedPersonaId: string) => {
     const t = selectedTopic.trim()
     if (!t) return
+    const pid = AVAILABLE_PERSONAS.some((p) => p.id === selectedPersonaId) ? selectedPersonaId : DEFAULT_PERSONA_ID
     setTopic(t)
-    setTurns([{ id: crypto.randomUUID(), role: 'ai', text: buildOpener(t) }])
+    setPersonaId(pid)
+    setTurns([{ id: crypto.randomUUID(), role: 'ai', text: buildOpener(t, pid) }])
     elapsedRef.current = 0
     setElapsed(0)
     setWarned(false)
@@ -438,6 +478,14 @@ export function FreeConversationClient() {
     setSummary(null)
     setChatError(null)
     setStage('chat')
+  }, [])
+
+  // 주제 선택 → 페르소나 선택 단계로 전환
+  const goToPersonaSelect = useCallback((chosenTopic: string) => {
+    const t = chosenTopic.trim()
+    if (!t) return
+    setPendingTopic(t)
+    setStartSubstep('select-persona')
   }, [])
 
   // ── 발화 전송 ─────────────────────────────────────────────────────────────
@@ -468,6 +516,7 @@ export function FreeConversationClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic,
+          personaId,
           turns: apiTurns,
           latestStudentText: trimmed,
         }),
@@ -502,7 +551,7 @@ export function FreeConversationClient() {
       setSending(false)
     }
     return studentTurn.id
-  }, [sending, turns, topic])
+  }, [sending, turns, topic, personaId])
 
   // 최신 sendMessageWithText를 ref에 동기화 — STT onstop 클로저에서 호출.
   useEffect(() => {
@@ -618,53 +667,146 @@ export function FreeConversationClient() {
   // ── 단계별 렌더 ───────────────────────────────────────────────────────────
 
   if (stage === 'start') {
+    // ── 1단계: 주제 선택 ────────────────────────────────────────────────────
+    if (startSubstep === 'select-topic') {
+      return (
+        <div className="max-w-2xl mx-auto space-y-6 px-4 py-6" data-testid="free-conversation-start">
+          <div>
+            <h1 className="text-xl font-bold text-text-primary">생성형 대화 연습</h1>
+            <p className="text-sm text-text-secondary mt-1">
+              먼저 대화 주제를 고르세요. 추천 주제 중에서 선택하거나 직접 입력할 수 있습니다. (1/2)
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader title="추천 주제" />
+            <CardBody className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="topic-cards">
+                {RECOMMENDED_TOPICS.map((t) => {
+                  const selected = selectedCardLabel === t.label
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        setSelectedCardLabel(t.label)
+                        setCustomTopic('')
+                      }}
+                      className={[
+                        'text-left rounded-lg border p-4 transition-colors',
+                        selected
+                          ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-300'
+                          : 'border-border bg-surface hover:bg-slate-50',
+                      ].join(' ')}
+                      data-testid={`topic-card-${t.id}`}
+                      aria-pressed={selected}
+                    >
+                      <div className="flex items-start justify-between mb-1">
+                        <p className="text-sm font-semibold text-text-primary">{t.label}</p>
+                        {selected && <span className="text-primary-600 text-sm" aria-hidden>✓</span>}
+                      </div>
+                      <p className="text-xs text-text-muted">{selected ? '선택됨' : '이 주제 선택'}</p>
+                    </button>
+                  )
+                })}
+              </div>
+              <div>
+                <button
+                  onClick={() => { if (selectedCardLabel) goToPersonaSelect(selectedCardLabel) }}
+                  disabled={!selectedCardLabel}
+                  className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="btn-next-to-persona"
+                >
+                  다음 →
+                </button>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="직접 주제 입력" />
+            <CardBody className="space-y-3">
+              <textarea
+                value={customTopic}
+                onChange={(e) => {
+                  setCustomTopic(e.target.value)
+                  if (e.target.value.trim()) setSelectedCardLabel(null)
+                }}
+                rows={2}
+                placeholder="예: 어제 본 드라마 이야기"
+                className="w-full rounded-md border border-border bg-surface text-text-primary text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+                data-testid="custom-topic-input"
+              />
+              <div>
+                <button
+                  onClick={() => goToPersonaSelect(customTopic)}
+                  disabled={customTopic.trim().length === 0}
+                  className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="btn-start-custom"
+                >
+                  다음 →
+                </button>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      )
+    }
+
+    // ── 2단계: 페르소나 선택 ────────────────────────────────────────────────
     return (
-      <div className="max-w-2xl mx-auto space-y-6 px-4 py-6" data-testid="free-conversation-start">
+      <div className="max-w-2xl mx-auto space-y-6 px-4 py-6" data-testid="free-conversation-persona-select">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">생성형 대화 연습</h1>
+          <h1 className="text-xl font-bold text-text-primary">대화 상대 선택</h1>
           <p className="text-sm text-text-secondary mt-1">
-            AI와 자유롭게 한국어 대화를 나눠보세요. 추천 주제 중에서 고르거나 직접 입력할 수 있습니다.
+            누구와 이야기할지 골라보세요. (2/2)
+          </p>
+          <p className="text-xs text-text-muted mt-1" data-testid="pending-topic">
+            주제: <span className="font-medium text-text-secondary">{pendingTopic}</span>
           </p>
         </div>
 
         <Card>
-          <CardHeader title="추천 주제" />
-          <CardBody>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="topic-cards">
-              {RECOMMENDED_TOPICS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => startConversation(t.label)}
-                  className="text-left rounded-lg border border-border bg-surface p-4 hover:bg-slate-50 transition-colors"
-                  data-testid={`topic-card-${t.id}`}
-                >
-                  <div className="flex items-start justify-between mb-1">
-                    <p className="text-sm font-semibold text-text-primary">{t.label}</p>
-                  </div>
-                  <p className="text-xs text-text-muted">이 주제로 시작하기 →</p>
-                </button>
-              ))}
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader title="직접 주제 입력" />
+          <CardHeader title="대화 상대" />
           <CardBody className="space-y-3">
-            <textarea
-              value={customTopic}
-              onChange={(e) => setCustomTopic(e.target.value)}
-              rows={2}
-              placeholder="예: 어제 본 드라마 이야기"
-              className="w-full rounded-md border border-border bg-surface text-text-primary text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
-              data-testid="custom-topic-input"
-            />
-            <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="persona-cards">
+              {AVAILABLE_PERSONAS.map((p) => {
+                const selected = pendingPersonaId === p.id
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setPendingPersonaId(p.id)}
+                    className={[
+                      'text-left rounded-lg border p-4 transition-colors',
+                      selected
+                        ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-300'
+                        : 'border-border bg-surface hover:bg-slate-50',
+                    ].join(' ')}
+                    data-testid={`persona-card-${p.id}`}
+                    aria-pressed={selected}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl" aria-hidden>{p.emoji}</span>
+                      <p className="text-sm font-semibold text-text-primary">{p.label}</p>
+                      {selected && <span className="ml-auto text-primary-600 text-sm" aria-hidden>✓</span>}
+                    </div>
+                    <p className="text-xs text-text-muted leading-relaxed">{p.description}</p>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => startConversation(customTopic)}
-                disabled={customTopic.trim().length === 0}
+                onClick={() => setStartSubstep('select-topic')}
+                className="px-4 py-2 rounded-md border border-border bg-surface text-text-secondary text-sm font-medium hover:bg-slate-50 transition-colors"
+                data-testid="btn-back-to-topic"
+              >
+                ← 이전
+              </button>
+              <button
+                onClick={() => startConversation(pendingTopic, pendingPersonaId)}
+                disabled={!pendingTopic.trim()}
                 className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="btn-start-custom"
+                data-testid="btn-start-chat"
               >
                 시작하기
               </button>
@@ -691,6 +833,9 @@ export function FreeConversationClient() {
             <p className="text-xs text-text-muted">주제</p>
             <p className="text-sm font-semibold text-text-primary truncate" data-testid="conversation-topic">
               {topic}
+            </p>
+            <p className="text-[11px] text-text-muted truncate mt-0.5" data-testid="conversation-persona">
+              {personaMeta(personaId).emoji} {personaMeta(personaId).label}와 대화 중
             </p>
           </div>
           <div className="text-right">
@@ -1076,6 +1221,11 @@ export function FreeConversationClient() {
           onClick={() => {
             stopSpeaking()
             setStage('start')
+            setStartSubstep('select-topic')
+            setSelectedCardLabel(null)
+            setPendingTopic('')
+            setPendingPersonaId(DEFAULT_PERSONA_ID)
+            setPersonaId(DEFAULT_PERSONA_ID)
             setTopic('')
             setCustomTopic('')
             setTurns([])
