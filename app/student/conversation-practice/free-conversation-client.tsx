@@ -245,6 +245,7 @@ export function FreeConversationClient() {
   const fetchSummary = useCallback(async (
     currentTurns: ChatTurn[],
     currentTopic: string,
+    currentPersonaId: string,
     lang: FeedbackLanguage,
   ) => {
     summaryAbortRef.current?.abort()
@@ -259,7 +260,7 @@ export function FreeConversationClient() {
       const res = await fetch('/api/conversation/free/summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: currentTopic, turns: apiTurns, helperLang: lang }),
+        body: JSON.stringify({ topic: currentTopic, personaId: currentPersonaId, turns: apiTurns, helperLang: lang }),
         signal: controller.signal,
       })
       if (controller.signal.aborted) return
@@ -309,7 +310,7 @@ export function FreeConversationClient() {
     // React 19 set-state-in-effect 룰: fetchSummary가 본체에서 setState를 호출하므로
     // 마이크로태스크에 미뤄 cascading render를 회피한다.
     queueMicrotask(() => {
-      void fetchSummary(turns, topic, helperLang)
+      void fetchSummary(turns, topic, personaId, helperLang)
     })
     return () => {
       summaryAbortRef.current?.abort()

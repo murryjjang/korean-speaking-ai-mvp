@@ -10,12 +10,17 @@ import {
   L1_NAME,
   type FeedbackLanguage,
 } from '@/src/lib/feedback-language'
+import { getPersona, PERSONAS, type Persona } from '@/src/lib/personas'
 
 type Turn = { role: 'student' | 'ai'; text: string }
 
-function buildSystemPrompt(lang: FeedbackLanguage): string {
+const DEFAULT_PERSONA_ID = 'friend_casual'
+
+function buildSystemPrompt(lang: FeedbackLanguage, persona: Persona): string {
   const l1 = L1_NAME[lang]
   return `당신은 한국어 학습 코치입니다.
+학습자(외국인)는 '${persona.nameKo}'(${persona.role}, 말투: ${persona.speakingStyle}) 페르소나와 자유 대화를 했습니다.
+요약·피드백의 어조는 그 대화 맥락과 어울리게 자연스러운 한국어 코치 톤으로 작성하세요.
 학습자(외국인)와 NPC의 자유 대화 세션을 분석해 다음을 생성하세요:
 
 1. 대화 요약: 어떤 주제로 어떤 흐름의 대화를 했는지 3~5줄
@@ -110,6 +115,9 @@ export async function POST(request: Request) {
   const b = body as Record<string, unknown>
   const topic = typeof b.topic === 'string' ? b.topic.trim() : ''
   const helperLang: FeedbackLanguage = isFeedbackLanguage(b.helperLang) ? b.helperLang : 'vi'
+  const personaId =
+    typeof b.personaId === 'string' && b.personaId.trim() ? b.personaId.trim() : DEFAULT_PERSONA_ID
+  const persona: Persona = getPersona(personaId) ?? getPersona(DEFAULT_PERSONA_ID) ?? PERSONAS[0]
   const turns: Turn[] = Array.isArray(b.turns)
     ? (b.turns as unknown[]).flatMap((t): Turn[] => {
         if (!t || typeof t !== 'object') return []
@@ -145,7 +153,7 @@ export async function POST(request: Request) {
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: buildSystemPrompt(helperLang) },
+        { role: 'system', content: buildSystemPrompt(helperLang, persona) },
         { role: 'user', content: userContent },
       ],
       response_format: { type: 'json_object' },
