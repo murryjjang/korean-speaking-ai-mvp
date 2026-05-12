@@ -1,16 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
-
-// 클라이언트 마운트 후 speechSynthesis 지원 여부를 동기적으로 노출.
-// useEffect + setState 패턴은 React 19 react-hooks/set-state-in-effect 룰에 걸림.
-const subscribeNoop = () => () => {}
-const getTtsSupportedSnapshot = () =>
-  typeof window !== 'undefined' && 'speechSynthesis' in window
-const getTtsSupportedServerSnapshot = () => false
+import { sanitizeForTTS } from '@/src/lib/text-utils/sanitize-for-tts'
 
 // 추천 주제 9개 (페르소나 메타데이터 없음 — 페르소나는 별도 단계에서 선택)
 const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string }> = [
@@ -195,14 +189,13 @@ export function FreeConversationClient() {
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
-  // 명세 23-b 1-B: NPC 음성 출력 (브라우저 TTS)
-  const ttsSupported = useSyncExternalStore(
-    subscribeNoop,
-    getTtsSupportedSnapshot,
-    getTtsSupportedServerSnapshot,
-  )
+  // v1.1 8-3: NPC 음성 출력 — 서버 Azure TTS(/api/tts)로 페르소나별 음성 재생.
+  // 합성 실패·미설정 시 음성 없이 텍스트만으로 진행한다(브라우저 speechSynthesis 미사용).
   const [ttsAutoPlay, setTtsAutoPlay] = useState(true)
   const [speakingTurnIdx, setSpeakingTurnIdx] = useState<number | null>(null)
+  const npcAudioRef = useRef<HTMLAudioElement | null>(null)
+  // 진행 중 합성/재생을 무효화하기 위한 시퀀스 카운터 (빠른 연속 재생·중지 race 방지).
+  const ttsSeqRef = useRef(0)
 
   // 23-i 보정-1: 발음 평가 토글 기본값 ON (시연·운영). localStorage 미설정 시 ON.
   // React 19 set-state-in-effect 룰 회피: useEffect 본체에서 직접 setState 대신
@@ -342,7 +335,7 @@ export function FreeConversationClient() {
     }
   }, [stage])
 
-  // 컴포넌트 언마운트 시 음성 녹음 인터벌 + TTS 정리
+  // 컴포넌트 언마운트 시 음성 녹음 인터벌 + NPC 오디오 정리
   useEffect(() => {
     return () => {
       if (voiceTickRef.current) {
@@ -353,8 +346,11 @@ export function FreeConversationClient() {
       if (mr && mr.state === 'recording') {
         try { mr.stop() } catch { /* noop */ }
       }
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        try { window.speechSynthesis.cancel() } catch { /* noop */ }
+      const a = npcAudioRef.current
+      if (a) {
+        try { a.pause() } catch { /* noop */ }
+        a.src = ''
+        npcAudioRef.current = null
       }
     }
   }, [])
@@ -363,82 +359,58 @@ export function FreeConversationClient() {
   // (text는 클로저로 캡처하므로 stale X — ref는 함수 참조 자체만 최신화.)
   const sendMessageWithTextRef = useRef<((text: string, studentTurnId?: string) => Promise<string | null>) | null>(null)
 
-  // ── NPC TTS (Phase 1-B) ──────────────────────────────────────────────────
-  // 학습자 녹음 중에는 음성 출력 안 함 (충돌 방지). 종료 화면(stage='end')에서도 재생 안 함.
-  const stopSpeaking = useCallback(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-    try { window.speechSynthesis.cancel() } catch { /* noop */ }
+  // ── NPC TTS (v1.1 8-3): 서버 Azure TTS ───────────────────────────────────
+  // 학습자 녹음 중에는 자동 재생 안 함 (충돌 방지). 종료 화면(stage='end')에서도 재생 안 함.
+  const stopNpcAudio = useCallback(() => {
+    // 진행 중인 합성/재생을 무효화한다.
+    ttsSeqRef.current += 1
+    const a = npcAudioRef.current
+    if (a) {
+      try { a.pause() } catch { /* noop */ }
+      a.src = ''
+      npcAudioRef.current = null
+    }
     setSpeakingTurnIdx(null)
   }, [])
 
-  // 명세 23-c Phase 7 / 23-d Phase B: 자연스러운 한국어 음성 우선 선택. getVoices()는
-  // 처음에 빈 배열일 수 있어 voiceschanged 이벤트 후 다시 가져오고 ref에 캐시한다.
-  // 23-d Phase B: 첫 NPC opener 자동 재생을 위해 voiceReady state로도 노출 — 마운트
-  // 시점에 voice 캐시가 비어 있어 opener 재생이 누락되는 문제 해결.
-  const koVoiceRef = useRef<SpeechSynthesisVoice | null>(null)
-  const [voiceReady, setVoiceReady] = useState(false)
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-    const synth = window.speechSynthesis
-    const PREFERRED = ['Heami', 'InJoon', 'SunHi', 'Yuna', '한국의', 'Korean'] as const
-    const pickVoice = (fromEvent: boolean) => {
-      const voices = synth.getVoices()
-      if (voices.length === 0) return
-      const koVoices = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('ko'))
-      let chosen: SpeechSynthesisVoice | undefined
-      if (koVoices.length > 0) {
-        for (const tag of PREFERRED) {
-          chosen = koVoices.find((v) => v.name.includes(tag))
-          if (chosen) break
-        }
-        if (!chosen) chosen = koVoices.find((v) => v.lang.toLowerCase() === 'ko-kr')
-        if (!chosen) chosen = koVoices[0]
-      }
-      koVoiceRef.current = chosen ?? null
-      // 한국어 voice가 없어도 utt.lang='ko-KR'로 fallback 가능하므로 ready 처리.
-      if (fromEvent) {
-        setVoiceReady(true)
-      } else {
-        // 마운트 effect 본체에서의 setState 회피 (React 19 set-state-in-effect 룰).
-        queueMicrotask(() => setVoiceReady(true))
-      }
-    }
-    pickVoice(false)
-    const onChanged = () => pickVoice(true)
-    synth.addEventListener?.('voiceschanged', onChanged)
-    return () => {
-      synth.removeEventListener?.('voiceschanged', onChanged)
-    }
-  }, [])
-
-  const speakText = useCallback((text: string, turnIdx: number) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+  // 텍스트를 평문으로 정제 → /api/tts(페르소나 음성)로 합성 → 재생.
+  // 합성 실패·미설정(audioBase64 없음)이면 음성 없이 텍스트만으로 조용히 진행한다.
+  const playNpcTts = useCallback(async (rawText: string, turnIdx: number) => {
+    const text = sanitizeForTTS(rawText)
+    if (!text) return
+    stopNpcAudio()
+    const seq = ++ttsSeqRef.current
+    setSpeakingTurnIdx(turnIdx)
+    const clear = () => setSpeakingTurnIdx((cur) => (cur === turnIdx ? null : cur))
     try {
-      window.speechSynthesis.cancel()
-      const utt = new SpeechSynthesisUtterance(text)
-      utt.lang = 'ko-KR'
-      // 살짝 빠르게 + 자연스러운 한국어 음성 선택 (사용 가능 시).
-      utt.rate = 1.05
-      utt.pitch = 1.0
-      utt.volume = 1.0
-      if (koVoiceRef.current) utt.voice = koVoiceRef.current
-      utt.onend = () => {
-        setSpeakingTurnIdx((cur) => (cur === turnIdx ? null : cur))
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, personaId, purpose: 'free_conversation', questionId: 'free-conversation' }),
+      })
+      if (seq !== ttsSeqRef.current) return
+      const data = (await res.json().catch(() => null)) as { audioBase64?: string; mimeType?: string } | null
+      if (seq !== ttsSeqRef.current) return
+      if (!data?.audioBase64) {
+        // mock/fallback/오류 — 음성 없이 진행.
+        clear()
+        return
       }
-      utt.onerror = () => {
-        setSpeakingTurnIdx((cur) => (cur === turnIdx ? null : cur))
-      }
-      setSpeakingTurnIdx(turnIdx)
-      window.speechSynthesis.speak(utt)
+      const audio = new Audio(`data:${data.mimeType ?? 'audio/mpeg'};base64,${data.audioBase64}`)
+      npcAudioRef.current = audio
+      audio.onended = () => { if (seq === ttsSeqRef.current) { npcAudioRef.current = null; clear() } }
+      audio.onerror = () => { if (seq === ttsSeqRef.current) { npcAudioRef.current = null; clear() } }
+      await audio.play().catch(() => {
+        if (seq === ttsSeqRef.current) { npcAudioRef.current = null; clear() }
+      })
     } catch {
-      setSpeakingTurnIdx(null)
+      if (seq === ttsSeqRef.current) clear()
     }
-  }, [])
+  }, [stopNpcAudio, personaId])
 
-  // 명세 23-g Phase A: 모든 새 NPC 응답 자동 재생 (opener + LLM 응답).
-  // 23-d Phase B는 opener만 다뤘고, sendMessageWithText 내부 자동 재생은 voiceState
-  // 클로저가 'processing'으로 캡처돼 음성 입력 직후 LLM 응답이 재생되지 않는 문제가
-  // 있었다. 가장 최근 ai 턴 인덱스를 ref Set으로 추적해 메시지당 한 번만 재생한다.
+  // 새 NPC 응답(opener + LLM 응답)을 자동 재생. 가장 최근 ai 턴 인덱스를 ref Set으로
+  // 추적해 메시지당 한 번만 재생한다. 녹음·STT 처리 중에는 재생하지 않고, voiceState가
+  // idle로 돌아오면 이 effect가 재실행되어 미재생 메시지를 재생한다.
   const playedAiTurnIdxsRef = useRef<Set<number>>(new Set())
   useEffect(() => {
     if (stage !== 'chat') {
@@ -446,9 +418,7 @@ export function FreeConversationClient() {
       playedAiTurnIdxsRef.current = new Set()
       return
     }
-    if (!ttsSupported || !ttsAutoPlay || !voiceReady) return
-    // 녹음·STT 처리 중에는 충돌 방지를 위해 재생 차단. voiceState가 idle로 전환되면
-    // 이 effect가 재실행되어 그 때 미재생 메시지가 있으면 재생된다.
+    if (!ttsAutoPlay) return
     if (voiceState !== 'idle') return
     let lastAiIdx = -1
     for (let i = turns.length - 1; i >= 0; i--) {
@@ -460,9 +430,10 @@ export function FreeConversationClient() {
     if (lastAiIdx === -1) return
     if (playedAiTurnIdxsRef.current.has(lastAiIdx)) return
     playedAiTurnIdxsRef.current.add(lastAiIdx)
-    // effect 본체에서의 setState 회피 — speakText 내부에서 setSpeakingTurnIdx 호출.
-    queueMicrotask(() => speakText(turns[lastAiIdx].text, lastAiIdx))
-  }, [stage, ttsSupported, ttsAutoPlay, voiceReady, voiceState, turns, speakText])
+    // effect 본체에서의 setState 회피(React 19 set-state-in-effect 룰) — playNpcTts가
+    // 내부에서 setSpeakingTurnIdx를 호출하므로 마이크로태스크로 미룬다.
+    queueMicrotask(() => { void playNpcTts(turns[lastAiIdx].text, lastAiIdx) })
+  }, [stage, ttsAutoPlay, voiceState, turns, playNpcTts])
 
   // ── 시작 ──────────────────────────────────────────────────────────────────
   const startConversation = useCallback((selectedTopic: string, selectedPersonaId: string) => {
@@ -573,7 +544,7 @@ export function FreeConversationClient() {
     if (voiceState !== 'idle' || sending) return
     setVoiceError(null)
     // 녹음과 NPC 음성 충돌 방지: 재생 중이면 즉시 중단
-    stopSpeaking()
+    stopNpcAudio()
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mr = new MediaRecorder(stream)
@@ -655,7 +626,7 @@ export function FreeConversationClient() {
       setVoiceError('마이크 권한이 필요합니다. 브라우저 권한을 확인해 주세요.')
       setVoiceState('idle')
     }
-  }, [voiceState, sending, stopVoiceTick, stopSpeaking, pronEvalEnabled])
+  }, [voiceState, sending, stopVoiceTick, stopNpcAudio, pronEvalEnabled])
 
   const stopVoiceRecording = useCallback(() => {
     const mr = mediaRecorderRef.current
@@ -847,7 +818,7 @@ export function FreeConversationClient() {
           </div>
           <button
             onClick={() => {
-              stopSpeaking()
+              stopNpcAudio()
               endConversation()
             }}
             className="px-3 py-1.5 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors"
@@ -858,21 +829,19 @@ export function FreeConversationClient() {
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5" data-testid="tts-toggle-row">
-          {ttsSupported && (
-            <label className="inline-flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={ttsAutoPlay}
-                onChange={(e) => {
-                  setTtsAutoPlay(e.target.checked)
-                  if (!e.target.checked) stopSpeaking()
-                }}
-                className="rounded border-border"
-                data-testid="tts-autoplay-toggle"
-              />
-              <span>NPC 음성 자동 재생</span>
-            </label>
-          )}
+          <label className="inline-flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={ttsAutoPlay}
+              onChange={(e) => {
+                setTtsAutoPlay(e.target.checked)
+                if (!e.target.checked) stopNpcAudio()
+              }}
+              className="rounded border-border"
+              data-testid="tts-autoplay-toggle"
+            />
+            <span>NPC 음성 자동 재생</span>
+          </label>
           {/* 23-h A-3: 발음 평가 토글 (기본 OFF, 비용 절약) */}
           <label className="inline-flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer select-none">
             <input
@@ -884,9 +853,9 @@ export function FreeConversationClient() {
             />
             <span>발음 평가 (Azure)</span>
           </label>
-          {ttsSupported && speakingTurnIdx !== null && (
+          {speakingTurnIdx !== null && (
             <button
-              onClick={() => stopSpeaking()}
+              onClick={() => stopNpcAudio()}
               className="text-xs px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100"
               data-testid="tts-stop-button"
             >
@@ -945,11 +914,11 @@ export function FreeConversationClient() {
                     </span>
                   </div>
                 )}
-                {t.role === 'ai' && ttsSupported && (
+                {t.role === 'ai' && (
                   <div className="mt-1.5 -mb-0.5 flex justify-end">
                     {speakingTurnIdx === i ? (
                       <button
-                        onClick={() => stopSpeaking()}
+                        onClick={() => stopNpcAudio()}
                         className="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 inline-flex items-center gap-0.5"
                         data-testid={`tts-stop-${i}`}
                         title="음성 중지"
@@ -958,7 +927,7 @@ export function FreeConversationClient() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => speakText(t.text, i)}
+                        onClick={() => { void playNpcTts(t.text, i) }}
                         disabled={voiceState === 'recording'}
                         className="text-[11px] px-1.5 py-0.5 rounded border border-border text-text-muted hover:bg-slate-50 inline-flex items-center gap-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                         data-testid={`tts-play-${i}`}
@@ -1220,7 +1189,7 @@ export function FreeConversationClient() {
       <div>
         <button
           onClick={() => {
-            stopSpeaking()
+            stopNpcAudio()
             setStage('start')
             setStartSubstep('select-topic')
             setSelectedCardLabel(null)
