@@ -111,6 +111,17 @@ describe('POST /api/conversation/free/respond', () => {
     expect(sys).toContain('한국 생활 정보 안내 도우미')
   })
 
+  it('시스템 프롬프트에 마크다운 금지(평문 출력) 지시가 포함된다 — TTS용', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+    createMock.mockResolvedValueOnce(llmText(FINAL_JSON))
+    await POST(req({ topic: '맛집·카페 찾기', personaId: 'korean_life_helper', latestStudentText: '강남 카페 추천해 주세요' }))
+    const sys = createMock.mock.calls[0][0].messages[0].content as string
+    expect(sys).toContain('평문')
+    expect(sys).toContain('마크다운')
+    // 별표·헤더 등 금지 문자를 안내
+    expect(sys).toMatch(/\*\*/)
+  })
+
   it('잘못된 personaId는 기본 페르소나(friend_casual)로 대체', async () => {
     vi.stubEnv('OPENAI_API_KEY', 'sk-test')
     createMock.mockResolvedValueOnce(llmText(FINAL_JSON))
