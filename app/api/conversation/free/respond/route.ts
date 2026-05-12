@@ -1,25 +1,82 @@
 // ── Free conversation: per-turn NPC response with learner correction ─────
 //
-// 명세 24-C: 학습자 발화에 LLM이 자연스럽게 응답하면서, 매 턴 학습자 발화의
-// 자연 표현 교정을 함께 반환한다. q4 인프라(OpenAI SDK 동적 import + JSON
-// response_format)와 동일 패턴.
+// v1.1: 페르소나 기반 NPC + 한국 특화 API 도구(OpenAI function calling)를 결합한 생성형 자유 대화.
+// 학습자 발화에 LLM이 자연스럽게 응답하면서, 매 턴 학습자 발화의 자연 표현 교정을 함께 반환한다.
 //
-// OPENAI_API_KEY 미설정 또는 호출 실패 시 mock 폴백을 반환해 시연이 깨지지
-// 않게 한다. q4 mock conversation provider는 절대 손대지 않는다 (가드 5).
+// OPENAI_API_KEY 미설정 또는 호출 실패 시 mock 폴백을 반환해 시연이 깨지지 않게 한다.
+// q4 mock conversation provider는 절대 손대지 않는다 (가드 5).
+
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
+
+import { getPersona, PERSONAS, type Persona } from '@/src/lib/personas'
+import { runTool, toolDefinitions, type OpenAIToolDefinition } from '@/src/lib/llm/tools'
 
 type Turn = { role: 'student' | 'ai'; text: string }
 
-function buildSystemPrompt(topic: string): string {
-  return `당신은 한국어 학습자와 자유롭게 대화하는 한국인 친구입니다.
-주제: ${topic}
+const DEFAULT_PERSONA_ID = 'friend_casual'
+const MAX_TOOL_ROUNDS = 3
+
+// 도구별 필수 환경변수 — 키가 없으면 그 도구는 LLM에 노출하지 않는다 (그 도구만 비활성화).
+function toolEnvAvailable(name: string): boolean {
+  switch (name) {
+    case 'search_place':
+      return !!process.env.KAKAO_REST_API_KEY
+    case 'search_web':
+      return !!process.env.NAVER_CLIENT_ID && !!process.env.NAVER_CLIENT_SECRET
+    case 'get_weather':
+      return !!process.env.KMA_API_KEY
+    case 'search_address':
+      return !!process.env.JUSO_API_KEY
+    default:
+      return false
+  }
+}
+
+function availableTools(): OpenAIToolDefinition[] {
+  return toolDefinitions.filter((t) => toolEnvAvailable(t.function.name))
+}
+
+function politenessGuide(persona: Persona): string {
+  switch (persona.politenessLevel) {
+    case 'casual':
+      return '반말과 해요체를 자연스럽게 섞어 친근하게'
+    case 'formal':
+      return '격식 있는 존댓말(합쇼체 위주)로 정중하게'
+    default:
+      return '정중한 해요체로 친근하면서도 예의 바르게'
+  }
+}
+
+function buildSystemPrompt(topic: string, persona: Persona, enabledToolNames: string[]): string {
+  // ageHint는 톤 가이드용으로만 — 답변에서 나이를 직접 드러내지 않는다.
+  const ageGuide = persona.ageHint ? `\n- (톤 참고, 직접 언급 금지) 화자 분위기: ${persona.ageHint}` : ''
+  const toolGuide =
+    enabledToolNames.length > 0
+      ? `
+
+[도구 활용]
+- 다음 도구를 활용해 자연스럽게 답변하세요: ${enabledToolNames.join(', ')}.
+- 날씨·장소·주소·맛집·후기처럼 실제 정보가 필요하면 추측하지 말고 해당 도구를 호출하세요.
+- 도구 결과가 ok:true면 답변에 자연스럽게 녹여 말하고, 결과가 없거나 ok:false 오류면 그 사실을 솔직히 알리고 대화를 이어가세요.
+- 도구는 꼭 필요할 때만 쓰고, 일상적인 잡담에는 쓰지 마세요.`
+      : ''
+
+  return `당신은 한국어 학습자와 자유롭게 대화하는 한국 사람입니다.
+
+[당신의 정체성]
+- 이름표: ${persona.nameKo}
+- 역할: ${persona.role}
+- 대화 스타일: ${persona.speakingStyle}
+- 어울리는 상황 예시: ${persona.scenarioExamples.join(', ')}${ageGuide}
 
 [응답 원칙]
-- 친근하고 자연스러운 일반체 (반말 아님, "-요"체)
+- ${politenessGuide(persona)} 말합니다.
 - 학습자 수준에 맞는 어휘 (초~중급)
 - 매 턴 학습자 발화에 자연스럽게 반응
 - 같은 인사·표현 반복 금지
 - 주제에 깊이 들어가는 후속 질문을 한 번에 하나씩
-- 1~3문장으로 짧게 응답
+- 보통은 1~3문장으로 짧게, 도구 결과를 전할 때는 4~5문장까지 허용
+- 현재 대화 주제: ${topic}${toolGuide}
 
 [교정 역할 — 매우 중요]
 - 학습자 발화가 한국어 모어 화자에게 자연스럽게 들리면 절대로 교정하지 마세요. 이때 corrected는 original과 글자까지 100% 동일하게 두고, reason은 "자연스럽게 잘 말씀하셨어요." 같은 짧은 칭찬으로 채웁니다.
@@ -27,9 +84,9 @@ function buildSystemPrompt(topic: string): string {
 - 의심스러우면 교정하지 마세요.
 
 [출력 형식]
-반드시 다음 JSON만 출력 (다른 텍스트, 코드 블록 금지):
+도구 호출이 끝나고 학습자에게 최종 답변할 때는 반드시 다음 JSON만 출력 (다른 텍스트, 코드 블록 금지):
 {
-  "npc_response": "한국어 NPC 응답 1~3문장",
+  "npc_response": "한국어 NPC 응답",
   "learner_correction": {
     "original": "학습자 원본",
     "corrected": "자연스러운 교정 (원본과 같아도 됨)",
@@ -67,9 +124,15 @@ function formatHistory(turns: Turn[]): string {
     .join('\n')
 }
 
-function mockResponse(latestStudentText: string): Response {
+function resolvePersona(personaId: string): Persona {
+  return getPersona(personaId) ?? getPersona(DEFAULT_PERSONA_ID) ?? PERSONAS[0]
+}
+
+function mockResponse(latestStudentText: string, personaId: string): Response {
   return Response.json({
     source: 'mock',
+    persona_id: personaId,
+    tools_used: [] as string[],
     npc_response: '재미있는 이야기네요! 좀 더 자세히 말씀해 주실 수 있어요?',
     learner_correction: {
       original: latestStudentText,
@@ -94,6 +157,8 @@ export async function POST(request: Request) {
   const b = body as Record<string, unknown>
   const topic = typeof b.topic === 'string' ? b.topic.trim() : ''
   const latest = typeof b.latestStudentText === 'string' ? b.latestStudentText.trim() : ''
+  const personaId =
+    typeof b.personaId === 'string' && b.personaId.trim() ? b.personaId.trim() : DEFAULT_PERSONA_ID
   const turns: Turn[] = Array.isArray(b.turns)
     ? (b.turns as unknown[]).flatMap((t): Turn[] => {
         if (!t || typeof t !== 'object') return []
@@ -113,9 +178,10 @@ export async function POST(request: Request) {
     return Response.json({ error: 'student_text_too_long' }, { status: 400 })
   }
 
+  const persona = resolvePersona(personaId)
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    return mockResponse(latest)
+    return mockResponse(latest, persona.personaId)
   }
 
   try {
@@ -127,22 +193,63 @@ export async function POST(request: Request) {
       ?? process.env.OPENAI_EVAL_MODEL
       ?? 'gpt-4o-mini'
 
-    const systemPrompt = buildSystemPrompt(topic)
+    const tools = availableTools()
+    const enabledToolNames = tools.map((t) => t.function.name)
+    const systemPrompt = buildSystemPrompt(topic, persona, enabledToolNames)
     const userContent = `[기존 대화 이력]\n${formatHistory(turns)}\n\n[학습자 최신 발화]\n${latest}`
 
-    const response = await client.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.7,
-      max_tokens: 500,
-    })
+    const messages: ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent },
+    ]
 
-    const raw = response.choices[0]?.message?.content ?? ''
-    const parsed = JSON.parse(raw) as Record<string, unknown>
+    // 도구 호출 → 결과 → 재호출을 최대 MAX_TOOL_ROUNDS회 반복. 마지막 라운드는 도구 없이 최종 답변을 강제.
+    const toolsUsed: string[] = []
+    let finalContent: string | null = null
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      const allowTools = tools.length > 0 && round < MAX_TOOL_ROUNDS
+      const response = await client.chat.completions.create({
+        model,
+        messages,
+        ...(allowTools ? { tools } : {}),
+        response_format: { type: 'json_object' },
+        temperature: 0.7,
+        max_tokens: 700,
+      })
+      const msg = response.choices[0]?.message
+      if (!msg) throw new Error('no_message')
+      const toolCalls = msg.tool_calls ?? []
+
+      if (allowTools && toolCalls.length > 0) {
+        messages.push({ role: 'assistant', content: msg.content ?? '', tool_calls: toolCalls })
+        for (const tc of toolCalls) {
+          if (tc.type !== 'function') {
+            messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify({ ok: false, error: 'invalid_args', message: '지원하지 않는 도구 호출 형식' }) })
+            continue
+          }
+          let args: Record<string, unknown> = {}
+          try {
+            const parsed = JSON.parse(tc.function.arguments || '{}')
+            if (parsed && typeof parsed === 'object') args = parsed as Record<string, unknown>
+          } catch {
+            args = {}
+          }
+          const result = await runTool(tc.function.name, args)
+          toolsUsed.push(tc.function.name)
+          messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) })
+        }
+        continue
+      }
+
+      finalContent = msg.content ?? ''
+      break
+    }
+
+    if (finalContent == null || !finalContent.trim()) {
+      throw new Error('empty_final_content')
+    }
+
+    const parsed = JSON.parse(finalContent) as Record<string, unknown>
     const npcText = parsed.npc_response
     const correction = parsed.learner_correction
 
@@ -181,11 +288,13 @@ export async function POST(request: Request) {
 
     return Response.json({
       source: 'llm',
+      persona_id: persona.personaId,
+      tools_used: toolsUsed,
       npc_response: npcText.trim(),
       learner_correction: safeCorrection,
     })
   } catch (err) {
     console.error('[conversation/free/respond] LLM error, falling back to mock:', err)
-    return mockResponse(latest)
+    return mockResponse(latest, persona.personaId)
   }
 }
