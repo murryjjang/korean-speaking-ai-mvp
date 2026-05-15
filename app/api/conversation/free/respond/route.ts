@@ -8,6 +8,7 @@
 
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 
+import { buildPersonaSystemPrompt } from '@/src/lib/llm/build-persona-system-prompt'
 import { getPersona, PERSONAS, type Persona } from '@/src/lib/personas'
 import { runTool, toolDefinitions, type OpenAIToolDefinition } from '@/src/lib/llm/tools'
 
@@ -36,73 +37,8 @@ function availableTools(): OpenAIToolDefinition[] {
   return toolDefinitions.filter((t) => toolEnvAvailable(t.function.name))
 }
 
-function politenessGuide(persona: Persona): string {
-  switch (persona.politenessLevel) {
-    case 'casual':
-      return '반말과 해요체를 자연스럽게 섞어 친근하게'
-    case 'formal':
-      return '격식 있는 존댓말(합쇼체 위주)로 정중하게'
-    default:
-      return '정중한 해요체로 친근하면서도 예의 바르게'
-  }
-}
-
-function buildSystemPrompt(topic: string, persona: Persona, enabledToolNames: string[]): string {
-  // ageHint는 톤 가이드용으로만 — 답변에서 나이를 직접 드러내지 않는다.
-  const ageGuide = persona.ageHint ? `\n- (톤 참고, 직접 언급 금지) 화자 분위기: ${persona.ageHint}` : ''
-  const toolGuide =
-    enabledToolNames.length > 0
-      ? `
-
-[도구 활용]
-- 다음 도구를 활용해 자연스럽게 답변하세요: ${enabledToolNames.join(', ')}.
-- 날씨·장소·주소·맛집·후기처럼 실제 정보가 필요하면 추측하지 말고 해당 도구를 호출하세요.
-- 도구 결과가 ok:true면 답변에 자연스럽게 녹여 말하고, 결과가 없거나 ok:false 오류면 그 사실을 솔직히 알리고 대화를 이어가세요.
-- 도구는 꼭 필요할 때만 쓰고, 일상적인 잡담에는 쓰지 마세요.`
-      : ''
-
-  return `당신은 한국어 학습자와 자유롭게 대화하는 한국 사람입니다.
-
-[당신의 정체성]
-- 이름표: ${persona.nameKo}
-- 역할: ${persona.role}
-- 대화 스타일: ${persona.speakingStyle}
-- 어울리는 상황 예시: ${persona.scenarioExamples.join(', ')}${ageGuide}
-
-[응답 원칙]
-- ${politenessGuide(persona)} 말합니다.
-- 학습자 수준에 맞는 어휘 (초~중급)
-- 매 턴 학습자 발화에 자연스럽게 반응
-- 같은 인사·표현 반복 금지
-- 주제에 깊이 들어가는 후속 질문을 한 번에 하나씩
-- 보통은 1~3문장으로 짧게, 도구 결과를 전할 때는 4~5문장까지 허용
-- 현재 대화 주제: ${topic}${toolGuide}
-
-[교정 역할 — 매우 중요]
-- 학습자 발화가 한국어 모어 화자에게 자연스럽게 들리면 절대로 교정하지 마세요. 이때 corrected는 original과 글자까지 100% 동일하게 두고, reason은 "자연스럽게 잘 말씀하셨어요." 같은 짧은 칭찬으로 채웁니다.
-- 작은 차이(조사 1개 차이, 어미 살짝 어색, 띄어쓰기)도 교정하지 않습니다. 큰 변경(명백한 비표준 표현, 명확한 문법 오류, 단어 자체가 잘못된 경우)에서만 corrected를 변경합니다.
-- 의심스러우면 교정하지 마세요.
-
-[중요 - 출력 텍스트 형식 규칙]
-- npc_response를 비롯한 모든 텍스트 값은 평문(plain text)으로만 작성합니다. 이 응답은 음성으로 읽어집니다.
-- 마크다운 문법을 절대 사용하지 마세요: **, *, #, -, |, \`, [], (), ~~ 등 일체 금지.
-- 검색 결과·목록을 나열할 때도 자연스러운 문장으로 풀어쓰세요.
-- 강조하고 싶을 때 별표(**) 대신 한국어 표현으로: "특히", "그 중에서도", "가장" 등 사용.
-- 잘못된 예: **스타벅스 강남점**은 *인기* 많은 카페입니다.
-- 올바른 예: 그 중에서도 스타벅스 강남점이 가장 인기가 많아요.
-- (이 규칙은 텍스트 값 내용에만 적용됩니다. 아래 JSON 구조 자체의 중괄호·따옴표는 정상적으로 사용하세요.)
-
-[출력 형식]
-도구 호출이 끝나고 학습자에게 최종 답변할 때는 반드시 다음 JSON만 출력 (다른 텍스트, 코드 블록 금지):
-{
-  "npc_response": "한국어 NPC 응답",
-  "learner_correction": {
-    "original": "학습자 원본",
-    "corrected": "자연스러운 교정 (원본과 같아도 됨)",
-    "reason": "교정 이유 또는 칭찬 (한 문장)"
-  }
-}`
-}
+// v1.1 단계 9-3: 시스템 프롬프트 조립은 buildPersonaSystemPrompt로 단일화한다.
+// 페르소나 캐릭터 시트·Few-shot·주제 유지·회귀 원칙·교정·출력 형식이 한 곳에서 관리된다.
 
 // 23-h A-2: 단어 일치율 가드.
 // LLM이 작은 차이도 교정 결과로 만드는 경향이 있어, 일치율 ≥ 0.85일 때
@@ -204,7 +140,11 @@ export async function POST(request: Request) {
 
     const tools = availableTools()
     const enabledToolNames = tools.map((t) => t.function.name)
-    const systemPrompt = buildSystemPrompt(topic, persona, enabledToolNames)
+    const systemPrompt = buildPersonaSystemPrompt({
+      persona,
+      topic,
+      availableToolNames: enabledToolNames,
+    })
     const userContent = `[기존 대화 이력]\n${formatHistory(turns)}\n\n[학습자 최신 발화]\n${latest}`
 
     const messages: ChatCompletionMessageParam[] = [

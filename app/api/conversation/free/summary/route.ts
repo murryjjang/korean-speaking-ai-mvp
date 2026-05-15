@@ -10,17 +10,31 @@ import {
   L1_NAME,
   type FeedbackLanguage,
 } from '@/src/lib/feedback-language'
+import { buildPersonaSystemPrompt } from '@/src/lib/llm/build-persona-system-prompt'
 import { getPersona, PERSONAS, type Persona } from '@/src/lib/personas'
 
 type Turn = { role: 'student' | 'ai'; text: string }
 
 const DEFAULT_PERSONA_ID = 'friend_casual'
 
-function buildSystemPrompt(lang: FeedbackLanguage, persona: Persona): string {
+function buildSystemPrompt(lang: FeedbackLanguage, persona: Persona, topic: string): string {
   const l1 = L1_NAME[lang]
-  return `당신은 한국어 학습 코치입니다.
-학습자(외국인)는 '${persona.nameKo}'(${persona.role}, 말투: ${persona.speakingStyle}) 페르소나와 자유 대화를 했습니다.
-요약·피드백의 어조는 그 대화 맥락과 어울리게 자연스러운 한국어 코치 톤으로 작성하세요.
+  // v1.1 단계 9-3: 페르소나 캐릭터 시트를 코치 프롬프트 상단에 주입해 페르소나 톤
+  // 일관성 있는 요약·피드백을 생성한다. forSummary=true로 응답 원칙·도구·JSON 출력
+  // 형식 섹션은 빼고, 종료 피드백 전용 출력 형식을 아래에 별도로 덧붙인다.
+  const personaContext = buildPersonaSystemPrompt({
+    persona,
+    topic,
+    availableToolNames: [],
+    forSummary: true,
+  })
+
+  return `${personaContext}
+
+[당신의 역할 — 한국어 학습 코치]
+위 페르소나(${persona.nameKo})와 학습자가 방금 자유 대화를 마쳤습니다. 이제 당신은 그 대화를 옆에서 들은 한국어 학습 코치 입장입니다.
+요약·피드백 어조는 페르소나 대화 맥락과 어울리게 자연스러운 한국어 코치 톤으로 작성하세요.
+
 학습자(외국인)와 NPC의 자유 대화 세션을 분석해 다음을 생성하세요:
 
 1. 대화 요약: 어떤 주제로 어떤 흐름의 대화를 했는지 3~5줄
@@ -159,7 +173,7 @@ export async function POST(request: Request) {
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: buildSystemPrompt(helperLang, persona) },
+        { role: 'system', content: buildSystemPrompt(helperLang, persona, topic) },
         { role: 'user', content: userContent },
       ],
       response_format: { type: 'json_object' },

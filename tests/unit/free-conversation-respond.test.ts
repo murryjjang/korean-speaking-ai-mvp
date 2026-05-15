@@ -102,13 +102,17 @@ describe('POST /api/conversation/free/respond', () => {
     expect(params.tools).toBeUndefined() // 키 없으므로 도구 비노출
   })
 
-  it('페르소나 주입: korean_life_helper 시 시스템 프롬프트에 페르소나 정보 반영', async () => {
+  it('페르소나 주입: korean_life_helper 시 시스템 프롬프트에 캐릭터 시트 반영', async () => {
     vi.stubEnv('OPENAI_API_KEY', 'sk-test')
     createMock.mockResolvedValueOnce(llmText(FINAL_JSON))
     await POST(req({ topic: '오늘 날씨', personaId: 'korean_life_helper', latestStudentText: '오늘 날씨 어때요?' }))
     const sys = createMock.mock.calls[0][0].messages[0].content as string
-    expect(sys).toContain('한국 생활 도우미')
-    expect(sys).toContain('한국 생활 정보 안내 도우미')
+    // v1.1 단계 9: nameKo는 캐릭터 이름(서연), 캐릭터 시트에 직업·연령 표현 포함
+    expect(sys).toContain('서연')
+    expect(sys).toContain('관광 안내 센터')
+    // 주제 유지·회귀 원칙·Few-shot 예시가 페르소나 프롬프트에 함께 들어간다
+    expect(sys).toContain('[주제 유지·회귀 원칙]')
+    expect(sys).toContain('[Few-shot 예시')
   })
 
   it('시스템 프롬프트에 마크다운 금지(평문 출력) 지시가 포함된다 — TTS용', async () => {
