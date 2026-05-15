@@ -557,6 +557,7 @@ export function DialogueMissionPanel({
         turns,
         goalResults,
         attemptId,
+        motherTongue,
       })
 
       // v1.1 14-2 / 14-3: 미션 완수 후 종합 평가 누적 + 세션 종료 (fail-silent).

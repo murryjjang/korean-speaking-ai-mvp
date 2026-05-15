@@ -127,6 +127,9 @@ export type SpeakingEvalDetail = {
   teacher_note: string
   learner_feedback_ko: string
   learner_feedback_simple: string
+  // v1.1 16-10-4: 외국어 학습자에게 표시할 다국어 학습 피드백(있을 때만).
+  // learner_feedback_ko와 같은 내용을 각 언어로 자연스럽게 표현한 1~2문장.
+  learner_feedback_multilingual?: { ko: string; en?: string; vi?: string; ar?: string }
   required_elements_found?: string[]
   missing_elements?: string[]
   evidence?: string[]

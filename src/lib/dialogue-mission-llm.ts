@@ -9,11 +9,15 @@
 import type { DialogueTurn, MissionGoalResult } from '@/src/types/dialogue'
 import { detectMissionProgress } from '@/src/lib/dialogue-mission'
 
+export type DialogueFeedbackText =
+  | string
+  | { ko: string; en?: string; vi?: string; ar?: string }
+
 export interface DialogueQualitativeScores {
   naturalness: number
   koreanAccuracy: number
   responsiveness: number
-  feedback: string
+  feedback: DialogueFeedbackText
 }
 
 export interface DialogueLLMEvaluation {
@@ -99,7 +103,11 @@ const SYSTEM_PROMPT_TEMPLATE = `당신은 한국어 말하기 평가 전문가�
 [대화 내용]
 {conversation}`
 
-function buildPrompt(turns: DialogueTurn[], missionGoals: string[]): string {
+function buildPrompt(
+  turns: DialogueTurn[],
+  missionGoals: string[],
+  multilingual: boolean,
+): string {
   const conversation = turns
     .filter((t) => t.status === 'completed' && (t.role === 'student' || t.role === 'ai'))
     .map((t) => `${t.role === 'student' ? '학습자' : 'NPC'}: ${t.text}`)
@@ -107,9 +115,20 @@ function buildPrompt(turns: DialogueTurn[], missionGoals: string[]): string {
 
   const goalsText = missionGoals.map((g, i) => `${i}. ${g}`).join('\n')
 
-  return SYSTEM_PROMPT_TEMPLATE
+  let prompt = SYSTEM_PROMPT_TEMPLATE
     .replace('{mission_goals}', goalsText || '(미션 목표 없음)')
     .replace('{conversation}', conversation || '(대화 없음)')
+
+  // v1.1 16-10-4: 학습자 모국어가 외국어일 때 feedback을 다국어 객체로 응답하도록 가이드 추가.
+  if (multilingual) {
+    prompt += `
+
+[v1.1 16-10-4 다국어 피드백 요구]
+qualitative 필드의 feedback_ko는 그대로 두고, 추가로 feedback_en, feedback_vi, feedback_ar
+세 필드도 함께 출력하세요. 모두 같은 내용을 각 언어로 자연스럽게 표현한 1~2문장.
+점수(naturalness/korean_accuracy/responsiveness)는 언어 무관 동일.`
+  }
+  return prompt
 }
 
 export function clampScore(n: unknown): number {
@@ -123,6 +142,7 @@ export async function evaluateDialogueWithLLM(
   missionGoals: string[],
   apiKey: string,
   modelOverride?: string,
+  motherTongue?: string | null,
 ): Promise<DialogueLLMEvaluation> {
   if (!apiKey) {
     throw new Error('evaluateDialogueWithLLM: apiKey is required')
@@ -137,7 +157,9 @@ export async function evaluateDialogueWithLLM(
   const { OpenAI } = await import('openai')
   const client = new OpenAI({ apiKey })
 
-  const prompt = buildPrompt(turns, missionGoals)
+  const mt = motherTongue?.trim().toLowerCase()
+  const multilingual = mt === 'en' || mt === 'vi' || mt === 'ar'
+  const prompt = buildPrompt(turns, missionGoals, multilingual)
 
   const response = await client.chat.completions.create({
     model,
@@ -147,7 +169,7 @@ export async function evaluateDialogueWithLLM(
     ],
     response_format: { type: 'json_object' },
     temperature: 0.2,
-    max_tokens: 800,
+    max_tokens: multilingual ? 1400 : 800,
   })
 
   const raw = response.choices[0]?.message?.content ?? ''
@@ -185,13 +207,23 @@ export async function evaluateDialogueWithLLM(
     }
   })
 
+  // v1.1 16-10-4: feedback_ko/_en/_vi/_ar 4개가 있으면 다국어 객체로 정리, 그 외는 기존 문자열.
+  const fbKo = typeof qualObj.feedback_ko === 'string' ? qualObj.feedback_ko.trim() : ''
+  const fbEn = typeof qualObj.feedback_en === 'string' ? qualObj.feedback_en.trim() : ''
+  const fbVi = typeof qualObj.feedback_vi === 'string' ? qualObj.feedback_vi.trim() : ''
+  const fbAr = typeof qualObj.feedback_ar === 'string' ? qualObj.feedback_ar.trim() : ''
+  const feedback: DialogueFeedbackText =
+    fbEn || fbVi || fbAr
+      ? { ko: fbKo, en: fbEn, vi: fbVi, ar: fbAr }
+      : fbKo
+
   return {
     missionResults,
     qualitative: {
       naturalness: clampScore(qualObj.naturalness),
       koreanAccuracy: clampScore(qualObj.korean_accuracy),
       responsiveness: clampScore(qualObj.responsiveness),
-      feedback: typeof qualObj.feedback_ko === 'string' ? qualObj.feedback_ko : '',
+      feedback,
     },
     rawResponse: raw,
   }
@@ -236,13 +268,14 @@ export async function evaluateDialogueMissionHybrid(
   questionId: string,
   missionGoals: string[],
   turns: DialogueTurn[],
+  motherTongue?: string | null,
 ): Promise<DialogueMissionHybridResult> {
   const useLLM = process.env.CONVERSATION_PROVIDER === 'openai'
   const apiKey = process.env.OPENAI_API_KEY
 
   if (useLLM && apiKey) {
     try {
-      const evaluation = await evaluateDialogueWithLLM(turns, missionGoals, apiKey)
+      const evaluation = await evaluateDialogueWithLLM(turns, missionGoals, apiKey, undefined, motherTongue)
       const hybridScore = computeHybridScore(evaluation)
       return {
         results: evaluation.missionResults,

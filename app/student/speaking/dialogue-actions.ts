@@ -124,6 +124,8 @@ export interface DialogueSubmitMeta {
   goalResults: MissionGoalResult[]
   /** Attempt UUID — when present, records this submission in the attempt store. */
   attemptId?: string
+  /** v1.1 16-10-4: 학습자 모국어 — LLM 평가 피드백을 다국어 객체로 받을지 결정. */
+  motherTongue?: string | null
 }
 
 export async function submitDialogue(
@@ -131,7 +133,7 @@ export async function submitDialogue(
   questionSetId: string,
   meta: DialogueSubmitMeta,
 ): Promise<{ submissionId: string }> {
-  const { turns, goalResults: clientGoalResults, attemptId } = meta
+  const { turns, goalResults: clientGoalResults, attemptId, motherTongue } = meta
 
   // Guard: must have at least one valid student turn
   const studentTurns = turns.filter((t) => t.role === 'student' && t.status === 'completed')
@@ -170,7 +172,7 @@ export async function submitDialogue(
   // q4 하이브리드 평가 — CONVERSATION_PROVIDER=openai일 때 LLM이 자연 발화 변형까지 판정.
   // 실패하거나 mock 모드면 client에서 보낸 규칙 기반 결과를 그대로 사용.
   const missionGoals = clientGoalResults.map((g) => g.labelKo)
-  const hybridResult = await evaluateDialogueMissionHybrid(questionId, missionGoals, turns)
+  const hybridResult = await evaluateDialogueMissionHybrid(questionId, missionGoals, turns, motherTongue)
   const goalResults: MissionGoalResult[] =
     hybridResult.source === 'llm' ? hybridResult.results : clientGoalResults
 
@@ -334,8 +336,18 @@ export async function submitDialogue(
     // grade 재산출
     const s = llmDetail.overall_score
     llmDetail.grade = s >= 90 ? 'A' : s >= 80 ? 'B' : s >= 70 ? 'C' : s >= 60 ? 'D' : 'F'
-    if (hybridResult.qualitative.feedback) {
-      llmDetail.learner_feedback_ko = hybridResult.qualitative.feedback
+    // v1.1 16-10-4: feedback이 문자열이면 그대로, 다국어 객체이면 ko를 메인에, 다국어 객체를 보조 필드에 보존.
+    const fb = hybridResult.qualitative.feedback
+    if (typeof fb === 'string' && fb.trim()) {
+      llmDetail.learner_feedback_ko = fb
+    } else if (fb && typeof fb === 'object' && fb.ko) {
+      llmDetail.learner_feedback_ko = fb.ko
+      llmDetail.learner_feedback_multilingual = {
+        ko: fb.ko,
+        en: fb.en ?? '',
+        vi: fb.vi ?? '',
+        ar: fb.ar ?? '',
+      }
     }
     llmDetail.teacher_note = `${llmDetail.teacher_note ?? ''}\n[하이브리드 점수] 정량 ${h.quantitativeScore}/60 + 정성 ${h.qualitativeScore}/40 = ${h.total}/100\n자연스러움 ${h.qualitativeBreakdown.naturalness} · 정확성 ${h.qualitativeBreakdown.koreanAccuracy} · 응답성 ${h.qualitativeBreakdown.responsiveness}`
   }

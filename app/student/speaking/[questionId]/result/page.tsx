@@ -7,6 +7,8 @@ import questionTypesJson from '@/src/content/question-types.json'
 import rubricsJson from '@/src/content/rubrics.json'
 import { PageHeader, Card, CardHeader, CardBody, Badge, ScoreBar, MultilingualFeedback } from '@/src/components/ui'
 import type { AzureWordResult } from '@/src/types/providers'
+import { MultilingualFeedbackBlock } from '@/src/components/multilingual-feedback-block'
+import { getCurrentParticipant } from '@/src/lib/research/session'
 
 const rubric = rubricsJson.find((r) => r.id === 'rubric-speaking-01')!
 
@@ -691,6 +693,10 @@ export default async function SpeakingResultPage({
 
   const evalRecord = submissionId ? getSpeakingEval(submissionId) : undefined
 
+  // v1.1 16-10: 참여자 모국어를 가져와 다국어 피드백 토글에 초기값으로 전달.
+  const participant = await getCurrentParticipant().catch(() => null)
+  const participantMotherTongue = participant?.motherTongue ?? null
+
   // Store가 초기화된 경우(서버 재시작 등) 안내
   if (!evalRecord) {
     return (
@@ -1138,9 +1144,13 @@ export default async function SpeakingResultPage({
               </>
             )}
 
-            <p className="mt-4 text-xs text-text-secondary bg-surface border border-border rounded-md p-3 leading-relaxed">
-              {speakingEvalDetail?.learner_feedback_ko ?? llmEvalResult.feedback}
-            </p>
+            {/* v1.1 16-10: 다국어 피드백이 있으면 토글 표시, 없으면 기존 한국어 단일 텍스트. */}
+            <MultilingualFeedbackBlock
+              className="mt-4"
+              feedbackKo={speakingEvalDetail?.learner_feedback_ko ?? llmEvalResult.feedback}
+              multilingual={speakingEvalDetail?.learner_feedback_multilingual ?? null}
+              motherTongueHint={participantMotherTongue}
+            />
             {speakingEvalDetail?.learner_feedback_simple && (
               <p className="mt-2 text-xs text-primary-700 bg-primary-50 border border-primary-100 rounded-md p-3 leading-relaxed">
                 {speakingEvalDetail.learner_feedback_simple}
