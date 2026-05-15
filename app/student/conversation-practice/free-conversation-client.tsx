@@ -5,6 +5,12 @@ import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
 import { getPersona } from '@/src/lib/personas'
+import {
+  endResearchSession,
+  logAssessment,
+  logUtterance,
+  startResearchSession,
+} from '@/src/lib/research/client-logger'
 import { sanitizeForTTS } from '@/src/lib/text-utils/sanitize-for-tts'
 
 // 추천 주제 9개 (페르소나 메타데이터 없음 — 페르소나는 별도 단계에서 선택)
@@ -174,6 +180,12 @@ export function FreeConversationClient() {
   const [sending, setSending] = useState(false)
   const [chatError, setChatError] = useState<string | null>(null)
 
+  // v1.1 단계 10-4: 시험운영 데이터 로깅 — 현재 대화의 research_sessions.id.
+  // null이면 미로깅 모드 (참여자 미로그인·Supabase 미설정 등). fail-silent.
+  const researchSessionIdRef = useRef<string | null>(null)
+  const researchTurnCounterRef = useRef<number>(0)
+  const lastStudentSendAtRef = useRef<number>(0)
+
   // Timer
   const [elapsed, setElapsed] = useState(0)
   const elapsedRef = useRef(0)
@@ -278,6 +290,24 @@ export function FreeConversationClient() {
       if (controller.signal.aborted) return
       setSummary(data)
       summaryFetchedRef.current = true
+      // v1.1 단계 10-4: 종료 요약·피드백을 research_assessments에 기록 (fail-silent).
+      // 첫 호출(isRefresh=false)에서만 저장 — helperLang 토글 재호출은 표시용이므로 skip.
+      if (!isRefresh) {
+        const sessionId = researchSessionIdRef.current
+        if (sessionId) {
+          void logAssessment({
+            sessionId,
+            mode: 'free_conversation',
+            feedbackText: data.summary_ko,
+            scoresDetail: {
+              feedback_ko: data.feedback_ko,
+              feedback_l1: data.feedback_l1,
+              summary_l1: data.summary_l1,
+              helper_lang: lang,
+            },
+          })
+        }
+      }
     } catch (err) {
       if (controller.signal.aborted) return
       if ((err as { name?: string })?.name === 'AbortError') return
@@ -303,6 +333,11 @@ export function FreeConversationClient() {
   const endConversation = useCallback(() => {
     stopTimer()
     setStage('end')
+    // v1.1 단계 10-4: research 세션 종료 — session_ended_at 기록 (fail-silent).
+    const sessionId = researchSessionIdRef.current
+    if (sessionId) {
+      void endResearchSession(sessionId)
+    }
   }, [stopTimer])
 
   // stage === 'end' 진입 또는 helperLang 변경 시 요약/피드백 재요청.
@@ -458,7 +493,8 @@ export function FreeConversationClient() {
     const pid = AVAILABLE_PERSONAS.some((p) => p.id === selectedPersonaId) ? selectedPersonaId : DEFAULT_PERSONA_ID
     setTopic(t)
     setPersonaId(pid)
-    setTurns([{ id: crypto.randomUUID(), role: 'ai', text: buildOpener(t, pid) }])
+    const opener = buildOpener(t, pid)
+    setTurns([{ id: crypto.randomUUID(), role: 'ai', text: opener }])
     elapsedRef.current = 0
     setElapsed(0)
     setWarned(false)
@@ -466,6 +502,24 @@ export function FreeConversationClient() {
     setSummary(null)
     setChatError(null)
     setStage('chat')
+    // v1.1 단계 10-4: research 세션 시작 (fail-silent). 참여자 미로그인이면 sessionId=null로
+    // 모든 후속 로깅이 자동 skip된다.
+    researchSessionIdRef.current = null
+    researchTurnCounterRef.current = 0
+    void (async () => {
+      const sessionId = await startResearchSession('free_conversation', { topic: t, personaId: pid })
+      if (!sessionId) return
+      researchSessionIdRef.current = sessionId
+      researchTurnCounterRef.current = 1
+      // opener는 turn 1 (npc) 로 기록.
+      await logUtterance({
+        sessionId,
+        turnNumber: 1,
+        speaker: 'npc',
+        text: opener,
+        metaJson: { kind: 'opener' },
+      })
+    })()
   }, [])
 
   // 주제 선택 → 페르소나 선택 단계로 전환
@@ -499,6 +553,8 @@ export function FreeConversationClient() {
 
     try {
       const apiTurns = turns.map((t) => ({ role: t.role, text: t.text }))
+      const startAt = Date.now()
+      lastStudentSendAtRef.current = startAt
       const res = await fetch('/api/conversation/free/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -513,8 +569,10 @@ export function FreeConversationClient() {
       const data = await res.json() as {
         source: 'llm' | 'mock'
         npc_response: string
+        tools_used?: string[]
         learner_correction?: { original: string; corrected: string; reason: string }
       }
+      const elapsedMs = Date.now() - startAt
       // setState updater: PA 응답이 먼저 도착해 pronScore가 set됐을 수 있으므로,
       // 직접 turns로 finalTurns를 구성하지 말고 함수형 업데이터로 병합한다.
       setTurns((prev) =>
@@ -527,6 +585,33 @@ export function FreeConversationClient() {
           .concat({ id: crypto.randomUUID(), role: 'ai', text: data.npc_response }),
       )
       // NPC 응답 자동 재생은 23-g Phase A 통합 effect(playedAiTurnIdxsRef)에서 처리.
+
+      // v1.1 단계 10-4: 학습자·NPC 발화 로깅 (fail-silent).
+      const sessionId = researchSessionIdRef.current
+      if (sessionId) {
+        const studentTurnNum = researchTurnCounterRef.current + 1
+        const npcTurnNum = researchTurnCounterRef.current + 2
+        researchTurnCounterRef.current = npcTurnNum
+        const toolCalls = Array.isArray(data.tools_used) && data.tools_used.length > 0
+          ? data.tools_used.map((name) => ({ name }))
+          : null
+        void logUtterance({
+          sessionId,
+          turnNumber: studentTurnNum,
+          speaker: 'learner',
+          text: trimmed,
+          metaJson: data.learner_correction ? { correction: data.learner_correction } : null,
+        })
+        void logUtterance({
+          sessionId,
+          turnNumber: npcTurnNum,
+          speaker: 'npc',
+          text: data.npc_response,
+          responseTimeMs: elapsedMs,
+          toolCalls,
+          metaJson: { source: data.source },
+        })
+      }
     } catch (err) {
       console.error('[free-conversation] respond error', err)
       setChatError('잠시 후 다시 시도해주세요.')
