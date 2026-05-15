@@ -10,6 +10,12 @@ import type { DialogueTurn, MissionGoalResult, DialogueMissionPanelStatus, Dialo
 import { detectMissionProgress } from '@/src/lib/dialogue-mission'
 import { validateRecordedAudio, getAudioValidationMessage } from '@/src/lib/audio-validation'
 import { shouldAnswerLanguageQuestion } from '@/src/lib/dialogue-policy'
+import {
+  startResearchSession,
+  endResearchSession,
+  logUtterance,
+  logAssessment,
+} from '@/src/lib/research/client-logger'
 
 const MIN_VALID_BLOB_SIZE = 3000
 
@@ -103,9 +109,22 @@ export function DialogueMissionPanel({
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Stop TTS on unmount
+  // v1.1 14-2: Q4 research 세션 상태 — mode==='assessment'일 때만 로깅.
+  // free-conversation flow는 free-conversation-client.tsx에서 자체 로깅.
+  const researchSessionIdRef = useRef<string | null>(null)
+  const researchTurnCounterRef = useRef<number>(0)
+  const researchEnabled = mode === 'assessment'
+
+  // Stop TTS on unmount + close research session if still open
   useEffect(() => {
-    return () => { ttsStop() }
+    return () => {
+      ttsStop()
+      const sid = researchSessionIdRef.current
+      if (sid) {
+        researchSessionIdRef.current = null
+        void endResearchSession(sid)
+      }
+    }
   }, [ttsStop])
 
   // Stop TTS when dialogue ends or is submitting
@@ -195,7 +214,32 @@ export function DialogueMissionPanel({
     // Auto-play first utterance (best-effort — browser autoplay policy may block)
     setPlayingTurnId(firstTurn.id)
     ttsPlay(aiFirstUtterance, questionId, 'ai-dialogue', personaId)
-  }, [aiFirstUtterance, ttsPlay, questionId, personaId])
+
+    // v1.1 14-2: research 세션 시작 + opener 로깅 (fail-silent, q4_dialogue 모드만).
+    if (researchEnabled) {
+      researchSessionIdRef.current = null
+      researchTurnCounterRef.current = 0
+      void (async () => {
+        const sid = await startResearchSession('q4_dialogue', {
+          questionId,
+          questionSetId,
+          difficulty,
+          attemptId,
+          missionGoals,
+          personaId,
+        })
+        if (!sid) return
+        researchSessionIdRef.current = sid
+        researchTurnCounterRef.current = 1
+        await logUtterance({
+          sessionId: sid,
+          turnNumber: 1,
+          speaker: 'npc',
+          text: aiFirstUtterance,
+        })
+      })()
+    }
+  }, [aiFirstUtterance, ttsPlay, questionId, personaId, researchEnabled, questionSetId, difficulty, attemptId, missionGoals])
 
   const handleStartRecording = useCallback(() => {
     recorder.reset()
@@ -324,10 +368,42 @@ export function DialogueMissionPanel({
     const newTurns = [...turns, studentTurn]
     setTurns(newTurns)
 
-    // PA 결과가 도착하면 해당 turn에 pronScore를 비동기로 부착
+    // v1.1 14-2 / 14-4: 학습자 발화 로깅 (fail-silent). 발음 점수는 비동기로 도착.
+    const learnerTurnNumber = researchTurnCounterRef.current + 1
+    if (researchEnabled && researchSessionIdRef.current) {
+      researchTurnCounterRef.current = learnerTurnNumber
+      const sid = researchSessionIdRef.current
+      void logUtterance({
+        sessionId: sid,
+        turnNumber: learnerTurnNumber,
+        speaker: 'learner',
+        text: transcript,
+        metaJson: {
+          sttProviderName,
+          intent: studentTurn.intent,
+          durationSec: recorder.durationSec,
+        },
+      })
+    }
+
+    // PA 결과가 도착하면 해당 turn에 pronScore를 비동기로 부착 + 발음 평가 로깅
     void paPromise.then((score) => {
       if (score == null) return
       setTurns((prev) => prev.map((t) => (t.id === studentTurnId ? { ...t, pronScore: score } : t)))
+      // v1.1 14-4: 발음 평가 결과를 research_assessments에 누적 기록 (fail-silent).
+      const sid = researchSessionIdRef.current
+      if (researchEnabled && sid) {
+        void logAssessment({
+          sessionId: sid,
+          mode: 'q4_dialogue',
+          scoreTotal: score,
+          scoresDetail: {
+            type: 'pronunciation_turn',
+            turnNumber: learnerTurnNumber,
+            pronScore: score,
+          },
+        })
+      }
     })
 
     // Get AI response
@@ -371,6 +447,20 @@ export function DialogueMissionPanel({
       // Auto-play AI response (fire-and-forget)
       setPlayingTurnId(aiTurn.id)
       ttsPlay(aiText, questionId, 'ai-dialogue', personaId)
+
+      // v1.1 14-2: NPC 응답 로깅 (fail-silent).
+      const npcTurnNumber = researchTurnCounterRef.current + 1
+      if (researchEnabled && researchSessionIdRef.current) {
+        researchTurnCounterRef.current = npcTurnNumber
+        const sid = researchSessionIdRef.current
+        void logUtterance({
+          sessionId: sid,
+          turnNumber: npcTurnNumber,
+          speaker: 'npc',
+          text: aiText,
+          metaJson: { providerName: aiProvider },
+        })
+      }
     } catch {
       const fallbackId = `turn-ai-fallback-${Date.now()}`
       const fallbackText = '네, 알겠습니다.'
@@ -387,13 +477,26 @@ export function DialogueMissionPanel({
       ])
       setPlayingTurnId(fallbackId)
       ttsPlay(fallbackText, questionId, 'ai-dialogue', personaId)
+
+      const npcTurnNumber = researchTurnCounterRef.current + 1
+      if (researchEnabled && researchSessionIdRef.current) {
+        researchTurnCounterRef.current = npcTurnNumber
+        const sid = researchSessionIdRef.current
+        void logUtterance({
+          sessionId: sid,
+          turnNumber: npcTurnNumber,
+          speaker: 'npc',
+          text: fallbackText,
+          metaJson: { providerName: 'fallback' },
+        })
+      }
     }
 
     recorder.reset()
     setBlobSize(null)
     setTurnError(null)
     setPanelStatus('ready')
-  }, [recorder, blobSize, turns, questionId, difficulty, ttsPlay, mode, personaId])
+  }, [recorder, blobSize, turns, questionId, difficulty, ttsPlay, mode, personaId, researchEnabled])
 
   const handleEndDialogue = useCallback(() => {
     if (!canSubmit) return
@@ -430,6 +533,42 @@ export function DialogueMissionPanel({
         goalResults,
         attemptId,
       })
+
+      // v1.1 14-2 / 14-3: 미션 완수 후 종합 평가 누적 + 세션 종료 (fail-silent).
+      const sid = researchSessionIdRef.current
+      if (researchEnabled && sid) {
+        const achievedCount = goalResults.filter((g) => g.achieved).length
+        const totalCount = goalResults.length
+        const studentTurns = turns.filter((t) => t.role === 'student')
+        const pronScores = studentTurns
+          .map((t) => t.pronScore)
+          .filter((s): s is number => typeof s === 'number')
+        const avgPron =
+          pronScores.length > 0
+            ? Math.round(pronScores.reduce((a, b) => a + b, 0) / pronScores.length)
+            : null
+        await logAssessment({
+          sessionId: sid,
+          mode: 'q4_dialogue',
+          scoreTotal: avgPron,
+          scoresDetail: {
+            type: 'mission_summary',
+            submissionId,
+            missionGoalsAchieved: achievedCount,
+            missionGoalsTotal: totalCount,
+            goalResults: goalResults.map((g) => ({
+              goalIndex: g.goalIndex,
+              labelKo: g.labelKo,
+              achieved: g.achieved,
+            })),
+            avgPronScore: avgPron,
+            learnerTurnCount: studentTurns.length,
+          },
+        })
+        researchSessionIdRef.current = null
+        await endResearchSession(sid)
+      }
+
       const resultParams = new URLSearchParams({ sub: submissionId })
       if (attemptId) resultParams.set('attemptId', attemptId)
       router.push(`/student/speaking/${questionId}/result?${resultParams.toString()}`)
@@ -437,7 +576,7 @@ export function DialogueMissionPanel({
       setSubmitError(true)
       setPanelStatus('completed')
     }
-  }, [canSubmit, questionId, questionSetId, attemptId, turns, goalResults, router])
+  }, [canSubmit, questionId, questionSetId, attemptId, turns, goalResults, router, researchEnabled])
 
   // 시간 종료 자동 제출 — 타이머가 maxDialogueDurationSec에 도달하면
   // 1) 진행 중 녹음을 중단하고
