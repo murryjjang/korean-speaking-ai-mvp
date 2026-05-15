@@ -1,5 +1,7 @@
 // v1.1 단계 10-2: 참여자 목록·신규 발급 페이지.
 
+import Link from 'next/link'
+
 import { isResearchRepoConfigured, listParticipants } from '@/src/lib/research/repository'
 
 import { createParticipantAction } from './actions'
@@ -83,7 +85,11 @@ export default async function ParticipantsPage() {
               <tbody>
                 {participants.map((p) => (
                   <tr key={p.id} className="border-t border-border" data-testid={`participant-row-${p.participantCode}`}>
-                    <td className="px-3 py-2 font-mono text-xs">{p.participantCode}</td>
+                    <td className="px-3 py-2 font-mono text-xs">
+                      <Link href={`/research/admin/participants/${p.id}`} className="text-primary-600 hover:underline">
+                        {p.participantCode}
+                      </Link>
+                    </td>
                     <td className="px-3 py-2">{p.name ?? '-'}</td>
                     <td className="px-3 py-2">{p.nationality ?? '-'}</td>
                     <td className="px-3 py-2">{p.koreanLevel ?? '-'}</td>
