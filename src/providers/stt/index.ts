@@ -44,12 +44,14 @@ class WhisperSTTProvider implements STTProvider {
 
     // Context prompt: signals the expected domain so Whisper anchors on learner
     // speech rather than fabricating news/YouTube outros from low-energy audio.
+    // temperature: 0 — Whisper의 자체 보정 의지를 최소화해 학습자 발화를 그대로 받아쓴다.
     const response = await client.audio.transcriptions.create({
       file: audioFile,
       model: 'whisper-1',
       language: 'ko',
       prompt:
-        '한국어 학습자가 자연스럽게 답변합니다. 카페·식당·일상 회화·인사·자기소개·계획 등의 발화입니다. 뉴스 앵커 멘트나 유튜브 outro가 아닙니다.',
+        '학습자의 한국어 발화를 정확히 그대로 받아쓰세요. 문법 교정이나 자연스럽게 다듬지 말고 발화 그대로 옮기세요. 다만 뉴스 앵커 멘트·유튜브 outro는 환각이므로 출력하지 마세요.',
+      temperature: 0,
     })
 
     const latencyMs = Date.now() - startMs
