@@ -109,22 +109,45 @@ describe('personas.ts 구조 확장 (v1.1 단계 9-1)', () => {
     }
   })
 
-  it('레거시 페르소나(cafe_staff_friendly 등)는 systemPromptTemplate 스텁을 가진다', () => {
-    const legacyIds = [
-      'cafe_staff_friendly',
-      'admin_staff_clear',
-      'event_partner_professional',
-      'korean_teacher_coach',
-    ]
-    for (const id of legacyIds) {
+  it('Q4 대화 미션 3명(cafe·admin·event)은 캐릭터 시트와 Few-shot 5종을 가진다 (v1.1 단계 11)', () => {
+    const q4Ids = ['cafe_staff_friendly', 'admin_staff_clear', 'event_partner_professional']
+    for (const id of q4Ids) {
       const p = getPersona(id)
-      expect(p, `missing legacy persona: ${id}`).toBeTruthy()
-      expect(p?.systemPromptTemplate.length).toBeGreaterThan(0)
-      expect(p?.fewShotExamples).toEqual([])
+      expect(p, `missing q4 persona: ${id}`).toBeTruthy()
+      expect(p?.systemPromptTemplate.length).toBeGreaterThan(50)
+      expect(p?.fewShotExamples.length).toBeGreaterThanOrEqual(5)
+      const scenarios = new Set(p?.fewShotExamples.map((e) => e.scenario))
+      for (const s of REQUIRED_SCENARIOS) {
+        expect(scenarios.has(s), `${id} missing scenario: ${s}`).toBe(true)
+      }
     }
   })
 
-  it('PERSONAS 배열 길이가 정확히 8 (레거시 4 + 자유 대화 4)', () => {
+  it('Q4 페르소나의 캐릭터 시트·Few-shot에 반말이 들어가지 않는다 (정중 톤 유지)', () => {
+    const q4Ids = ['cafe_staff_friendly', 'admin_staff_clear', 'event_partner_professional']
+    // 반말 종결어미 패턴 — "어"·"야"·"지"·"잖아" 종결 (한국어 어색대응 예시는 학습자 입력이라 제외)
+    const banmalEndings = /(아|어|야|지|잖아)\.$/
+    for (const id of q4Ids) {
+      const p = getPersona(id)!
+      for (const ex of p.fewShotExamples) {
+        if (ex.scenario === '한국어어색') continue
+        // npc 응답 마지막 문장이 반말로 끝나면 안 됨
+        const sentences = ex.response.split(/[.?!]/).map((s) => s.trim()).filter(Boolean)
+        for (const sent of sentences) {
+          expect(banmalEndings.test(sent + '.'), `${id} sentence "${sent}" looks like banmal`).toBe(false)
+        }
+      }
+    }
+  })
+
+  it('레거시 페르소나(korean_teacher_coach)는 systemPromptTemplate 스텁을 가진다', () => {
+    const p = getPersona('korean_teacher_coach')
+    expect(p).toBeTruthy()
+    expect(p?.systemPromptTemplate.length).toBeGreaterThan(0)
+    expect(p?.fewShotExamples).toEqual([])
+  })
+
+  it('PERSONAS 배열 길이가 정확히 8 (레거시 1 + Q4 3 + 자유 대화 4)', () => {
     expect(PERSONAS).toHaveLength(8)
   })
 })

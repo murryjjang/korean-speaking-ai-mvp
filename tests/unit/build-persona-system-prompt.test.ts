@@ -108,15 +108,17 @@ describe('buildPersonaSystemPrompt', () => {
     expect(out).toContain('"learner_correction"')
   })
 
-  it('레거시 페르소나(cafe_staff_friendly)는 fewShotExamples가 비어 있어도 시스템 프롬프트가 정상 조립된다', () => {
-    const cafe = getPersona('cafe_staff_friendly')!
+  it('레거시 페르소나(korean_teacher_coach)는 fewShotExamples가 비어 있어도 시스템 프롬프트가 정상 조립된다', () => {
+    // v1.1 단계 11에서 cafe_staff_friendly 등 Q4 3명에 Few-shot 5종이 추가됐으므로,
+    // 진짜 빈 레거시는 korean_teacher_coach 하나만 남았다.
+    const coach = getPersona('korean_teacher_coach')!
     const out = buildPersonaSystemPrompt({
-      persona: cafe,
-      topic: '카페 음료 주문',
+      persona: coach,
+      topic: '문법 질문 답변',
       availableToolNames: [],
     })
-    expect(out).toContain('친절한 카페 점원')
-    expect(out).toContain('주제: 카페 음료 주문')
+    expect(out).toContain('한국어 선생님')
+    expect(out).toContain('주제: 문법 질문 답변')
     expect(out).not.toContain('[Few-shot 예시')
     expect(out).toContain('[교정 역할')
   })
