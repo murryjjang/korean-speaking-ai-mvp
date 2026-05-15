@@ -714,9 +714,31 @@ export function FreeConversationClient() {
                         ? paData.normalizedScore
                         : null
                     if (score == null) return
+                    const rounded = Math.round(score)
                     setTurns((prev) => prev.map((t) =>
-                      t.id === studentTurnId ? { ...t, pronScore: Math.round(score) } : t,
+                      t.id === studentTurnId ? { ...t, pronScore: rounded } : t,
                     ))
+                    // v1.1 14-4: 자유 대화도 발화별 발음 점수를 research_assessments에 누적 기록.
+                    const sid = researchSessionIdRef.current
+                    if (sid) {
+                      void logAssessment({
+                        sessionId: sid,
+                        mode: 'free_conversation',
+                        scoreTotal: rounded,
+                        scoresDetail: {
+                          type: 'pronunciation_turn',
+                          pronScore: rounded,
+                          accuracyScore: typeof paData?.accuracyScore === 'number' ? paData.accuracyScore : null,
+                          fluencyScore: typeof paData?.fluencyScore === 'number' ? paData.fluencyScore : null,
+                          completenessScore: typeof paData?.completenessScore === 'number' ? paData.completenessScore : null,
+                        },
+                        pronunciationData: {
+                          referenceText: transcript,
+                          recognizedText: typeof paData?.recognizedText === 'string' ? paData.recognizedText : null,
+                          wordResults: Array.isArray(paData?.wordResults) ? paData.wordResults : null,
+                        },
+                      })
+                    }
                   } catch (err) {
                     console.warn('[free-conversation] pron eval error', err)
                   }
