@@ -9,6 +9,7 @@ import { PageHeader, Card, CardHeader, CardBody, Badge, ScoreBar, MultilingualFe
 import type { AzureWordResult } from '@/src/types/providers'
 import { MultilingualFeedbackBlock } from '@/src/components/multilingual-feedback-block'
 import { getCurrentParticipant } from '@/src/lib/research/session'
+import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 
 const rubric = rubricsJson.find((r) => r.id === 'rubric-speaking-01')!
 
@@ -937,7 +938,16 @@ export default async function SpeakingResultPage({
         description={`${set?.name ?? '말하기 평가'} · ${qType?.name ?? ''} · ${submittedAt}`}
       />
 
-      <div className="max-w-2xl mx-auto space-y-6">
+      {/* v1.1 26-3: 평가 결과 화면 전체를 PDF로 다운로드 */}
+      <div className="max-w-2xl mx-auto mb-3 flex justify-end">
+        <PdfDownloadButton
+          targetId="speaking-result-pdf-target"
+          fileName={`평가결과_${questionId}_${submissionId ?? ''}.pdf`}
+          label="평가 결과 PDF"
+        />
+      </div>
+
+      <div id="speaking-result-pdf-target" className="max-w-2xl mx-auto space-y-6">
         {/* 총점 */}
         <Card>
           <CardHeader

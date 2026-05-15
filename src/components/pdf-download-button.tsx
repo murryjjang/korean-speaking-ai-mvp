@@ -7,25 +7,28 @@
 
 import { useState } from 'react'
 
-export function PdfDownloadButton({
-  targetRef,
-  fileName,
-  label = 'PDF 다운로드',
-  className,
-  disabled = false,
-  beforeCapture,
-  afterCapture,
-}: {
-  targetRef: React.RefObject<HTMLElement | null>
+type PdfDownloadButtonProps =
+  | (CommonProps & { targetRef: React.RefObject<HTMLElement | null>; targetId?: never })
+  | (CommonProps & { targetId: string; targetRef?: never })
+
+type CommonProps = {
   fileName: string
   label?: string
   className?: string
   disabled?: boolean
-  /** 캡처 직전 호출 — 임시로 펼치기/스크롤 정리 등에 사용. */
   beforeCapture?: () => void | Promise<void>
-  /** 캡처 직후 호출 — beforeCapture에서 변경한 상태 복원. */
   afterCapture?: () => void | Promise<void>
-}) {
+}
+
+export function PdfDownloadButton(props: PdfDownloadButtonProps) {
+  const {
+    fileName,
+    label = 'PDF 다운로드',
+    className,
+    disabled = false,
+    beforeCapture,
+    afterCapture,
+  } = props
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,7 +37,11 @@ export function PdfDownloadButton({
     setError(null)
     setBusy(true)
     try {
-      const el = targetRef.current
+      const el = 'targetRef' in props && props.targetRef
+        ? props.targetRef.current
+        : 'targetId' in props && props.targetId
+          ? document.getElementById(props.targetId)
+          : null
       if (!el) throw new Error('pdf_target_missing')
       if (beforeCapture) await beforeCapture()
       // 폰트 로딩 안정화 — 한국어·아랍어 폰트 비동기 로딩이 끝난 후 캡처해야
