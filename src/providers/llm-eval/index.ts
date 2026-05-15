@@ -278,6 +278,45 @@ function scoreToGrade(score: number): 'A' | 'B' | 'C' | 'D' | 'F' {
   return 'F'
 }
 
+// v1.1 단계 27: mock 응답도 외국어 학습자에게 다국어 피드백을 동봉한다.
+// 점수 구간별 정형 문구 — OpenAI 응답 형식과 1:1 호환.
+const MOCK_FEEDBACK_BANDS = {
+  high: {
+    ko: '훌륭합니다! 잘 표현했습니다. 같은 수준을 유지하며 계속 연습하세요.',
+    en: 'Excellent work! You expressed yourself well. Keep practicing at this level.',
+    vi: 'Xuất sắc! Bạn đã diễn đạt rất tốt. Hãy tiếp tục luyện tập ở mức độ này.',
+    ar: 'عمل ممتاز! لقد عبّرت بشكل جيد. واصل التدرب على هذا المستوى.',
+  },
+  mid: {
+    ko: '잘했습니다! 조금 더 연습하면 더 좋아질 거예요.',
+    en: 'Good job! With a little more practice it will get even better.',
+    vi: 'Làm tốt lắm! Luyện tập thêm một chút sẽ tốt hơn nữa.',
+    ar: 'أحسنت! مع المزيد من التمرين سيكون أفضل.',
+  },
+  low: {
+    ko: '열심히 시도했습니다. 빠진 부분을 보충해서 다시 시도해 보세요.',
+    en: 'Good effort. Try again, filling in the parts you missed.',
+    vi: 'Bạn đã cố gắng. Hãy thử lại và bổ sung những phần còn thiếu.',
+    ar: 'لقد بذلت جهدًا جيدًا. حاول مرة أخرى مع تعويض ما فاتك.',
+  },
+} as const
+
+function multilingualForOverall(overall: number, kos: string) {
+  const band = overall >= 80 ? 'high' : overall >= 60 ? 'mid' : 'low'
+  const fb = MOCK_FEEDBACK_BANDS[band]
+  // ko는 호출부가 이미 결정한 학습자 피드백 한국어를 우선 사용. 비어 있으면 band 기본.
+  return { ko: kos || fb.ko, en: fb.en, vi: fb.vi, ar: fb.ar }
+}
+
+function maybeAttachMultilingual(detail: SpeakingEvalDetail, input: SpeakingEvalInput): SpeakingEvalDetail {
+  const mt = (input.motherTongue ?? '').trim().toLowerCase()
+  if (mt !== 'en' && mt !== 'vi' && mt !== 'ar') return detail
+  return {
+    ...detail,
+    learner_feedback_multilingual: multilingualForOverall(detail.overall_score, detail.learner_feedback_ko),
+  }
+}
+
 function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
   const transcript = input.transcript
   const wordCount = transcript.trim().split(/\s+/).filter(Boolean).length
@@ -545,6 +584,18 @@ async function callOpenAI(
     )
   }
 
+  // v1.1 단계 27: 학습자 모국어가 외국어이면 learner_feedback_multilingual을 추가 요구.
+  const mt = (input.motherTongue ?? '').trim().toLowerCase()
+  const multilingual = mt === 'en' || mt === 'vi' || mt === 'ar'
+  if (multilingual) {
+    const langName = mt === 'en' ? 'English' : mt === 'vi' ? 'Vietnamese' : 'Arabic'
+    parts.push(
+      `[다국어 피드백 요구]\n학습자 모국어: ${langName}(${mt}). 응답 JSON에 다음 키를 추가하세요:\n` +
+        `"learner_feedback_multilingual": { "ko": "<learner_feedback_ko와 동일 내용>", "en": "...", "vi": "...", "ar": "..." }\n` +
+        `각 언어는 learner_feedback_ko와 같은 의미·길이로 자연스럽게 번역. 빈 문자열은 허용.`,
+    )
+  }
+
   const response = await client.chat.completions.create({
     model,
     messages: [
@@ -553,7 +604,7 @@ async function callOpenAI(
     ],
     response_format: { type: 'json_object' },
     temperature: 0.3,
-    max_tokens: 1024,
+    max_tokens: multilingual ? 1700 : 1024,
   })
 
   const raw = response.choices[0]?.message?.content ?? ''
@@ -588,6 +639,21 @@ async function callOpenAI(
       typeof parsed.learner_feedback_ko === 'string' ? parsed.learner_feedback_ko : '',
     learner_feedback_simple:
       typeof parsed.learner_feedback_simple === 'string' ? parsed.learner_feedback_simple : '',
+    learner_feedback_multilingual: (() => {
+      // v1.1 단계 27: 학습자 모국어가 외국어일 때만 LLM이 보내는 다국어 객체를 받는다.
+      if (!multilingual) return undefined
+      const m = parsed.learner_feedback_multilingual
+      if (!m || typeof m !== 'object') return undefined
+      const obj = m as Record<string, unknown>
+      const pickStr = (k: string) =>
+        typeof obj[k] === 'string' && (obj[k] as string).trim() ? (obj[k] as string).trim() : ''
+      const ko = pickStr('ko') || (typeof parsed.learner_feedback_ko === 'string' ? parsed.learner_feedback_ko : '')
+      const en = pickStr('en')
+      const vi = pickStr('vi')
+      const ar = pickStr('ar')
+      if (!ko && !en && !vi && !ar) return undefined
+      return { ko, en, vi, ar }
+    })(),
     needs_teacher_review: typeof parsed.needs_teacher_review === 'boolean'
       ? parsed.needs_teacher_review
       : overallScore < 30,
@@ -619,7 +685,7 @@ export async function evaluateSpeakingDetail(
   if (provider !== 'openai' || !apiKey) {
     await new Promise((resolve) => setTimeout(resolve, 600))
     return {
-      detail: getMockDetail(input),
+      detail: maybeAttachMultilingual(getMockDetail(input), input),
       providerName: 'mock',
       latencyMs: 600,
       status: 'fallback',
@@ -634,7 +700,7 @@ export async function evaluateSpeakingDetail(
     const errorMessage = err instanceof Error ? err.message : String(err)
     console.error('[llm-eval] OpenAI call failed, using mock fallback:', errorMessage)
     return {
-      detail: getMockDetail(input),
+      detail: maybeAttachMultilingual(getMockDetail(input), input),
       providerName: 'mock',
       latencyMs: Date.now() - start,
       status: 'fallback',

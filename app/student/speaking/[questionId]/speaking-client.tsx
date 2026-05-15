@@ -376,6 +376,7 @@ export function SpeakingClient({
         audioUrl,
         pronunciationResult,
         attemptId,
+        motherTongue,
       })
 
       // v1.1 단계 10-5: 시험운영 로깅 — q1~q4 단일 턴 평가 세션 (fail-silent).
@@ -417,7 +418,7 @@ export function SpeakingClient({
       setSubmitError(true)
       setPhase('review')
     }
-  }, [question.id, question.prompt, question.typeId, questionSetId, attemptId, router, recorder.state, recorder.blobUrl, recorder.durationSec, recorder.audioStats, blobSize])
+  }, [question.id, question.prompt, question.typeId, questionSetId, attemptId, router, recorder.state, recorder.blobUrl, recorder.durationSec, recorder.audioStats, blobSize, motherTongue])
 
   const handleRetake = useCallback(() => {
     recorder.reset()

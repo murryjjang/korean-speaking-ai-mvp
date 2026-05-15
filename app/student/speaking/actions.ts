@@ -57,6 +57,8 @@ export interface SpeakingSubmitMeta {
   pronunciationResult?: ClientPronunciationResult
   /** Attempt UUID — when present, records this submission in the attempt store. */
   attemptId?: string
+  /** v1.1 단계 27: 학습자 모국어 — LLM 평가 다국어 피드백 활성 신호. */
+  motherTongue?: string | null
 }
 
 export async function submitSpeaking(
@@ -212,6 +214,7 @@ export async function submitSpeaking(
     requiredElementAliases: (question as { requiredElementAliases?: Record<string, string[]> })?.requiredElementAliases,
     pronunciationScore: pronunciationForEval?.normalizedScore,
     pronunciationFeedback: pronunciationForEval?.feedback,
+    motherTongue: meta?.motherTongue ?? null,
   })
 
   const [pronunciationResult, llmEvalRaw] = await Promise.all([

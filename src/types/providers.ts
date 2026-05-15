@@ -112,6 +112,9 @@ export type SpeakingEvalInput = {
   requiredElementAliases?: Record<string, string[]>
   pronunciationScore?: number
   pronunciationFeedback?: string
+  // v1.1 단계 27: 학습자 모국어(ko/en/vi/ar/other). 외국어이면 OpenAI 평가가
+  // learner_feedback_multilingual을 채워 반환하도록 프롬프트가 분기한다.
+  motherTongue?: string | null
 }
 
 export type SpeakingEvalDetail = {
