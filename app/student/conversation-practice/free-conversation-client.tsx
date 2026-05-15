@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
+import { getPersona } from '@/src/lib/personas'
 import { sanitizeForTTS } from '@/src/lib/text-utils/sanitize-for-tts'
 
 // 추천 주제 9개 (페르소나 메타데이터 없음 — 페르소나는 별도 단계에서 선택)
@@ -19,19 +20,33 @@ const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'find-facility', label: '편의시설(약국·병원) 찾기' },
 ]
 
-// 선택 가능한 페르소나 (v1.1). id는 src/lib/personas.ts의 personaId와 일치.
+// 선택 가능한 페르소나 (v1.1 단계 9: 4명 — 친구·도우미 × 여·남).
+// id는 src/lib/personas.ts의 personaId와 일치. UI 라벨은 캐릭터 이름(수아·재현·서연·영석)을
+// 노출하지 않고 역할·성별만 보여준다.
 const AVAILABLE_PERSONAS: ReadonlyArray<{ id: string; label: string; description: string; emoji: string }> = [
   {
     id: 'friend_casual',
-    label: '친구',
-    description: '반말·친근체. 일상 대화·취미·여행 추천에 적합',
+    label: '친구 (여)',
+    description: '반말·친근체, 활발',
     emoji: '😊',
   },
   {
+    id: 'friend_casual_male',
+    label: '친구 (남)',
+    description: '반말·친근체, 농담 잘함',
+    emoji: '🙂',
+  },
+  {
     id: 'korean_life_helper',
-    label: '한국 생활 도우미',
-    description: '존댓말·정중체. 정보 조회·실생활 안내에 적합',
+    label: '도우미 (여)',
+    description: '존댓말·정중, 디지털·트렌드',
     emoji: '👋',
+  },
+  {
+    id: 'korean_life_helper_male',
+    label: '도우미 (남)',
+    description: '존댓말·정중, 행정·절차',
+    emoji: '🧑‍💼',
   },
 ]
 
@@ -74,10 +89,11 @@ function formatTime(sec: number): string {
 }
 
 function buildOpener(topic: string, personaId: string): string {
-  if (personaId === 'korean_life_helper') {
-    return `안녕하세요! "${topic}" 관련해서 도와드릴게요. 무엇이 궁금하세요?`
+  // v1.1 단계 9: 페르소나 politenessLevel 기반으로 분기 — 자유 대화 4명 모두 자연스럽게 처리.
+  const persona = getPersona(personaId)
+  if (persona?.politenessLevel === 'polite' || persona?.politenessLevel === 'formal') {
+    return `안녕하세요! "${topic}" 관련해서 편하게 물어보세요. 무엇이 궁금하세요?`
   }
-  // friend_casual 등 친근체 기본
   return `"${topic}" 얘기해볼까? 편하게 시작해 봐!`
 }
 
