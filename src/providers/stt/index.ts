@@ -42,10 +42,14 @@ class WhisperSTTProvider implements STTProvider {
       type: blob.type || 'audio/webm',
     })
 
+    // Context prompt: signals the expected domain so Whisper anchors on learner
+    // speech rather than fabricating news/YouTube outros from low-energy audio.
     const response = await client.audio.transcriptions.create({
       file: audioFile,
       model: 'whisper-1',
       language: 'ko',
+      prompt:
+        '한국어 학습자가 자연스럽게 답변합니다. 카페·식당·일상 회화·인사·자기소개·계획 등의 발화입니다. 뉴스 앵커 멘트나 유튜브 outro가 아닙니다.',
     })
 
     const latencyMs = Date.now() - startMs
