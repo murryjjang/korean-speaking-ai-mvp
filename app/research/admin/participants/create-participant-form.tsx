@@ -60,7 +60,21 @@ export function CreateParticipantForm() {
       </label>
       <label className="block">
         <span className="text-xs text-text-muted">모국어 (선택)</span>
-        <input name="motherTongue" type="text" className={inputClass} data-testid="input-new-mother-tongue" disabled={pending} />
+        {/* v1.1 16-10-7: 셀렉트로 변경 — 학습자 로그인 시 표시 언어 자동 적용에 사용. */}
+        <select
+          name="motherTongue"
+          className={inputClass}
+          data-testid="input-new-mother-tongue"
+          disabled={pending}
+          defaultValue=""
+        >
+          <option value="">선택 안 함</option>
+          <option value="ko">한국어 (ko)</option>
+          <option value="en">English (en)</option>
+          <option value="vi">Tiếng Việt (vi)</option>
+          <option value="ar">العربية (ar)</option>
+          <option value="other">기타 (other)</option>
+        </select>
       </label>
       <label className="block">
         <span className="text-xs text-text-muted">PIN (선택, 4자리)</span>
