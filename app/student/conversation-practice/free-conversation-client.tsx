@@ -9,6 +9,7 @@ import { DisplayLanguageToggle } from '@/src/components/ui/display-language-togg
 import { isRTLDisplay, pickText } from '@/src/lib/i18n/display-language'
 import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
 import { ToolResultCards } from '@/src/components/tool-result-cards'
+import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { getPersona } from '@/src/lib/personas'
 import {
   endResearchSession,
@@ -193,6 +194,9 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [sending, setSending] = useState(false)
   const [chatError, setChatError] = useState<string | null>(null)
+
+  // v1.1 26-2: PDF 다운로드용 ref — 종료 화면 내용물 컨테이너 캡처.
+  const pdfSectionRef = useRef<HTMLDivElement | null>(null)
 
   // v1.1 단계 10-4: 시험운영 데이터 로깅 — 현재 대화의 research_sessions.id.
   // null이면 미로깅 모드 (참여자 미로그인·Supabase 미설정 등). fail-silent.
@@ -1249,10 +1253,19 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
   // stage === 'end'
   return (
     <div className="max-w-2xl mx-auto space-y-6 px-4 py-6" data-testid="free-conversation-end">
-      <div>
-        <h1 className="text-xl font-bold text-text-primary">대화 요약 + 학습 피드백</h1>
-        <p className="text-sm text-text-secondary mt-1">주제: {topic}</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold text-text-primary">대화 요약 + 학습 피드백</h1>
+          <p className="text-sm text-text-secondary mt-1">주제: {topic}</p>
+        </div>
+        {/* v1.1 26-2: 종료 화면 전체를 PDF로 다운로드 */}
+        <PdfDownloadButton
+          targetRef={pdfSectionRef}
+          fileName={`자유대화_${new Date().toISOString().slice(0,10)}_${topic.replace(/\s+/g,'-')}.pdf`}
+          label="대화 요약 PDF"
+        />
       </div>
+      <div ref={pdfSectionRef} className="space-y-6">
 
       {summaryLoading && !summary && (
         <Card>
@@ -1416,6 +1429,7 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
           </Card>
         </>
       )}
+      </div>{/* /pdfSectionRef wrapper */}
 
       <div>
         <button
