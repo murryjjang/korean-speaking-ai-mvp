@@ -154,7 +154,9 @@ export default async function StudentProgressPage() {
                 </span>
                 <span>·</span>
                 <span>{MODE_LABEL[s.mode] ?? s.mode}</span>
-                {s.sessionEndedAt ? null : <span className="text-xs text-yellow-600 ml-2">(진행 중)</span>}
+                {s.sessionEndedAt
+                  ? <span className="text-xs text-emerald-600 ml-2">(완료)</span>
+                  : <span className="text-xs text-yellow-600 ml-2">(진행 중)</span>}
               </li>
             ))}
           </ul>

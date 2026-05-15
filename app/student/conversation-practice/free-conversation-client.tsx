@@ -386,7 +386,7 @@ export function FreeConversationClient() {
     }
   }, [stage])
 
-  // 컴포넌트 언마운트 시 음성 녹음 인터벌 + NPC 오디오 정리
+  // 컴포넌트 언마운트 시 음성 녹음 인터벌 + NPC 오디오 + research 세션 정리
   useEffect(() => {
     return () => {
       if (voiceTickRef.current) {
@@ -402,6 +402,12 @@ export function FreeConversationClient() {
         try { a.pause() } catch { /* noop */ }
         a.src = ''
         npcAudioRef.current = null
+      }
+      // v1.1 14-3: 미명시 종료(언마운트/탭 닫기/네비게이션)에서도 세션을 종료해 진행 중 상태 방지.
+      const sid = researchSessionIdRef.current
+      if (sid) {
+        researchSessionIdRef.current = null
+        void endResearchSession(sid)
       }
     }
   }, [])

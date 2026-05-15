@@ -162,6 +162,17 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chat])
 
+  // v1.1 14-3: 미명시 종료(언마운트/네비게이션)에서도 research 세션을 닫는다.
+  useEffect(() => {
+    return () => {
+      const rsid = researchSessionIdRef.current
+      if (rsid) {
+        researchSessionIdRef.current = null
+        void endResearchSession(rsid)
+      }
+    }
+  }, [])
+
   const addChatItem = useCallback((role: 'ai' | 'user', text: string) => {
     const key = nextKey.current++
     setChat((prev) => [...prev, { key, role, text }])
