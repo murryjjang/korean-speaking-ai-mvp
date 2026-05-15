@@ -13,6 +13,7 @@ import {
 import { getCurrentParticipant } from '@/src/lib/research/session'
 import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
 import { ModeDonut, DailyBars, ScoreLine } from '@/src/components/research/progress-charts'
+import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 
 import { logoutAction } from '../actions'
 
@@ -121,6 +122,12 @@ export default async function StudentProgressPage() {
         <div className="flex items-center gap-2 flex-wrap">
           {/* v1.1 16-10-5: 표시 언어 토글 — 모국어 자동 적용, 명시 선택 시 유지. */}
           <DisplayLanguageToggle motherTongueHint={participant.motherTongue} />
+          {/* v1.1 26-4: 진척 종합 PDF 다운로드 */}
+          <PdfDownloadButton
+            targetId="research-progress-pdf-target"
+            fileName={`학습진척_${participant.participantCode}_${new Date().toISOString().slice(0,10)}.pdf`}
+            label="진척 PDF"
+          />
           <form action={logoutAction}>
             <button
               type="submit"
@@ -132,6 +139,8 @@ export default async function StudentProgressPage() {
           </form>
         </div>
       </header>
+
+      <div id="research-progress-pdf-target">
 
       <section className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="student-stats">
         <Stat label="총 세션" value={String(sessions.length)} />
@@ -190,6 +199,7 @@ export default async function StudentProgressPage() {
           </ul>
         )}
       </section>
+      </div>{/* /research-progress-pdf-target */}
 
       <section className="mt-8">
         <h2 className="text-sm font-semibold text-text-primary mb-2">학습 시작</h2>
