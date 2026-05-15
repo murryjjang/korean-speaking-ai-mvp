@@ -11,6 +11,9 @@
 // 프롬프트는 input.aiRole / aiInformation / missionGoals 로부터 동적 생성 →
 // q4 3종(cafe/admin/event) 모두 동일 코드로 동작한다.
 
+import { buildQ4PersonaSystemPrompt } from '@/src/lib/llm/build-q4-persona-system-prompt'
+import { getPersona } from '@/src/lib/personas'
+
 import type {
   DialogueConversationInput,
   DialogueConversationOutput,
@@ -21,6 +24,16 @@ import type {
 const PROVIDER_NAME = 'openai'
 const DEFAULT_MODEL = 'gpt-4o-mini'
 const MAX_HISTORY_TURNS = 10 // 직전 5쌍(학습자/AI) 정도
+
+// v1.1 단계 11-3: personaId 미지정 시 questionId 패턴으로 페르소나 추론.
+// 기존 MockDialogueConversationProvider의 #inferPersonaId와 동일 규칙 — 호출부 변경 없이
+// LLM 분기에서도 일관된 페르소나 사용.
+function inferPersonaIdFromQuestionId(questionId: string): string | undefined {
+  if (questionId.includes('beginner')) return 'cafe_staff_friendly'
+  if (questionId.includes('intermediate')) return 'admin_staff_clear'
+  if (questionId.includes('advanced')) return 'event_partner_professional'
+  return undefined
+}
 
 const SYSTEM_PROMPT_TEMPLATE = `당신은 한국어 학습자와 대화하는 AI 역할입니다.
 
@@ -126,6 +139,19 @@ function formatHistory(turns: DialogueTurnInput[]): string {
 }
 
 function buildSystemPrompt(input: DialogueConversationInput): string {
+  // v1.1 단계 11-3: personaId가 명시되거나 questionId에서 추론되면 페르소나 시트 기반
+  // buildQ4PersonaSystemPrompt를 사용한다. 페르소나가 없으면 v1.0 템플릿으로 폴백.
+  const personaId = input.personaId ?? inferPersonaIdFromQuestionId(input.questionId)
+  const persona = personaId ? getPersona(personaId) : undefined
+  if (persona) {
+    return buildQ4PersonaSystemPrompt({
+      persona,
+      aiRole: input.aiRole,
+      aiInformation: input.aiInformation,
+      missionGoals: input.missionGoals,
+      conversationHistory: input.turns,
+    })
+  }
   return SYSTEM_PROMPT_TEMPLATE
     .replace('{role}', input.aiRole || 'AI 어시스턴트')
     .replace('{ai_information}', input.aiInformation || '(추가 정보 없음)')
