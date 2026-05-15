@@ -3,7 +3,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import { CONSENT_TEXT_EN, CONSENT_TEXT_KO, type ConsentLocale } from '@/src/lib/research/consent-text'
+import { CONSENT_TEXTS, type ConsentLocale } from '@/src/lib/research/consent-text'
 import { anonymizeIp, sha256Hex } from '@/src/lib/research/helpers'
 import { createConsentLog, markParticipantConsented } from '@/src/lib/research/repository'
 import { clearParticipantSession, getCurrentParticipant } from '@/src/lib/research/session'
@@ -11,8 +11,11 @@ import { CONSENT_VERSION } from '@/src/lib/research/types'
 
 /** 동의 처리: research_participants.consent_status = true + consent_log 기록 */
 export async function recordConsent(formData: FormData): Promise<void> {
-  const locale: ConsentLocale = formData.get('locale') === 'en' ? 'en' : 'ko'
-  const body = locale === 'en' ? CONSENT_TEXT_EN : CONSENT_TEXT_KO
+  const raw = formData.get('locale')
+  // v1.1 16-10-6: 4언어 모두 수용
+  const locale: ConsentLocale =
+    raw === 'en' || raw === 'vi' || raw === 'ar' ? raw : 'ko'
+  const body = CONSENT_TEXTS[locale]
 
   const participant = await getCurrentParticipant()
   if (!participant) redirect('/research/login')

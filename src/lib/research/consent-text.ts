@@ -1,7 +1,8 @@
-// v1.1 단계 10-3: 동의서 본문 (한국어·영어).
+// v1.1 단계 10-3 / 16-10-6: 동의서 본문 (한국어·영어·베트남어·아랍어).
 //
 // 본문이 바뀌면 CONSENT_VERSION을 올린다. 본문 해시(sha256)로 저장 — 운영자가
-// 어느 버전 본문에 동의했는지 감사 가능.
+// 어느 버전 본문에 동의했는지 감사 가능. KO/EN은 법적 정본, VI/AR은 학습자
+// 편의용 번역(필요 시 영어/한국어 정본을 함께 확인 안내).
 
 export const CONSENT_TEXT_KO = `한국어 말하기 학습 시험운영 참여 동의서
 
@@ -65,4 +66,77 @@ Please contact the operator directly.
 
 I have understood the above and consent to participating in this pilot study.`
 
-export type ConsentLocale = 'ko' | 'en'
+export const CONSENT_TEXT_VI = `Đồng ý tham gia Thử nghiệm AI Học Nói Tiếng Hàn
+
+Thử nghiệm này nhằm xác minh hiệu quả của hệ thống AI học nói tiếng Hàn (KDLI Korean MVP). Dữ liệu thu thập sẽ được sử dụng cho nghiên cứu học thuật và báo cáo KDLI.
+
+[Dữ liệu được thu thập]
+- Hoạt động học tập: chế độ luyện tập, thời gian bắt đầu/kết thúc phiên
+- Dữ liệu lời nói: bản ghi âm, văn bản đã chuyển từ giọng nói, phản hồi của NPC
+- Điểm đánh giá: điểm phát âm/độ trôi chảy/ngữ pháp/từ vựng và phản hồi
+- Nhật ký công cụ: việc sử dụng công cụ hệ thống (tìm kiếm, thời tiết, địa chỉ)
+- Thông tin kỹ thuật: địa chỉ IP tại thời điểm đồng ý (ẩn danh hóa — chỉ giữ tiền tố /24) và user agent
+
+[Sử dụng dữ liệu]
+- Nghiên cứu học thuật (bài báo, hội nghị)
+- Báo cáo KDLI
+- Cải thiện hệ thống
+
+[Thời gian lưu giữ]
+Dữ liệu được lưu giữ trong 2 năm sau khi nghiên cứu kết thúc. Tất cả thông tin định danh sẽ bị xóa khi hết thời gian lưu giữ.
+
+[Ẩn danh hóa]
+Tất cả dữ liệu được công bố chỉ sử dụng mã người tham gia (ví dụ: P001). Tên, quốc tịch và thông tin liên hệ không bao giờ được tiết lộ.
+
+[Quyền của người tham gia]
+- Bạn có thể rút lui bất cứ lúc nào (liên hệ người vận hành).
+- Bạn có thể yêu cầu xem hoặc xóa dữ liệu của chính mình.
+
+[Liên hệ nhà nghiên cứu]
+Vui lòng liên hệ trực tiếp với người vận hành.
+
+Tôi đã hiểu các nội dung trên và đồng ý tham gia thử nghiệm này.
+
+(Bản tiếng Hàn và tiếng Anh là bản chính thức. Bản dịch này nhằm hỗ trợ hiểu nội dung.)`
+
+export const CONSENT_TEXT_AR = `موافقة المشاركة في تجربة الذكاء الاصطناعي لتعلم محادثة اللغة الكورية
+
+تُجرى هذه التجربة للتحقق من فاعلية نظام الذكاء الاصطناعي لتعلم محادثة اللغة الكورية (KDLI Korean MVP). ستُستخدم البيانات المُجمَّعة لأغراض البحث الأكاديمي وتقارير KDLI.
+
+[البيانات التي يتم جمعها]
+- نشاط التعلم: وضع التدريب، أوقات بدء/انتهاء الجلسة
+- بيانات الكلام: تسجيلات صوتية، نصوص محوّلة من الصوت، ردود NPC
+- درجات التقييم: درجات النطق/الطلاقة/القواعد/المفردات والملاحظات
+- سجلات استخدام الأدوات: استخدام أدوات النظام (البحث، الطقس، العنوان)
+- معلومات تقنية: عنوان IP وقت الموافقة (مُجهَّل — يُحتفظ بأول 24 بت فقط) ونوع المتصفح
+
+[استخدام البيانات]
+- البحث الأكاديمي (الأوراق العلمية، المؤتمرات)
+- تقارير KDLI
+- تحسين النظام
+
+[مدة الاحتفاظ]
+يتم الاحتفاظ بالبيانات لمدة عامين بعد انتهاء الدراسة. تُحذف جميع المعلومات المحدِّدة للهوية في نهاية فترة الاحتفاظ.
+
+[إخفاء الهوية]
+تستخدم جميع البيانات المنشورة رموز المشاركين فقط (مثل P001). لا يتم الإفصاح عن الأسماء أو الجنسيات أو معلومات الاتصال.
+
+[حقوق المشاركين]
+- يمكنك الانسحاب في أي وقت (تواصل مع المشغّل).
+- يمكنك طلب الوصول إلى بياناتك الشخصية أو حذفها.
+
+[التواصل مع الباحث]
+يرجى التواصل مع المشغّل مباشرةً.
+
+أقرّ بأنني قد فهمت ما سبق وأوافق على المشاركة في هذه التجربة.
+
+(النسخة الكورية والإنجليزية هما النسختان الرسميتان. هذه الترجمة لتسهيل الفهم.)`
+
+export type ConsentLocale = 'ko' | 'en' | 'vi' | 'ar'
+
+export const CONSENT_TEXTS: Record<ConsentLocale, string> = {
+  ko: CONSENT_TEXT_KO,
+  en: CONSENT_TEXT_EN,
+  vi: CONSENT_TEXT_VI,
+  ar: CONSENT_TEXT_AR,
+}

@@ -5,7 +5,7 @@
 
 import { redirect } from 'next/navigation'
 
-import { CONSENT_TEXT_EN, CONSENT_TEXT_KO } from '@/src/lib/research/consent-text'
+import { CONSENT_TEXTS, type ConsentLocale } from '@/src/lib/research/consent-text'
 import { getCurrentParticipant } from '@/src/lib/research/session'
 
 import { recordConsent, declineConsent } from './actions'
@@ -95,64 +95,74 @@ function renderConsentBody(body: string): React.ReactNode {
   )
 }
 
+const LOCALE_LABEL: Record<ConsentLocale, string> = {
+  ko: '한국어',
+  en: 'English',
+  vi: 'Tiếng Việt',
+  ar: 'العربية',
+}
+
+// 화면 상단 안내 문구 — 한국어 우선, 표시 언어가 그 외면 해당 언어로 보조.
+const I18N_TEXT: Record<ConsentLocale, { title: string; subtitle: string; pcLabel: string; agree: string; decline: string; lang: string }> = {
+  ko: { title: '시험운영 참여 동의', subtitle: '계속하기 전에 본문을 자세히 읽어주세요.', pcLabel: '참여자 코드', agree: '동의하고 시작', decline: '동의하지 않음', lang: '언어 선택' },
+  en: { title: 'Consent to Participate', subtitle: 'Please read carefully before continuing.', pcLabel: 'Participant code', agree: 'I agree and start', decline: 'I do not agree', lang: 'Language' },
+  vi: { title: 'Đồng ý tham gia thử nghiệm', subtitle: 'Vui lòng đọc kỹ trước khi tiếp tục.', pcLabel: 'Mã người tham gia', agree: 'Tôi đồng ý và bắt đầu', decline: 'Tôi không đồng ý', lang: 'Ngôn ngữ' },
+  ar: { title: 'الموافقة على المشاركة', subtitle: 'يرجى القراءة بعناية قبل المتابعة.', pcLabel: 'رمز المشارك', agree: 'أوافق وأبدأ', decline: 'لا أوافق', lang: 'اللغة' },
+}
+
+function isConsentLocale(v: unknown): v is ConsentLocale {
+  return v === 'ko' || v === 'en' || v === 'vi' || v === 'ar'
+}
+
 export default async function ConsentPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
-  const locale = params.locale === 'en' ? 'en' : 'ko'
-  const body = locale === 'en' ? CONSENT_TEXT_EN : CONSENT_TEXT_KO
+  const locale: ConsentLocale = isConsentLocale(params.locale) ? params.locale : 'ko'
+  const body = CONSENT_TEXTS[locale]
+  const t = I18N_TEXT[locale]
+  const rtl = locale === 'ar'
 
   const participant = await getCurrentParticipant()
   if (!participant) redirect('/research/login')
   if (participant.consentStatus) redirect('/research/student/progress')
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-8" data-testid="research-consent-page">
+    <main
+      className="max-w-2xl mx-auto px-4 py-8"
+      data-testid="research-consent-page"
+      dir={rtl ? 'rtl' : undefined}
+    >
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">
-            {locale === 'en' ? 'Consent to Participate' : '시험운영 참여 동의'}
-          </h1>
-          <p className="text-sm text-text-secondary mt-1">
-            {locale === 'en'
-              ? 'Please read carefully before continuing.'
-              : '계속하기 전에 본문을 자세히 읽어주세요.'}
-          </p>
+          <h1 className="text-2xl font-bold text-text-primary">{t.title}</h1>
+          <p className="text-sm text-text-secondary mt-1">{t.subtitle}</p>
         </div>
-        {/* v1.1 16-3: KO/EN 언어 토글 — 두 버튼 그룹으로 명확히 표시 */}
+        {/* v1.1 16-3 / 16-10-6: KO/EN/VI/AR 4언어 토글 */}
         <div
           className="inline-flex rounded-md border border-border overflow-hidden text-xs"
           role="group"
-          aria-label={locale === 'en' ? 'Language' : '언어 선택'}
+          aria-label={t.lang}
           data-testid="consent-locale-toggle"
         >
-          <a
-            href="/research/consent?locale=ko"
-            className={`px-3 py-1.5 ${
-              locale === 'ko'
-                ? 'bg-primary-600 text-white font-semibold'
-                : 'bg-white text-text-secondary hover:bg-slate-50'
-            }`}
-            aria-current={locale === 'ko' ? 'page' : undefined}
-            data-testid="link-toggle-consent-locale-ko"
-          >
-            한국어
-          </a>
-          <a
-            href="/research/consent?locale=en"
-            className={`px-3 py-1.5 ${
-              locale === 'en'
-                ? 'bg-primary-600 text-white font-semibold'
-                : 'bg-white text-text-secondary hover:bg-slate-50'
-            }`}
-            aria-current={locale === 'en' ? 'page' : undefined}
-            data-testid="link-toggle-consent-locale-en"
-          >
-            English
-          </a>
+          {(['ko', 'en', 'vi', 'ar'] as ConsentLocale[]).map((code) => (
+            <a
+              key={code}
+              href={`/research/consent?locale=${code}`}
+              className={`px-3 py-1.5 ${
+                locale === code
+                  ? 'bg-primary-600 text-white font-semibold'
+                  : 'bg-white text-text-secondary hover:bg-slate-50'
+              }`}
+              aria-current={locale === code ? 'page' : undefined}
+              data-testid={`link-toggle-consent-locale-${code}`}
+            >
+              {LOCALE_LABEL[code]}
+            </a>
+          ))}
         </div>
       </header>
 
       <p className="mt-4 text-xs text-text-muted" data-testid="participant-code-label">
-        {locale === 'en' ? 'Participant code' : '참여자 코드'}: <span className="font-mono">{participant.participantCode}</span>
+        {t.pcLabel}: <span className="font-mono">{participant.participantCode}</span>
       </p>
 
       <section
@@ -170,7 +180,7 @@ export default async function ConsentPage({ searchParams }: { searchParams: Sear
             className="rounded-md bg-primary-600 text-white text-sm font-medium px-4 py-2 hover:bg-primary-700"
             data-testid="btn-consent-agree"
           >
-            {locale === 'en' ? 'I agree and start' : '동의하고 시작'}
+            {t.agree}
           </button>
         </form>
         <form action={declineConsent}>
@@ -179,7 +189,7 @@ export default async function ConsentPage({ searchParams }: { searchParams: Sear
             className="rounded-md border border-border bg-surface text-text-secondary text-sm font-medium px-4 py-2 hover:bg-slate-50"
             data-testid="btn-consent-decline"
           >
-            {locale === 'en' ? 'I do not agree' : '동의하지 않음'}
+            {t.decline}
           </button>
         </form>
       </div>
