@@ -15,21 +15,20 @@ const KNOWN_HALLUCINATIONS: readonly string[] = [
 // Regex patterns for broader hallucination categories.
 // Whisper tends to fabricate news anchor outros, broadcast IDs, and YouTube
 // sign-offs when fed near-silent or low-energy Korean audio.
+//
+// v1.1 16-8: 짧은 단어 매칭(뉴스/앵커/기자/이덕용 등)은 학습자 정상 발화를
+// 오탐할 수 있어 제거. 전체 문장 패턴만 유지한다.
 const HALLUCINATION_PATTERNS: readonly RegExp[] = [
-  // Broadcaster + 뉴스 (MBC 뉴스, KBS 뉴스, etc.)
-  /\b(MBC|KBS|SBS|JTBC|YTN|TVN|채널A|TV조선)\s*뉴스\b/,
-  // "MBC 뉴스 이덕용입니다" 형태 (broadcaster name + 뉴스 + 이름 + 입니다)
-  /^.{0,15}뉴스\s+.{0,15}입니다\.?$/,
-  // 뉴스/방송 어휘 (참고: src/providers/llm-eval/index.ts 의 off-task 패턴과 의도적으로 중복)
-  /뉴스|앵커|기자|보도|리포트/,
-  // Whisper가 자주 생성하는 가짜 이름
-  /이덕영|이덕용/,
-  // "○○○ 앵커입니다." 형태
-  /^.{0,20}앵커입니다\.?$/,
-  // YouTube CTA
-  /채널을\s*구독/,
-  // YouTube outro
-  /오늘은\s*여기까지/,
+  // "MBC 뉴스 이덕용입니다" — broadcaster + 뉴스 + 이름 + 입니다로 끝나는 짧은 문장만 차단.
+  /^\s*(MBC|KBS|SBS|JTBC|YTN|TVN|채널A|TV조선)\s*뉴스\s+.{1,15}입니다\.?\s*$/,
+  // "○○○ 앵커입니다." 짧은 문장만 (학습자가 평소 쓰지 않는 형태).
+  /^\s*.{0,20}앵커입니다\.?\s*$/,
+  // "오늘 ○○○ 기자였습니다." 짧은 뉴스 사인오프 문장.
+  /^\s*.{0,30}기자였습니다\.?\s*$/,
+  // YouTube CTA — 명시적 채널 구독 권유 한 문장.
+  /^\s*.{0,20}채널을\s*구독.{0,20}$/,
+  // YouTube outro — "오늘은 여기까지" 형태 한 문장.
+  /^\s*오늘은\s*여기까지.{0,20}$/,
 ]
 
 export function normalizeTranscript(text: string): string {

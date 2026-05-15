@@ -36,49 +36,25 @@ describe('stt-sanity', () => {
     })
   })
 
-  describe('isLikelySttHallucination — 신규 정규식 패턴', () => {
-    it('"MBC 뉴스" 매칭', () => {
-      expect(isLikelySttHallucination('MBC 뉴스 입니다')).toBe(true)
-    })
-
-    it('"KBS 뉴스" 매칭', () => {
-      expect(isLikelySttHallucination('KBS 뉴스 9시 입니다')).toBe(true)
-    })
-
-    it('"채널A 뉴스" 매칭', () => {
-      expect(isLikelySttHallucination('채널A 뉴스 입니다')).toBe(true)
-    })
-
-    it('"MBC 뉴스 이덕용입니다" 형태 매칭', () => {
+  describe('isLikelySttHallucination — 신규 정규식 패턴 (전체 문장만 차단)', () => {
+    it('"MBC 뉴스 이덕용입니다" 전체 문장 매칭', () => {
       expect(isLikelySttHallucination('MBC 뉴스 이덕용입니다')).toBe(true)
     })
 
-    it('"앵커" 단어 포함 매칭', () => {
-      expect(isLikelySttHallucination('이상 9시 뉴스 앵커 김민지였습니다')).toBe(true)
+    it('"KBS 뉴스 김민지입니다" 전체 문장 매칭', () => {
+      expect(isLikelySttHallucination('KBS 뉴스 김민지입니다')).toBe(true)
     })
 
-    it('"기자" 단어 포함 매칭', () => {
+    it('"현장에서 박지훈 기자였습니다" 전체 문장 매칭', () => {
       expect(isLikelySttHallucination('현장에서 박지훈 기자였습니다')).toBe(true)
     })
 
-    it('"보도" 단어 포함 매칭', () => {
-      expect(isLikelySttHallucination('정부 발표를 보도해 드렸습니다')).toBe(true)
-    })
-
-    it('"리포트" 단어 포함 매칭', () => {
-      expect(isLikelySttHallucination('지금까지 현장 리포트였습니다')).toBe(true)
-    })
-
-    it('"이덕영" 가짜 이름 매칭', () => {
-      expect(isLikelySttHallucination('이덕영 앵커입니다')).toBe(true)
-    })
-
-    it('"이덕용" 가짜 이름 매칭', () => {
-      expect(isLikelySttHallucination('이덕용입니다 안녕히')).toBe(true)
-    })
-
-    it('"○○ 앵커입니다." 형태', () => {
+    it('"○○ 앵커입니다." 짧은 형태', () => {
       expect(isLikelySttHallucination('김민지 앵커입니다.')).toBe(true)
+    })
+
+    it('"이덕영 앵커입니다" 매칭', () => {
+      expect(isLikelySttHallucination('이덕영 앵커입니다')).toBe(true)
     })
 
     it('"채널을 구독" CTA 매칭', () => {
@@ -87,6 +63,32 @@ describe('stt-sanity', () => {
 
     it('"오늘은 여기까지" outro 매칭', () => {
       expect(isLikelySttHallucination('오늘은 여기까지 입니다')).toBe(true)
+    })
+  })
+
+  describe('isLikelySttHallucination — v1.1 16-8: 짧은 단어 단독 발화 통과', () => {
+    it('"뉴스" 단어 학습자 일상 발화 → 통과', () => {
+      expect(isLikelySttHallucination('어제 뉴스 봤어요. 정말 재미있었어요.')).toBe(false)
+    })
+
+    it('"앵커" 단어 학습자 발화 → 통과', () => {
+      expect(isLikelySttHallucination('저는 앵커가 되고 싶어요.')).toBe(false)
+    })
+
+    it('"기자" 단어 학습자 발화 → 통과', () => {
+      expect(isLikelySttHallucination('우리 학교에 기자가 왔어요.')).toBe(false)
+    })
+
+    it('"보도" 단어 학습자 발화 → 통과', () => {
+      expect(isLikelySttHallucination('정부 발표를 보도해 드렸습니다')).toBe(false)
+    })
+
+    it('"리포트" 단어 학습자 발화 → 통과', () => {
+      expect(isLikelySttHallucination('지금까지 현장 리포트였습니다')).toBe(false)
+    })
+
+    it('"이덕용" 가짜 이름이 더 긴 문장에 포함 → 통과 (전체 문장 형태 아님)', () => {
+      expect(isLikelySttHallucination('이덕용입니다 안녕히')).toBe(false)
     })
   })
 
