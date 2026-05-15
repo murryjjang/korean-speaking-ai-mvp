@@ -54,7 +54,7 @@ describe('personas.ts 구조 확장 (v1.1 단계 9-1)', () => {
 
   it('자유 대화 4명의 defaultVoice가 사양과 일치한다', () => {
     expect(getPersona('friend_casual')?.defaultVoice).toBe('ko-KR-SunHiNeural')
-    expect(getPersona('friend_casual_male')?.defaultVoice).toBe('ko-KR-YuChanNeural')
+    expect(getPersona('friend_casual_male')?.defaultVoice).toBe('ko-KR-BongJinNeural')
     expect(getPersona('korean_life_helper')?.defaultVoice).toBe('ko-KR-SeoHyeonNeural')
     expect(getPersona('korean_life_helper_male')?.defaultVoice).toBe('ko-KR-InJoonNeural')
   })

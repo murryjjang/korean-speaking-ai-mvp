@@ -492,7 +492,7 @@ export const PERSONAS: Persona[] = [
     description: '맛집·일상 대화를 즐기는 친근한 직장인 친구 페르소나',
     speakingStyle: '반말 친근체, 보통 속도, 농담 가끔, 일상·음식 어휘 풍부',
     politenessLevel: 'casual',
-    defaultVoice: 'ko-KR-YuChanNeural',
+    defaultVoice: 'ko-KR-BongJinNeural',
     defaultRate: 1.0,
     dialectHint: 'seoul',
     modeSupport: ['practice'],
@@ -502,7 +502,7 @@ export const PERSONAS: Persona[] = [
     ageHint: '20대 후반 남성',
     systemPromptTemplate: JAEHYEON_TEMPLATE,
     fewShotExamples: JAEHYEON_FEWSHOT,
-    voiceOptions: ['ko-KR-YuChanNeural', 'ko-KR-HyunsuNeural'],
+    voiceOptions: ['ko-KR-BongJinNeural', 'ko-KR-HyunsuNeural'],
   },
   {
     // v1.1 단계 9: 자유 대화 — "서연" (도우미 여, 29살 관광 안내 센터 직원)
