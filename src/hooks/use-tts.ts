@@ -80,8 +80,19 @@ export function useTTS(): UseTTSReturn {
             setState('error')
             setErrorMessage(FALLBACK_ERROR)
           }
-          setState('playing')
-          await audio.play()
+          audio.addEventListener(
+            'canplaythrough',
+            () => {
+              if (seq !== seqRef.current) return
+              setState('playing')
+              audio.play().catch(() => {
+                if (seq !== seqRef.current) return
+                setState('error')
+                setErrorMessage(FALLBACK_ERROR)
+              })
+            },
+            { once: true },
+          )
           return
         }
 

@@ -12,6 +12,26 @@ const KNOWN_HALLUCINATIONS: readonly string[] = [
   '시청해 주셔서',
 ]
 
+// Regex patterns for broader hallucination categories.
+// Whisper tends to fabricate news anchor outros, broadcast IDs, and YouTube
+// sign-offs when fed near-silent or low-energy Korean audio.
+const HALLUCINATION_PATTERNS: readonly RegExp[] = [
+  // Broadcaster + 뉴스 (MBC 뉴스, KBS 뉴스, etc.)
+  /\b(MBC|KBS|SBS|JTBC|YTN|TVN|채널A|TV조선)\s*뉴스\b/,
+  // "MBC 뉴스 이덕용입니다" 형태 (broadcaster name + 뉴스 + 이름 + 입니다)
+  /^.{0,15}뉴스\s+.{0,15}입니다\.?$/,
+  // 뉴스/방송 어휘 (참고: src/providers/llm-eval/index.ts 의 off-task 패턴과 의도적으로 중복)
+  /뉴스|앵커|기자|보도|리포트/,
+  // Whisper가 자주 생성하는 가짜 이름
+  /이덕영|이덕용/,
+  // "○○○ 앵커입니다." 형태
+  /^.{0,20}앵커입니다\.?$/,
+  // YouTube CTA
+  /채널을\s*구독/,
+  // YouTube outro
+  /오늘은\s*여기까지/,
+]
+
 export function normalizeTranscript(text: string): string {
   return text.trim().replace(/\s+/g, ' ')
 }
@@ -34,6 +54,11 @@ export function isLikelySttHallucination(transcript: string): boolean {
     if (lower === phrase.toLowerCase() || lower.includes(phrase.toLowerCase())) {
       return true
     }
+  }
+
+  // Regex patterns (news anchor, broadcaster, fake names, CTAs)
+  for (const pattern of HALLUCINATION_PATTERNS) {
+    if (pattern.test(normalized)) return true
   }
 
   // YouTube-style outros (broader check)
