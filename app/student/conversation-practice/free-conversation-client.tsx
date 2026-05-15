@@ -447,10 +447,21 @@ export function FreeConversationClient() {
         clear()
         return
       }
-      const audio = new Audio(`data:${data.mimeType ?? 'audio/mpeg'};base64,${data.audioBase64}`)
+      // canplaythrough 대기 후 재생 — 초반 ~100-200ms 잘림 방지 (v1.1 13a-2 + 14-1-1).
+      const audio = new Audio()
+      audio.preload = 'auto'
       npcAudioRef.current = audio
       audio.onended = () => { if (seq === ttsSeqRef.current) { npcAudioRef.current = null; clear() } }
       audio.onerror = () => { if (seq === ttsSeqRef.current) { npcAudioRef.current = null; clear() } }
+      audio.src = `data:${data.mimeType ?? 'audio/mpeg'};base64,${data.audioBase64}`
+      await new Promise<void>((resolve) => {
+        if (audio.readyState >= 4) return resolve()
+        const onReady = () => resolve()
+        audio.addEventListener('canplaythrough', onReady, { once: true })
+        // 안전장치 — 일부 환경에서 canplaythrough가 발생하지 않을 수 있음.
+        setTimeout(onReady, 1500)
+      })
+      if (seq !== ttsSeqRef.current) return
       await audio.play().catch(() => {
         if (seq === ttsSeqRef.current) { npcAudioRef.current = null; clear() }
       })
