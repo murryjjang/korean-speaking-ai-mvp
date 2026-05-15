@@ -8,6 +8,7 @@ import { useDisplayLanguage } from '@/src/hooks/use-display-language'
 import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
 import { isRTLDisplay, pickText } from '@/src/lib/i18n/display-language'
 import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
+import { ToolResultCards } from '@/src/components/tool-result-cards'
 import { getPersona } from '@/src/lib/personas'
 import {
   endResearchSession,
@@ -73,12 +74,16 @@ const WARNING_AT = 150 // 2:30 (남은 30초 경고)
 // 23-h A-3: 발음 평가 토글 localStorage 키
 const PRON_EVAL_TOGGLE_KEY = 'kspai:free-conv:pron-eval'
 
+type ToolResultItem = { name: string; args: Record<string, unknown>; result: unknown }
+
 type ChatTurn = {
   id: string
   role: 'ai' | 'student'
   text: string
   correction?: { original: string; corrected: string; reason: string }
   pronScore?: number // 23-h A-3: 토글 ON 시 학습자 발화의 Azure PA 점수
+  // v1.1 25-2: NPC 응답이 사용한 도구 결과 (시각 카드용). AI 턴에만 첨부.
+  toolResults?: ToolResultItem[]
 }
 
 type Stage = 'start' | 'chat' | 'end'
@@ -603,6 +608,7 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
         source: 'llm' | 'mock'
         npc_response: string
         tools_used?: string[]
+        tool_results?: ToolResultItem[]
         learner_correction?: { original: string; corrected: string; reason: string }
       }
       const elapsedMs = Date.now() - startAt
@@ -615,7 +621,15 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
               ? { ...t, correction: data.learner_correction }
               : t,
           )
-          .concat({ id: crypto.randomUUID(), role: 'ai', text: data.npc_response }),
+          .concat({
+            id: crypto.randomUUID(),
+            role: 'ai',
+            text: data.npc_response,
+            // v1.1 25-2: NPC 응답에 사용된 도구 결과를 턴에 첨부 → 시각 카드 렌더.
+            toolResults: Array.isArray(data.tool_results) && data.tool_results.length > 0
+              ? data.tool_results
+              : undefined,
+          }),
       )
       // NPC 응답 자동 재생은 23-g Phase A 통합 effect(playedAiTurnIdxsRef)에서 처리.
 
@@ -1066,6 +1080,10 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                 }
               >
                 <p className="whitespace-pre-wrap">{t.text}</p>
+                {/* v1.1 25-2: 도구 호출 결과 시각 카드 — AI 응답에만 표시 */}
+                {t.role === 'ai' && t.toolResults && t.toolResults.length > 0 && (
+                  <ToolResultCards toolResults={t.toolResults} />
+                )}
                 {/* 23-h A-3: 발음 평가 점수 (토글 ON 시 학습자 발화에만 표시) */}
                 {t.role === 'student' && typeof t.pronScore === 'number' && (
                   <div className="mt-1 flex justify-end" data-testid={`pron-score-${i}`}>
@@ -1142,8 +1160,14 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
           ))}
           {sending && (
             <div className="flex justify-start" data-testid="sending-indicator">
-              <div className="rounded-2xl px-4 py-2 bg-surface border border-border text-text-secondary text-sm">
-                <span className="inline-flex gap-1">
+              <div className="rounded-2xl px-4 py-2 bg-surface border border-border text-text-secondary text-sm flex items-center gap-2">
+                <span
+                  className="inline-block w-3 h-3 border-2 border-text-muted border-t-transparent rounded-full animate-spin"
+                  aria-hidden="true"
+                />
+                {/* v1.1 25-3: 도구 호출 가능성을 안내하는 짧은 메시지 + 점 펄스. */}
+                <span className="text-xs">응답을 준비하는 중입니다…</span>
+                <span className="inline-flex gap-1 ml-1" aria-hidden>
                   <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-pulse" />
                   <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-pulse" style={{ animationDelay: '0.15s' }} />
                   <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-pulse" style={{ animationDelay: '0.3s' }} />

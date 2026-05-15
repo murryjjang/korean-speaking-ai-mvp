@@ -78,6 +78,7 @@ function mockResponse(latestStudentText: string, personaId: string): Response {
     source: 'mock',
     persona_id: personaId,
     tools_used: [] as string[],
+    tool_results: [] as Array<{ name: string; args: Record<string, unknown>; result: unknown }>,
     npc_response: '재미있는 이야기네요! 좀 더 자세히 말씀해 주실 수 있어요?',
     learner_correction: {
       original: latestStudentText,
@@ -154,6 +155,8 @@ export async function POST(request: Request) {
 
     // 도구 호출 → 결과 → 재호출을 최대 MAX_TOOL_ROUNDS회 반복. 마지막 라운드는 도구 없이 최종 답변을 강제.
     const toolsUsed: string[] = []
+    // v1.1 25-2: 도구 호출별 인자·결과를 UI 카드용으로 함께 노출.
+    const toolResults: Array<{ name: string; args: Record<string, unknown>; result: unknown }> = []
     let finalContent: string | null = null
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       const allowTools = tools.length > 0 && round < MAX_TOOL_ROUNDS
@@ -185,6 +188,7 @@ export async function POST(request: Request) {
           }
           const result = await runTool(tc.function.name, args)
           toolsUsed.push(tc.function.name)
+          toolResults.push({ name: tc.function.name, args, result })
           messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) })
         }
         continue
@@ -239,6 +243,7 @@ export async function POST(request: Request) {
       source: 'llm',
       persona_id: persona.personaId,
       tools_used: toolsUsed,
+      tool_results: toolResults,
       npc_response: npcText.trim(),
       learner_correction: safeCorrection,
     })
