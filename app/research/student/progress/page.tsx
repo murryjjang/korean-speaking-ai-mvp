@@ -12,6 +12,7 @@ import {
 } from '@/src/lib/research/repository'
 import { getCurrentParticipant } from '@/src/lib/research/session'
 import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
+import { ModeDonut, DailyBars, ScoreLine } from '@/src/components/research/progress-charts'
 
 import { logoutAction } from '../actions'
 
@@ -30,6 +31,27 @@ function fmtMinutes(sec: number): string {
   const m = Math.floor(sec / 60)
   const s = sec % 60
   return s === 0 ? `${m}분` : `${m}분 ${s}초`
+}
+
+// v1.1 25-4: 최근 7일(오늘 포함) 일자별 세션 카운트 — DailyBars 입력.
+function buildDailyBuckets(sessions: { sessionStartedAt: string }[]): { date: string; value: number }[] {
+  const dayMs = 86_400_000
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const buckets: { date: string; value: number }[] = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * dayMs)
+    const iso = d.toISOString().slice(0, 10)
+    buckets.push({ date: iso, value: 0 })
+  }
+  for (const s of sessions) {
+    const sd = new Date(s.sessionStartedAt)
+    sd.setHours(0, 0, 0, 0)
+    const iso = sd.toISOString().slice(0, 10)
+    const b = buckets.find((x) => x.date === iso)
+    if (b) b.value += 1
+  }
+  return buckets
 }
 
 function startOfWeekKST(): number {
@@ -121,28 +143,29 @@ export default async function StudentProgressPage() {
       {sessions.length > 0 ? (
         <section className="mt-6">
           <h2 className="text-sm font-semibold text-text-primary mb-2">모드별 사용 분포</h2>
-          <ul className="space-y-1.5" data-testid="mode-distribution">
-            {Object.keys(MODE_LABEL).map((m) => (
-              <li key={m} className="flex items-center gap-3 text-sm">
-                <span className="w-24 text-xs text-text-secondary">{MODE_LABEL[m]}</span>
-                <div className="flex-1 h-3 rounded bg-slate-100 overflow-hidden">
-                  <div
-                    className="h-full bg-primary-500"
-                    style={{ width: `${Math.round(((modeCounts[m] ?? 0) / sessions.length) * 100)}%` }}
-                    aria-hidden
-                  />
-                </div>
-                <span className="w-10 text-right text-xs tabular-nums">{modeCounts[m] ?? 0}</span>
-              </li>
-            ))}
-          </ul>
+          {/* v1.1 25-4: 도넛 + 범례 시각화 */}
+          <div data-testid="mode-distribution">
+            <ModeDonut
+              data={Object.keys(MODE_LABEL)
+                .filter((m) => (modeCounts[m] ?? 0) > 0)
+                .map((m) => ({ label: MODE_LABEL[m], value: modeCounts[m] ?? 0 }))}
+            />
+          </div>
+        </section>
+      ) : null}
+
+      {sessions.length > 0 ? (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold text-text-primary mb-2">최근 7일 학습 활동</h2>
+          {/* 일별 막대 차트 — 오늘 포함 7일 */}
+          <DailyBars data={buildDailyBuckets(sessions)} />
         </section>
       ) : null}
 
       {scorePoints.length > 0 ? (
         <section className="mt-6">
           <h2 className="text-sm font-semibold text-text-primary mb-2">점수 추이</h2>
-          <ScoreTrend points={scorePoints} />
+          <ScoreLine points={scorePoints.map((p) => ({ at: p.at, score: p.score }))} />
         </section>
       ) : null}
 
@@ -231,22 +254,3 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ScoreTrend({ points }: { points: { at: number; score: number; mode: string }[] }) {
-  // 단순 막대그래프 — 최근 10개만 표시.
-  const last = points.slice(-10)
-  const max = Math.max(100, ...last.map((p) => p.score))
-  return (
-    <div className="flex items-end gap-1 h-24" data-testid="score-trend">
-      {last.map((p, i) => (
-        <div key={i} className="flex flex-col items-center justify-end flex-1" title={`${p.mode}: ${p.score.toFixed(1)}`}>
-          <div
-            className="w-full bg-primary-400 rounded-t"
-            style={{ height: `${Math.round((p.score / max) * 100)}%` }}
-            aria-hidden
-          />
-          <span className="text-[10px] text-text-muted tabular-nums mt-1">{p.score.toFixed(0)}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
