@@ -81,6 +81,12 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (!user) {
+    // v1.1 단계 12: /research/login으로 발급된 참여자 쿠키 보유자는 /student/*
+    // 학습 페이지에 한해 Supabase Auth 없이 통과시킨다. /teacher·/admin 은 그대로 차단.
+    const researchParticipantId = request.cookies.get(RESEARCH_PARTICIPANT_COOKIE)?.value
+    if (researchParticipantId && pathname.startsWith('/student')) {
+      return NextResponse.next({ request })
+    }
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(loginUrl)
