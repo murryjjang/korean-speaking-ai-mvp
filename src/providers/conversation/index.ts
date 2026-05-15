@@ -48,6 +48,10 @@ export type DialogueConversationOutput = {
   providerName: string
   latencyMs: number
   status: 'success' | 'fallback'
+  // v1.1 15-2: Q4도 자유 대화 수준의 교정·이탈 검지 표시를 위해 부가 정보를
+  // optional로 전달. JSON 응답에서 파싱되며, mock/fallback에서는 생략 가능.
+  learnerGrammarNote?: string
+  offTopicDetected?: boolean
 }
 
 export interface DialogueConversationProvider {

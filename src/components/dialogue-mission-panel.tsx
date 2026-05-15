@@ -429,10 +429,19 @@ export function DialogueMissionPanel({
 
       let aiText = '네, 알겠습니다.'
       let aiProvider = 'fallback'
+      let learnerGrammarNote = ''
       if (res.ok) {
         const data = await res.json()
         if (typeof data?.aiText === 'string' && data.aiText) aiText = data.aiText
         if (typeof data?.providerName === 'string') aiProvider = data.providerName
+        if (typeof data?.learnerGrammarNote === 'string' && data.learnerGrammarNote.trim()) {
+          learnerGrammarNote = data.learnerGrammarNote.trim()
+        }
+      }
+
+      // v1.1 15-2: 학습자 turn에 NPC가 반환한 문법 교정 안내를 부착해 UI에 노출.
+      if (learnerGrammarNote) {
+        setTurns((prev) => prev.map((t) => (t.id === studentTurnId ? { ...t, grammarNote: learnerGrammarNote } : t)))
       }
 
       const aiTurn: DialogueTurn = {
@@ -776,6 +785,27 @@ export function DialogueMissionPanel({
                         >
                           다시 듣기
                         </button>
+                      </div>
+                    )}
+                    {/* v1.1 15-2: 학습자 turn 옆 — 교정 안내 + 발음 점수 + (있다면) 교정 노트 */}
+                    {turn.role === 'student' && (
+                      <div className="mt-1.5 flex flex-col items-end gap-1">
+                        {typeof turn.pronScore === 'number' && (
+                          <span
+                            className="text-[10px] text-primary-700 font-medium"
+                            data-testid="student-pron-score"
+                          >
+                            발음 정확도 {turn.pronScore}/100
+                          </span>
+                        )}
+                        {turn.grammarNote && (
+                          <span
+                            className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 max-w-full"
+                            data-testid="student-grammar-note"
+                          >
+                            교정: {turn.grammarNote}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

@@ -86,6 +86,9 @@ export async function POST(request: Request) {
       aiText: result.text,
       providerName: result.providerName,
       status: result.status,
+      // v1.1 15-2: 학습자 발화 교정 안내(있을 때만) + 이탈 검지 플래그를 UI로 전달.
+      learnerGrammarNote: result.learnerGrammarNote ?? '',
+      offTopicDetected: result.offTopicDetected ?? false,
     })
   } catch (err) {
     console.error('[dialogue/respond] provider error, falling back to mock:', err)

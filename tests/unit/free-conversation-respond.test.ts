@@ -110,8 +110,8 @@ describe('POST /api/conversation/free/respond', () => {
     // v1.1 단계 9: nameKo는 캐릭터 이름(서연), 캐릭터 시트에 직업·연령 표현 포함
     expect(sys).toContain('서연')
     expect(sys).toContain('관광 안내 센터')
-    // 주제 유지·회귀 원칙·Few-shot 예시가 페르소나 프롬프트에 함께 들어간다
-    expect(sys).toContain('[주제 유지·회귀 원칙]')
+    // v1.1 15-1: 주제 유지·회귀 — 엄격 적용 라벨로 갱신
+    expect(sys).toContain('[주제 유지·회귀 — 엄격 적용]')
     expect(sys).toContain('[Few-shot 예시')
   })
 

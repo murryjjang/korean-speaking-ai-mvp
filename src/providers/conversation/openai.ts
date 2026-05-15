@@ -111,7 +111,7 @@ NPC: "어서 오세요. 무엇을 도와드릴까요?"
 NPC: "오늘 어떤 음료 드시겠어요? 아메리카노, 라떼, 주스 중에서 골라보세요."
 
 추가 지시:
-- learner_grammar_note 필드는 사용하지 말고 npc_utterance 괄호 안에만 교정 안내 (UI 일관성)
+- v1.1 15-2: learner_grammar_note 필드도 함께 채우세요 (한 줄 정리, 오류 없으면 빈 문자열). UI에서 별도 표시됩니다.
 - 교정이 시간 압박을 만들도록 의도됨 — 짧고 명확하게
 
 [출력 형식]
@@ -209,11 +209,20 @@ export class OpenAIDialogueConversationProvider implements DialogueConversationP
       throw new Error('OpenAI dialogue response: missing npc_utterance')
     }
 
+    // v1.1 15-2: learner_grammar_note·off_topic_detected를 호출부에 전달.
+    const grammarNoteRaw = obj.learner_grammar_note
+    const learnerGrammarNote =
+      typeof grammarNoteRaw === 'string' && grammarNoteRaw.trim() ? grammarNoteRaw.trim() : ''
+    const offTopicRaw = obj.off_topic_detected
+    const offTopicDetected = typeof offTopicRaw === 'boolean' ? offTopicRaw : false
+
     return {
       text: utterance.trim(),
       providerName: PROVIDER_NAME,
       latencyMs: Date.now() - start,
       status: 'success',
+      learnerGrammarNote,
+      offTopicDetected,
     }
   }
 }
