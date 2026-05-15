@@ -7,6 +7,7 @@ import { Button, Card, CardBody, Badge, LangHint } from '@/src/components/ui'
 import type { LangHintItem } from '@/src/components/ui'
 import { submitSpeaking } from '../actions'
 import type { ClientPronunciationResult } from '../actions'
+import { logSingleTurnSession, modeFromQuestionTypeId } from '@/src/lib/research/client-logger'
 import { useAudioRecorder } from '@/src/hooks/use-audio-recorder'
 import { validateRecordedAudio, getAudioValidationMessage } from '@/src/lib/audio-validation'
 import { useTTS } from '@/src/hooks/use-tts'
@@ -374,6 +375,40 @@ export function SpeakingClient({
         pronunciationResult,
         attemptId,
       })
+
+      // v1.1 단계 10-5: 시험운영 로깅 — q1~q4 단일 턴 평가 세션 (fail-silent).
+      void logSingleTurnSession({
+        mode: modeFromQuestionTypeId(question.typeId),
+        metaJson: {
+          questionId: question.id,
+          questionSetId,
+          attemptId,
+          submissionId,
+          typeId: question.typeId,
+        },
+        learnerText: sttTranscript ?? '(전사 없음)',
+        audioUrl: audioUrl ?? null,
+        scoreTotal: pronunciationResult?.normalizedScore ?? null,
+        scoresDetail: pronunciationResult
+          ? {
+              normalizedScore: pronunciationResult.normalizedScore,
+              pronScore: pronunciationResult.pronScore,
+              accuracyScore: pronunciationResult.accuracyScore,
+              fluencyScore: pronunciationResult.fluencyScore,
+              completenessScore: pronunciationResult.completenessScore,
+              providerName: pronunciationResult.providerName,
+              latencyMs: pronunciationResult.latencyMs,
+            }
+          : {},
+        pronunciationData: pronunciationResult
+          ? {
+              recognizedText: pronunciationResult.recognizedText ?? null,
+              wordResults: pronunciationResult.wordResults ?? null,
+              fallbackReason: pronunciationResult.fallbackReason ?? null,
+            }
+          : null,
+      })
+
       const resultParams = new URLSearchParams({ sub: submissionId, attemptId })
       router.push(`/student/speaking/${question.id}/result?${resultParams.toString()}`)
     } catch {

@@ -7,6 +7,7 @@ import { computeEtriWordDiff } from '@/src/lib/etri-word-diff'
 import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 import { isRTL, L1_LABEL_KO } from '@/src/lib/feedback-language'
+import { logSingleTurnSession } from '@/src/lib/research/client-logger'
 
 // ── 지문 ────────────────────────────────────────────────────────────────────
 const REFERENCE_LINES = [
@@ -747,11 +748,20 @@ export function ReadingPracticeClient() {
   const runFallbackSTT = () => {
     const lines = DEMO_STT_ACCURATE
     setSttLines(lines)
-    const score = computeWordMatchScore(REFERENCE_LINES.join(' '), lines.join(' '))
+    const referenceText = REFERENCE_LINES.join(' ')
+    const score = computeWordMatchScore(referenceText, lines.join(' '))
     setFinalScore(score)
     setAzureResult(null)
     setProviderNote('현재는 참고 평가 모드입니다. 정밀 발음평가는 Azure 연동 안정화 후 고도화될 예정입니다.')
     setPhase('result')
+    // v1.1 단계 10-5: fallback 경로에서도 시험운영 로깅 (fail-silent).
+    void logSingleTurnSession({
+      mode: 'reading',
+      metaJson: { referenceText, fallback: true },
+      learnerText: lines.join(' ') || '(전사 없음)',
+      scoreTotal: score,
+      scoresDetail: { wordMatchScore: score, referenceText, sttLines: lines, fallback: true },
+    })
   }
 
   const runAzurePronunciation = async (blob: Blob, referenceText: string, sttLinesCurrent: string[]) => {
@@ -784,6 +794,18 @@ export function ReadingPracticeClient() {
       setFinalScore(score)
     }
     setPhase('result')
+
+    // v1.1 단계 10-5: 읽기 모드 시험운영 로깅 — 단일 턴 평가 (fail-silent).
+    // finalScore는 setState 비동기 반영이라 여기서 재계산해 직접 전달.
+    const learnerText = sttLinesCurrent.join(' ')
+    const scoreToLog = computeWordMatchScore(referenceText, learnerText)
+    void logSingleTurnSession({
+      mode: 'reading',
+      metaJson: { referenceText },
+      learnerText: learnerText || '(전사 없음)',
+      scoreTotal: scoreToLog,
+      scoresDetail: { wordMatchScore: scoreToLog, referenceText, sttLines: sttLinesCurrent },
+    })
   }
 
   const reset = () => {

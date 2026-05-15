@@ -5,6 +5,7 @@ import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
+import { logSingleTurnSession } from '@/src/lib/research/client-logger'
 
 // ── Azure 단어 결과 타입 ──────────────────────────────────────────────────────
 interface AzureWordResult {
@@ -711,6 +712,22 @@ export function PresentationPracticeClient() {
         }
         if (controller.signal.aborted) return
         setEvaluateResult(data)
+        // v1.1 단계 10-5: 발표 모드 시험운영 로깅 — 단일 턴(발화 전체) + 평가 (fail-silent).
+        // isRefresh=true(helperLang 토글 재호출)는 로깅하지 않음 — 첫 평가만 기록.
+        if (!isRefresh) {
+          void logSingleTurnSession({
+            mode: 'presentation',
+            metaJson: { topic: topic.trim(), helperLang },
+            learnerText: transcript,
+            scoresDetail: {
+              feedback_ko: data.feedback_ko,
+              feedback_l1: data.feedback_l1,
+              originalScript,
+              correctedScript,
+              helperLang,
+            },
+          })
+        }
       } catch (err) {
         if (controller.signal.aborted) return
         if ((err as { name?: string })?.name === 'AbortError') return

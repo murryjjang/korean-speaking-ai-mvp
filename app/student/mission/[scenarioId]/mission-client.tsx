@@ -6,6 +6,11 @@ import Link from 'next/link'
 import { Button, Card, CardBody, CardHeader, Badge, LangHint } from '@/src/components/ui'
 import type { LangHintItem } from '@/src/components/ui'
 import { startMission, sendTurn, submitMission } from '../actions'
+import {
+  endResearchSession,
+  logUtterance,
+  startResearchSession,
+} from '@/src/lib/research/client-logger'
 
 // ── 타입 ──────────────────────────────────────────────────────────
 
@@ -149,6 +154,10 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
   const nextKey = useRef(0)
   const chatBottomRef = useRef<HTMLDivElement>(null)
 
+  // v1.1 단계 10-5: q4_dialogue 시험운영 로깅 (fail-silent).
+  const researchSessionIdRef = useRef<string | null>(null)
+  const researchTurnRef = useRef<number>(0)
+
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chat])
@@ -165,6 +174,25 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
       setSessionId(sid)
       addChatItem('ai', greetingText)
       setPhase('chatting')
+      // research 세션 시작 + greeting 발화 기록 (fail-silent)
+      researchSessionIdRef.current = null
+      researchTurnRef.current = 0
+      void (async () => {
+        const rsid = await startResearchSession('q4_dialogue', {
+          scenarioId: scenario.scenarioId,
+          missionSessionId: sid,
+        })
+        if (!rsid) return
+        researchSessionIdRef.current = rsid
+        researchTurnRef.current = 1
+        await logUtterance({
+          sessionId: rsid,
+          turnNumber: 1,
+          speaker: 'npc',
+          text: greetingText,
+          metaJson: { kind: 'greeting' },
+        })
+      })()
     } catch {
       setStartError(true)
     }
@@ -176,6 +204,7 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
     setUserInput('')
     addChatItem('user', text)
     setIsAiThinking(true)
+    const startAt = Date.now()
     try {
       const result = await sendTurn(sessionId, text)
       addChatItem('ai', result.aiResponse)
@@ -188,6 +217,22 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
       }
       if (result.isComplete) {
         setPhase('complete')
+      }
+      // research 발화 기록 (fail-silent)
+      const rsid = researchSessionIdRef.current
+      if (rsid) {
+        const studentTurn = researchTurnRef.current + 1
+        const npcTurn = researchTurnRef.current + 2
+        researchTurnRef.current = npcTurn
+        void logUtterance({ sessionId: rsid, turnNumber: studentTurn, speaker: 'learner', text })
+        void logUtterance({
+          sessionId: rsid,
+          turnNumber: npcTurn,
+          speaker: 'npc',
+          text: result.aiResponse,
+          responseTimeMs: Date.now() - startAt,
+          metaJson: { goalsAchievedIds: result.goalsAchievedIds, isComplete: result.isComplete },
+        })
       }
     } catch {
       addChatItem('ai', '오류가 발생했습니다. 다시 시도해주세요.')
@@ -206,6 +251,9 @@ export function MissionClient({ scenario }: { scenario: ScenarioProps }) {
     setPhase('submitting')
     try {
       const { submissionId } = await submitMission(sessionId)
+      // research 세션 종료 (fail-silent)
+      const rsid = researchSessionIdRef.current
+      if (rsid) void endResearchSession(rsid)
       router.push(`/student/mission/${scenario.scenarioId}/result?sub=${submissionId}`)
     } catch {
       setSubmitError(true)

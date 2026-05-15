@@ -65,3 +65,51 @@ export type LogAssessmentInput = {
 export async function logAssessment(input: LogAssessmentInput): Promise<void> {
   await postJson('/api/research/assessments', input)
 }
+
+/**
+ * 단일 턴 평가형 세션 한 번에 기록 — q1~q3·발표·읽기처럼 1턴 입력 + 평가 결과가
+ * 함께 나오는 모드용 편의 함수. 세션 시작 → 학습자 발화 1개 → 평가 → 세션 종료를
+ * 순차적으로 fire-and-forget으로 호출한다. 어떤 단계 실패해도 다른 단계는 진행.
+ */
+export type LogSingleTurnSessionInput = {
+  mode: ResearchMode
+  metaJson?: Record<string, unknown>
+  learnerText: string
+  audioUrl?: string | null
+  scoreTotal?: number | null
+  scoresDetail?: Record<string, unknown>
+  feedbackText?: string | null
+  pronunciationData?: Record<string, unknown> | null
+}
+
+export async function logSingleTurnSession(input: LogSingleTurnSessionInput): Promise<void> {
+  const sessionId = await startResearchSession(input.mode, input.metaJson)
+  if (!sessionId) return
+  await logUtterance({
+    sessionId,
+    turnNumber: 1,
+    speaker: 'learner',
+    text: input.learnerText,
+    audioUrl: input.audioUrl ?? null,
+  })
+  await logAssessment({
+    sessionId,
+    mode: input.mode,
+    scoreTotal: input.scoreTotal ?? null,
+    scoresDetail: input.scoresDetail ?? {},
+    feedbackText: input.feedbackText ?? null,
+    pronunciationData: input.pronunciationData ?? null,
+  })
+  await endResearchSession(sessionId)
+}
+
+/**
+ * typeId(q1~q4 question type) → research mode 매핑.
+ * KDLI Korean MVP에는 q2 계열 세부 타입이 여러 개 있어 모두 q2_describe로 묶는다.
+ */
+export function modeFromQuestionTypeId(typeId: string): ResearchMode {
+  if (typeId === 'qt-reading') return 'q1_repeat'
+  if (typeId === 'qt-picture') return 'q3_picture'
+  if (typeId === 'qt-dialogue-mission') return 'q4_dialogue'
+  return 'q2_describe'
+}
