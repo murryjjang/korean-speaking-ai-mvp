@@ -1050,7 +1050,7 @@ export function FreeConversationClient() {
                 {t.role === 'student' && typeof t.pronScore === 'number' && (
                   <div className="mt-1 flex justify-end" data-testid={`pron-score-${i}`}>
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">
-                      발음 {t.pronScore}
+                      발음 정확도 {t.pronScore}/100
                     </span>
                   </div>
                 )}
@@ -1078,9 +1078,10 @@ export function FreeConversationClient() {
                     )}
                   </div>
                 )}
-                {t.role === 'student' && t.correction && t.correction.corrected !== t.correction.original && (
+                {t.role === 'student' && t.correction && t.correction.corrected.trim() !== t.correction.original.trim() && (
                   <div className="mt-2 pt-2 border-t border-white/30 text-xs">
-                    {/* 23-h A-2: 변경 부분만 강조 — LCS 기반 단어 단위 diff */}
+                    {/* 23-h A-2 / 16-7: 변경 부분만 강조 — LCS 기반 단어 단위 diff.
+                        칭찬(corrected==original)일 때는 아래 ✓ 블록만 노출하고 취소선 없음. */}
                     <p className="leading-relaxed">
                       <span className="opacity-80 mr-1">✏️</span>
                       {diffWordsInline(t.correction.original, t.correction.corrected).map((seg, k) => {
@@ -1113,7 +1114,7 @@ export function FreeConversationClient() {
                     <p className="opacity-80 mt-0.5">{t.correction.reason}</p>
                   </div>
                 )}
-                {t.role === 'student' && t.correction && t.correction.corrected === t.correction.original && (
+                {t.role === 'student' && t.correction && t.correction.corrected.trim() === t.correction.original.trim() && (
                   <p className="mt-1 text-xs opacity-80">✓ {t.correction.reason}</p>
                 )}
               </div>

@@ -1485,7 +1485,7 @@ export default async function SpeakingResultPage({
                     >
                       <p className="whitespace-pre-wrap">{t.text}</p>
                       {/* 23-i 추가-1: 학습자 발화 inline diff 교정 (변경 있을 때만) */}
-                      {t.role === 'student' && t.correctedText && t.correctedText !== t.text && (
+                      {t.role === 'student' && t.correctedText && t.correctedText.trim() !== t.text.trim() && (
                         <div className="mt-2 pt-2 border-t border-white/30 text-xs">
                           <p className="leading-relaxed">
                             <span className="opacity-80 mr-1">✏️</span>
@@ -1524,7 +1524,7 @@ export default async function SpeakingResultPage({
                       {t.role === 'student' && typeof t.pronScore === 'number' && (
                         <div className="mt-1 flex justify-end">
                           <span className="text-[11px] px-1.5 py-0.5 rounded bg-white/20 text-white font-medium">
-                            발음 {t.pronScore}
+                            발음 정확도 {t.pronScore}/100
                           </span>
                         </div>
                       )}
