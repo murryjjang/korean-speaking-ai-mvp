@@ -41,7 +41,9 @@ export class AzureTTSProvider implements TTSProvider {
     const envRate = process.env.AZURE_TTS_RATE ? parseFloat(process.env.AZURE_TTS_RATE) : 1.0
     const rate = clampRate(options?.rate ?? envRate)
 
-    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${lang}"><voice name="${voice}"><prosody rate="${rate}">${escapeXml(text)}</prosody></voice></speak>`
+    // <break time="300ms"/> prevents start-of-utterance truncation on some clients
+    // (audio element starts decoding before full buffer; first ~100-200ms can drop).
+    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${lang}"><voice name="${voice}"><break time="300ms"/><prosody rate="${rate}">${escapeXml(text)}</prosody></voice></speak>`
 
     const url = `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`
 
