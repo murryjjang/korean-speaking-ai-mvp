@@ -7,6 +7,7 @@ import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-la
 import { useDisplayLanguage } from '@/src/hooks/use-display-language'
 import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
 import { isRTLDisplay, pickText } from '@/src/lib/i18n/display-language'
+import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
 import { getPersona } from '@/src/lib/personas'
 import {
   endResearchSession,
@@ -911,10 +912,13 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                     data-testid={`persona-card-${p.id}`}
                     aria-pressed={selected}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xl" aria-hidden>{p.emoji}</span>
-                      <p className="text-sm font-semibold text-text-primary">{p.label}</p>
-                      {selected && <span className="ml-auto text-primary-600 text-sm" aria-hidden>✓</span>}
+                    <div className="flex items-center gap-3 mb-2">
+                      {/* v1.1 25-1: DiceBear 아바타 — 페르소나별 시드 고정 */}
+                      <PersonaAvatar personaId={p.id} size={48} alt={p.label} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-text-primary truncate">{p.label}</p>
+                      </div>
+                      {selected && <span className="text-primary-600 text-sm" aria-hidden>✓</span>}
                     </div>
                     <p className="text-xs text-text-muted leading-relaxed">{p.description}</p>
                   </button>
@@ -956,13 +960,14 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
           }}
           data-testid="conversation-header"
         >
+          <PersonaAvatar personaId={personaId} size={40} alt={personaMeta(personaId).label} />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-text-muted">주제</p>
             <p className="text-sm font-semibold text-text-primary truncate" data-testid="conversation-topic">
               {topic}
             </p>
             <p className="text-[11px] text-text-muted truncate mt-0.5" data-testid="conversation-persona">
-              {personaMeta(personaId).emoji} {personaMeta(personaId).label} ({personaMeta(personaId).description})와 대화 중
+              {personaMeta(personaId).label} ({personaMeta(personaId).description})와 대화 중
             </p>
           </div>
           <div className="text-right">

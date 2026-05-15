@@ -17,6 +17,7 @@ import {
   logAssessment,
 } from '@/src/lib/research/client-logger'
 import { useDisplayLanguage } from '@/src/hooks/use-display-language'
+import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
 
 const MIN_VALID_BLOB_SIZE = 3000
 
@@ -767,12 +768,17 @@ export function DialogueMissionPanel({
                   key={turn.id}
                   className={`flex gap-2 ${turn.role === 'student' ? 'flex-row-reverse' : ''}`}
                 >
-                  <div
-                    className={`shrink-0 px-1.5 h-6 min-w-6 rounded-full flex items-center justify-center text-[10px] font-bold
-                      ${turn.role === 'ai' ? 'bg-purple-100 text-purple-700' : 'bg-primary-100 text-primary-700'}`}
-                  >
-                    {turn.role === 'ai' ? npcRoleLabel : '나'}
-                  </div>
+                  {/* v1.1 25-1: AI 턴에는 페르소나 아바타, 학습자 턴에는 기존 '나' 배지. */}
+                  {turn.role === 'ai' && personaId ? (
+                    <PersonaAvatar personaId={personaId} size={28} className="shrink-0" alt={npcRoleLabel} />
+                  ) : (
+                    <div
+                      className={`shrink-0 px-1.5 h-6 min-w-6 rounded-full flex items-center justify-center text-[10px] font-bold
+                        ${turn.role === 'ai' ? 'bg-purple-100 text-purple-700' : 'bg-primary-100 text-primary-700'}`}
+                    >
+                      {turn.role === 'ai' ? npcRoleLabel : '나'}
+                    </div>
+                  )}
                   <div
                     className={`max-w-[80%] rounded-lg px-3 py-2 text-xs leading-relaxed
                       ${turn.role === 'ai'
