@@ -11,6 +11,7 @@ import {
   listSessionsByParticipant,
 } from '@/src/lib/research/repository'
 import { getCurrentParticipant } from '@/src/lib/research/session'
+import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
 
 import { logoutAction } from '../actions'
 
@@ -88,22 +89,26 @@ export default async function StudentProgressPage() {
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8" data-testid="research-student-progress">
-      <header className="flex items-center justify-between">
+      <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-text-primary">학습 진척 상황</h1>
           <p className="text-sm text-text-secondary mt-1">
             참여자 코드: <span className="font-mono">{participant.participantCode}</span>
           </p>
         </div>
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="px-3 py-1.5 rounded-md border border-border bg-surface text-sm text-text-secondary hover:bg-slate-50"
-            data-testid="btn-participant-logout"
-          >
-            로그아웃
-          </button>
-        </form>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* v1.1 16-10-5: 표시 언어 토글 — 모국어 자동 적용, 명시 선택 시 유지. */}
+          <DisplayLanguageToggle motherTongueHint={participant.motherTongue} />
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              className="px-3 py-1.5 rounded-md border border-border bg-surface text-sm text-text-secondary hover:bg-slate-50"
+              data-testid="btn-participant-logout"
+            >
+              로그아웃
+            </button>
+          </form>
+        </div>
       </header>
 
       <section className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="student-stats">

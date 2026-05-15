@@ -602,7 +602,7 @@ export function DialogueMissionPanel({
       setSubmitError(true)
       setPanelStatus('completed')
     }
-  }, [canSubmit, questionId, questionSetId, attemptId, turns, goalResults, router, researchEnabled])
+  }, [canSubmit, questionId, questionSetId, attemptId, turns, goalResults, router, researchEnabled, motherTongue])
 
   // 시간 종료 자동 제출 — 타이머가 maxDialogueDurationSec에 도달하면
   // 1) 진행 중 녹음을 중단하고

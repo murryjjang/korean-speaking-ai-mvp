@@ -7,7 +7,7 @@
 
 import { useDisplayLanguage } from '@/src/hooks/use-display-language'
 import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
-import { isRTLDisplay, pickText, type MultilingualText } from '@/src/lib/i18n/display-language'
+import { pickText, type MultilingualText } from '@/src/lib/i18n/display-language'
 
 export function MultilingualFeedbackBlock({
   feedbackKo,
