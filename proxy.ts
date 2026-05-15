@@ -50,6 +50,12 @@ export async function proxy(request: NextRequest) {
     return researchResponse ?? NextResponse.next()
   }
 
+  // v1.1 16-5: /student 정확히 일치할 때만, research 참여자는 진척 페이지로 리다이렉트.
+  // subpath(/student/conversation-practice 등)는 그대로 통과시켜 학습 흐름 보존.
+  if (pathname === '/student' && request.cookies.get(RESEARCH_PARTICIPANT_COOKIE)?.value) {
+    return NextResponse.redirect(new URL('/research/student/progress', request.url))
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
