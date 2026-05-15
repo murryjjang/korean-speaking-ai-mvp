@@ -17,7 +17,6 @@ import {
   logAssessment,
 } from '@/src/lib/research/client-logger'
 import { useDisplayLanguage } from '@/src/hooks/use-display-language'
-import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
 
 const MIN_VALID_BLOB_SIZE = 3000
 
@@ -522,7 +521,7 @@ export function DialogueMissionPanel({
     setBlobSize(null)
     setTurnError(null)
     setPanelStatus('ready')
-  }, [recorder, blobSize, turns, questionId, difficulty, ttsPlay, mode, personaId, researchEnabled])
+  }, [recorder, blobSize, turns, questionId, difficulty, ttsPlay, mode, personaId, researchEnabled, motherTongue])
 
   const handleEndDialogue = useCallback(() => {
     if (!canSubmit) return

@@ -17,7 +17,12 @@ type Turn = { role: 'student' | 'ai'; text: string }
 
 const DEFAULT_PERSONA_ID = 'friend_casual'
 
-function buildSystemPrompt(lang: FeedbackLanguage, persona: Persona, topic: string): string {
+function buildSystemPrompt(
+  lang: FeedbackLanguage,
+  persona: Persona,
+  topic: string,
+  multilingual: boolean,
+): string {
   const l1 = L1_NAME[lang]
   // v1.1 단계 9-3: 페르소나 캐릭터 시트를 코치 프롬프트 상단에 주입해 페르소나 톤
   // 일관성 있는 요약·피드백을 생성한다. forSummary=true로 응답 원칙·도구·JSON 출력
@@ -28,6 +33,34 @@ function buildSystemPrompt(lang: FeedbackLanguage, persona: Persona, topic: stri
     availableToolNames: [],
     forSummary: true,
   })
+
+  // v1.1 16-10-3: 학습자 모국어가 외국어이면 KO + EN + VI + AR 4개 언어 동시 출력.
+  // UI 토글에서 즉시 언어 전환 가능. 한국어 모어 화자(또는 미지정)는 기존 ko + helperLang 동작.
+  const languagesBlock = multilingual
+    ? `한국어(ko)와 영어(en)·베트남어(vi)·아랍어(ar) 네 언어로 동시 출력합니다.
+모든 언어는 같은 의미를 같은 길이로 자연스럽게 표현하세요.
+ko·en·vi·ar 외 언어는 절대 출력하지 마세요.`
+    : `한국어와 ${l1} 두 언어로만 동시 출력합니다. 영어/베트남어/아랍어 외 다른 언어는 절대 포함하지 마세요.
+선택 언어가 ${l1}이 아닐 때는 해당 언어를 절대 출력하지 마세요. 두 언어 모두 같은 의미로 자연스럽게 표현합니다.`
+
+  const outputBlock = multilingual
+    ? `출력 형식 (반드시 JSON, 다른 텍스트 금지):
+{
+  "summary": { "ko": "...", "en": "...", "vi": "...", "ar": "..." },
+  "feedback": {
+    "ko": { "strengths": ["..."], "next_steps": ["..."] },
+    "en": { "strengths": ["..."], "next_steps": ["..."] },
+    "vi": { "strengths": ["..."], "next_steps": ["..."] },
+    "ar": { "strengths": ["..."], "next_steps": ["..."] }
+  }
+}`
+    : `출력 형식 (반드시 JSON, 다른 텍스트 금지):
+{
+  "summary_ko": "...",
+  "summary_l1": "...",
+  "feedback_ko": {"strengths": ["..."], "next_steps": ["..."]},
+  "feedback_l1": {"strengths": ["..."], "next_steps": ["..."]}
+}`
 
   return `${personaContext}
 
@@ -42,22 +75,15 @@ function buildSystemPrompt(lang: FeedbackLanguage, persona: Persona, topic: stri
    - strengths: 학습자가 잘한 점 2~3개 (구체적으로)
    - next_steps: 다음 연습 시 개선하면 좋을 점 1~2개
 
-한국어와 ${l1} 두 언어로만 동시 출력합니다. 영어/베트남어/아랍어 외 다른 언어는 절대 포함하지 마세요.
-선택 언어가 ${l1}이 아닐 때는 해당 언어를 절대 출력하지 마세요. 두 언어 모두 같은 의미로 자연스럽게 표현합니다.
+${languagesBlock}
 
 [중요 - 출력 텍스트 형식 규칙]
-- 모든 텍스트 값(summary_ko, summary_l1, strengths·next_steps 항목)은 평문(plain text)으로만 작성합니다.
+- 모든 텍스트 값은 평문(plain text)으로만 작성합니다.
 - 마크다운 문법을 절대 사용하지 마세요: **, *, #, -, |, \`, [], (), ~~ 등 일체 금지.
 - 강조하고 싶을 때 별표(**) 대신 "특히", "그 중에서도", "가장" 같은 자연스러운 표현으로 풀어쓰세요.
 - (이 규칙은 텍스트 값 내용에만 적용됩니다. 아래 JSON 구조 자체의 중괄호·따옴표는 정상적으로 사용하세요.)
 
-출력 형식 (반드시 JSON, 다른 텍스트 금지):
-{
-  "summary_ko": "...",
-  "summary_l1": "...",
-  "feedback_ko": {"strengths": ["..."], "next_steps": ["..."]},
-  "feedback_l1": {"strengths": ["..."], "next_steps": ["..."]}
-}`
+${outputBlock}`
 }
 
 function formatTranscript(topic: string, turns: Turn[]): string {
@@ -103,21 +129,39 @@ function mockL1(lang: FeedbackLanguage, topic: string): {
   }
 }
 
-function mockSummary(lang: FeedbackLanguage, topic: string): Response {
+function mockSummary(lang: FeedbackLanguage, topic: string, multilingual: boolean): Response {
+  const summaryKo = `${topic}을(를) 주제로 자유롭게 대화를 나누었습니다. 학습자는 자신의 경험과 의견을 한국어로 표현했고, AI 파트너는 후속 질문으로 대화를 이어갔습니다.`
+  const feedbackKo = {
+    strengths: [
+      '주제에 맞춰 자기 생각을 한국어로 표현했습니다.',
+      'NPC의 질문에 적절히 응답하며 대화를 이어갔습니다.',
+    ],
+    next_steps: ['더 다양한 표현과 어휘를 사용해 보세요.'],
+  }
   const l1 = mockL1(lang, topic)
-  return Response.json({
+
+  const base: Record<string, unknown> = {
     source: 'mock',
-    summary_ko: `${topic}을(를) 주제로 자유롭게 대화를 나누었습니다. 학습자는 자신의 경험과 의견을 한국어로 표현했고, AI 파트너는 후속 질문으로 대화를 이어갔습니다.`,
+    summary_ko: summaryKo,
     summary_l1: l1.summary,
-    feedback_ko: {
-      strengths: [
-        '주제에 맞춰 자기 생각을 한국어로 표현했습니다.',
-        'NPC의 질문에 적절히 응답하며 대화를 이어갔습니다.',
-      ],
-      next_steps: ['더 다양한 표현과 어휘를 사용해 보세요.'],
-    },
+    feedback_ko: feedbackKo,
     feedback_l1: { strengths: l1.strengths, next_steps: l1.next_steps },
-  })
+  }
+
+  if (multilingual) {
+    const en = mockL1('en', topic)
+    const vi = mockL1('vi', topic)
+    const ar = mockL1('ar', topic)
+    base.summary = { ko: summaryKo, en: en.summary, vi: vi.summary, ar: ar.summary }
+    base.feedback = {
+      ko: feedbackKo,
+      en: { strengths: en.strengths, next_steps: en.next_steps },
+      vi: { strengths: vi.strengths, next_steps: vi.next_steps },
+      ar: { strengths: ar.strengths, next_steps: ar.next_steps },
+    }
+  }
+
+  return Response.json(base)
 }
 
 export async function POST(request: Request) {
@@ -135,6 +179,10 @@ export async function POST(request: Request) {
   const b = body as Record<string, unknown>
   const topic = typeof b.topic === 'string' ? b.topic.trim() : ''
   const helperLang: FeedbackLanguage = isFeedbackLanguage(b.helperLang) ? b.helperLang : 'vi'
+  // v1.1 16-10-3: 학습자 모국어가 외국어(en/vi/ar)면 4개 언어 모두 요청.
+  const motherTongue =
+    typeof b.motherTongue === 'string' ? b.motherTongue.trim().toLowerCase() : ''
+  const multilingual = motherTongue === 'en' || motherTongue === 'vi' || motherTongue === 'ar'
   const personaId =
     typeof b.personaId === 'string' && b.personaId.trim() ? b.personaId.trim() : DEFAULT_PERSONA_ID
   const persona: Persona = getPersona(personaId) ?? getPersona(DEFAULT_PERSONA_ID) ?? PERSONAS[0]
@@ -151,12 +199,12 @@ export async function POST(request: Request) {
     return Response.json({ error: 'missing_topic' }, { status: 400 })
   }
   if (turns.length === 0) {
-    return mockSummary(helperLang, topic)
+    return mockSummary(helperLang, topic, multilingual)
   }
 
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    return mockSummary(helperLang, topic)
+    return mockSummary(helperLang, topic, multilingual)
   }
 
   try {
@@ -173,16 +221,64 @@ export async function POST(request: Request) {
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: buildSystemPrompt(helperLang, persona, topic) },
+        { role: 'system', content: buildSystemPrompt(helperLang, persona, topic, multilingual) },
         { role: 'user', content: userContent },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.4,
-      max_tokens: 900,
+      max_tokens: multilingual ? 1800 : 900,
     })
 
     const raw = response.choices[0]?.message?.content ?? ''
     const parsed = JSON.parse(raw) as Record<string, unknown>
+
+    if (multilingual) {
+      // v1.1 16-10-3: 4언어 객체 응답 파싱. 부분 누락이면 ko 폴백.
+      const summaryObj = (parsed.summary ?? {}) as Record<string, unknown>
+      const feedbackObj = (parsed.feedback ?? {}) as Record<string, unknown>
+      const pickStr = (m: Record<string, unknown>, k: string): string =>
+        typeof m[k] === 'string' && (m[k] as string).trim() ? (m[k] as string).trim() : ''
+      const pickFeedback = (k: string): { strengths: string[]; next_steps: string[] } => {
+        const v = feedbackObj[k]
+        if (!v || typeof v !== 'object') return { strengths: [], next_steps: [] }
+        const obj = v as Record<string, unknown>
+        const strengths = Array.isArray(obj.strengths)
+          ? (obj.strengths as unknown[]).filter((s): s is string => typeof s === 'string')
+          : []
+        const next_steps = Array.isArray(obj.next_steps)
+          ? (obj.next_steps as unknown[]).filter((s): s is string => typeof s === 'string')
+          : []
+        return { strengths, next_steps }
+      }
+      const summaryKo = pickStr(summaryObj, 'ko')
+      const fbKo = pickFeedback('ko')
+      if (!summaryKo || (fbKo.strengths.length === 0 && fbKo.next_steps.length === 0)) {
+        throw new Error('missing_ko_payload')
+      }
+      const summary = {
+        ko: summaryKo,
+        en: pickStr(summaryObj, 'en'),
+        vi: pickStr(summaryObj, 'vi'),
+        ar: pickStr(summaryObj, 'ar'),
+      }
+      const feedback = {
+        ko: fbKo,
+        en: pickFeedback('en'),
+        vi: pickFeedback('vi'),
+        ar: pickFeedback('ar'),
+      }
+      return Response.json({
+        source: 'llm',
+        // 다국어 신규 필드
+        summary,
+        feedback,
+        // 기존 호환 필드 — helperLang 기준 폴백.
+        summary_ko: summary.ko,
+        summary_l1: summary[helperLang] || summary.ko,
+        feedback_ko: feedback.ko,
+        feedback_l1: feedback[helperLang] ?? feedback.ko,
+      })
+    }
 
     const requiredText = (k: string): string => {
       const v = parsed[k]
@@ -212,6 +308,6 @@ export async function POST(request: Request) {
     })
   } catch (err) {
     console.error('[conversation/free/summary] LLM error, falling back to mock:', err)
-    return mockSummary(helperLang, topic)
+    return mockSummary(helperLang, topic, multilingual)
   }
 }
