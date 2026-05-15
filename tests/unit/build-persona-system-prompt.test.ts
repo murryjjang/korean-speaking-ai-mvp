@@ -1,0 +1,153 @@
+// v1.1 단계 9-2: buildPersonaSystemPrompt 단위 테스트.
+//
+// - 페르소나 캐릭터 시트 주입
+// - 주제 주입
+// - 활성 도구 이름 반영
+// - 주제 유지·회귀 원칙 + 회귀 표현 5종 포함
+// - Few-shot 예시 라벨 + 다이얼로그 형식
+// - 마크다운 금지·JSON 출력 형식 규칙 유지
+// - forSummary 모드는 JSON·도구·응답원칙 섹션 생략
+
+import { describe, expect, it } from 'vitest'
+
+import { buildPersonaSystemPrompt } from '@/src/lib/llm/build-persona-system-prompt'
+import { getPersona } from '@/src/lib/personas'
+
+const sua = () => getPersona('friend_casual')!
+const seoyeon = () => getPersona('korean_life_helper')!
+const yeongseok = () => getPersona('korean_life_helper_male')!
+const jaehyeon = () => getPersona('friend_casual_male')!
+
+describe('buildPersonaSystemPrompt', () => {
+  it('페르소나 캐릭터 시트가 시스템 프롬프트 상단에 주입된다', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: sua(),
+      topic: '주말 계획',
+      availableToolNames: [],
+    })
+    expect(out).toContain('수아')
+    expect(out).toContain('22살')
+    expect(out).toContain('반말')
+    expect(out).toContain('헐 진짜?')
+  })
+
+  it('주제가 [현재 대화 정보] 섹션에 들어간다', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: jaehyeon(),
+      topic: '맛집 추천',
+      availableToolNames: [],
+    })
+    expect(out).toContain('주제: 맛집 추천')
+  })
+
+  it('도구 이름이 활성화된 도구 섹션에 반영된다', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: seoyeon(),
+      topic: '카페 찾기',
+      availableToolNames: ['search_place', 'get_weather'],
+    })
+    expect(out).toContain('사용 가능 도구: search_place, get_weather')
+    expect(out).toContain('[도구 활용]')
+    expect(out).toContain('search_place')
+  })
+
+  it('도구가 없으면 도구 섹션이 비고 "(없음)" 표시', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: sua(),
+      topic: '취미',
+      availableToolNames: [],
+    })
+    expect(out).toContain('사용 가능 도구: (없음)')
+    expect(out).not.toContain('[도구 활용]')
+  })
+
+  it('주제 유지·회귀 원칙 + 회귀 표현 5종이 모두 포함된다', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: seoyeon(),
+      topic: '주말 계획',
+      availableToolNames: [],
+    })
+    expect(out).toContain('[주제 유지·회귀 원칙]')
+    expect(out).toContain('근데 그래서')
+    expect(out).toContain('아 맞다')
+    expect(out).toContain('그건 그렇고')
+    expect(out).toContain('그런데')
+    expect(out).toContain('한 가지 더 말씀드리면')
+    // 3턴 이상 이탈 시 의향 확인 가이드 — 강요 X
+    expect(out).toContain('혹시 주말 계획 얘기 더 할래요?')
+  })
+
+  it('Few-shot 예시 5종이 시나리오 라벨과 함께 렌더된다', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: sua(),
+      topic: '주말 계획',
+      availableToolNames: [],
+    })
+    expect(out).toContain('[Few-shot 예시')
+    expect(out).toContain('[정상]')
+    expect(out).toContain('[주제이탈회귀]')
+    expect(out).toContain('[도구호출]')
+    expect(out).toContain('[모르는정보]')
+    expect(out).toContain('[한국어어색]')
+    // 다이얼로그 형식 — `학습자: "..."` / `수아: "..."`
+    expect(out).toMatch(/학습자: "[^"]+"\s*\n수아: "[^"]+"/)
+  })
+
+  it('교정 정책·마크다운 금지·JSON 출력 형식이 유지된다 (v1.0 회귀 없음)', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: sua(),
+      topic: '취미',
+      availableToolNames: [],
+    })
+    expect(out).toContain('[교정 역할')
+    expect(out).toContain('자연스럽게 잘 말씀하셨어요.')
+    expect(out).toContain('평문(plain text)')
+    expect(out).toContain('마크다운')
+    expect(out).toMatch(/\*\*/)
+    expect(out).toContain('"npc_response"')
+    expect(out).toContain('"learner_correction"')
+  })
+
+  it('레거시 페르소나(cafe_staff_friendly)는 fewShotExamples가 비어 있어도 시스템 프롬프트가 정상 조립된다', () => {
+    const cafe = getPersona('cafe_staff_friendly')!
+    const out = buildPersonaSystemPrompt({
+      persona: cafe,
+      topic: '카페 음료 주문',
+      availableToolNames: [],
+    })
+    expect(out).toContain('친절한 카페 점원')
+    expect(out).toContain('주제: 카페 음료 주문')
+    expect(out).not.toContain('[Few-shot 예시')
+    expect(out).toContain('[교정 역할')
+  })
+
+  it('forSummary=true일 때 응답 원칙·도구·주제 유지·JSON 출력 형식 섹션을 생략한다', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: yeongseok(),
+      topic: '비자 연장',
+      availableToolNames: ['search_address'],
+      forSummary: true,
+    })
+    expect(out).toContain('영석')
+    expect(out).toContain('주제: 비자 연장')
+    expect(out).toContain('[교정 역할')
+    expect(out).toContain('[Few-shot 예시')
+    expect(out).not.toContain('[응답 원칙]')
+    expect(out).not.toContain('[도구 활용]')
+    expect(out).not.toContain('[주제 유지·회귀 원칙]')
+    expect(out).not.toContain('"npc_response"')
+  })
+
+  it('자유 대화 4명 모두에 대해 캐릭터 이름·5개 시나리오·회귀 표현이 들어간다 (스모크)', () => {
+    const personas = [sua(), jaehyeon(), seoyeon(), yeongseok()]
+    for (const p of personas) {
+      const out = buildPersonaSystemPrompt({
+        persona: p,
+        topic: '테스트 주제',
+        availableToolNames: [],
+      })
+      expect(out, `${p.personaId} missing nameKo`).toContain(p.nameKo)
+      expect(out, `${p.personaId} missing scenarios`).toMatch(/\[정상\][\s\S]+\[주제이탈회귀\][\s\S]+\[도구호출\][\s\S]+\[모르는정보\][\s\S]+\[한국어어색\]/)
+    }
+  })
+})
