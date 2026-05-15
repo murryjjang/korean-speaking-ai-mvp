@@ -26,6 +26,9 @@ export type BuildQ4PersonaSystemPromptArgs = {
   aiInformation: string
   missionGoals: string[]
   conversationHistory: DialogueTurnInput[]
+  // v1.1 16-10-2: 학습자 모국어 힌트(ko/en/vi/ar/other). 지정되면 learner_grammar_note를
+  // 다국어 객체로 응답하도록 가이드한다. 미지정 시 한국어 단일 문자열 응답(기존 동작).
+  motherTongue?: string | null
 }
 
 function formatHistory(turns: DialogueTurnInput[]): string {
@@ -64,9 +67,40 @@ ${lines}`
  *  - v1.1 15-2: learner_grammar_note 필드를 다시 사용한다. UI에서 별도 표시되며
  *    명백한 시제·어휘·문법 오류 발견 시 한 줄 정리, 오류 없으면 빈 문자열.
  */
+// v1.1 16-10-2: motherTongue에 따라 다국어 객체 응답 가이드를 동적으로 결정.
+function multilingualGrammarNoteBlock(motherTongue?: string | null): {
+  guideText: string
+  schemaSnippet: string
+} {
+  const mt = motherTongue?.trim().toLowerCase()
+  // 학습자 모국어가 외국어(en/vi/ar)일 때만 다국어 객체로 응답.
+  const isForeign = mt === 'en' || mt === 'vi' || mt === 'ar'
+  if (!isForeign) {
+    return {
+      guideText:
+        '- learner_grammar_note 필드는 한국어 한 줄 문자열로 채우세요. 오류가 없으면 빈 문자열.',
+      schemaSnippet: '"learner_grammar_note": "문법 교정 안내 또는 빈 문자열"',
+    }
+  }
+  const langName = mt === 'en' ? 'English' : mt === 'vi' ? 'Vietnamese' : 'Arabic'
+  return {
+    guideText: `- 학습자의 모국어가 ${langName}(${mt}) 입니다.\n` +
+      `- learner_grammar_note 필드는 다국어 객체로 응답하세요: { ko, en, vi, ar }.\n` +
+      `  · ko: 한국어 한 줄 정리 (예: "'가요' → '갔어요' (과거 시제)")\n` +
+      `  · en: 영어 한 줄 정리 (예: "'가요' (present) → '갔어요' (past tense)")\n` +
+      `  · vi: 베트남어 한 줄 정리 (예: "'가요' (hiện tại) → '갔어요' (quá khứ)")\n` +
+      `  · ar: 아랍어 한 줄 정리\n` +
+      `- 오류가 없으면 모든 언어 키를 빈 문자열로 둡니다.\n` +
+      `- npc_utterance는 항상 한국어 그대로(학습 목적). 다국어는 learner_grammar_note에만.`,
+    schemaSnippet:
+      '"learner_grammar_note": { "ko": "한국어 정리", "en": "english summary", "vi": "tóm tắt", "ar": "ملخص" }',
+  }
+}
+
 export function buildQ4PersonaSystemPrompt(args: BuildQ4PersonaSystemPromptArgs): string {
-  const { persona, aiRole, aiInformation, missionGoals, conversationHistory } = args
+  const { persona, aiRole, aiInformation, missionGoals, conversationHistory, motherTongue } = args
   const roleForCorrection = aiRole || persona.role || '점원'
+  const multilingual = multilingualGrammarNoteBlock(motherTongue)
 
   return `당신은 한국어 학습자와 대화하는 AI 역할입니다.
 
@@ -166,7 +200,8 @@ ${formatMissionGoals(missionGoals)}
 - 교정 포함 발화: 2~3문장 응대 (교정 안내 + 다음 단계)
 
 추가 지시:
-- learner_grammar_note 필드는 UI에 별도 표시되므로, 명확한 오류가 있을 때 반드시 한 줄로 채우세요. 오류가 없으면 빈 문자열로 둡니다.
+- learner_grammar_note 필드는 UI에 별도 표시되므로, 명확한 오류가 있을 때 반드시 채우세요.
+${multilingual.guideText}
 - 교정이 시간 압박을 만들도록 의도됨 — 짧고 명확하게${fewShotBlock(persona)}
 
 [출력 형식]
@@ -174,7 +209,7 @@ ${formatMissionGoals(missionGoals)}
 {
   "npc_utterance": "한국어 응답 1~2문장",
   "off_topic_detected": boolean,
-  "learner_grammar_note": "문법 교정 안내 또는 빈 문자열"
+  ${multilingual.schemaSnippet}
 }
 
 [기존 대화 이력]

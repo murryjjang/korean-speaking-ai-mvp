@@ -27,8 +27,9 @@ export type DialogueTurn = {
   ttsAudioUrl?: string | null
   // 23-h D-6: 학습자 발화 turn의 Azure PA 점수 (0-100). q4 결과 화면 평균 산출용.
   pronScore?: number
-  // v1.1 15-2: NPC가 반환한 학습자 발화 교정 안내(시제·어휘·문법). 학습자 turn에만 부착.
-  grammarNote?: string
+  // v1.1 15-2 / 16-10-2: NPC가 반환한 학습자 발화 교정 안내. 학습자 모국어가 외국어면
+  // 다국어 객체로 도착할 수 있다. 학습자 turn에만 부착.
+  grammarNote?: string | { ko?: string; en?: string; vi?: string; ar?: string }
 }
 
 export type MissionGoalResult = {

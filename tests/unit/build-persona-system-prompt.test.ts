@@ -89,6 +89,27 @@ describe('buildPersonaSystemPrompt', () => {
     expect(out).toContain('카드로 교체')
   })
 
+  it('v1.1 16-10-2: motherTongue 미지정 시 reason은 단일 문자열', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: seoyeon(),
+      topic: '주말 계획',
+      availableToolNames: [],
+    })
+    expect(out).toContain('"reason": "교정 이유 또는 칭찬 (한 문장)"')
+  })
+
+  it('v1.1 16-10-2: motherTongue="en" → reason 다국어 객체', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: seoyeon(),
+      topic: '주말 계획',
+      availableToolNames: [],
+      motherTongue: 'en',
+    })
+    expect(out).toContain('"reason": { "ko"')
+    expect(out).toContain('English')
+    expect(out).toContain('다국어 객체로 응답')
+  })
+
   it('Few-shot 예시 5종이 시나리오 라벨과 함께 렌더된다', () => {
     const out = buildPersonaSystemPrompt({
       persona: sua(),

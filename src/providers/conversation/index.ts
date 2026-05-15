@@ -41,7 +41,15 @@ export type DialogueConversationInput = {
   allowLanguageHelp?: 'limited' | 'full'
   maxTurns?: number
   autonomyLevel?: 'guided' | 'open'
+  // v1.1 16-10-2: 학습자 모국어(ko/en/vi/ar/other). 외국어이면 learner_grammar_note를
+  // 다국어 객체로 응답하도록 프롬프트가 분기.
+  motherTongue?: string | null
 }
+
+// v1.1 16-10-2: learner_grammar_note가 문자열 또는 다국어 객체로 올 수 있음.
+export type MultilingualNote =
+  | string
+  | { ko?: string; en?: string; vi?: string; ar?: string }
 
 export type DialogueConversationOutput = {
   text: string
@@ -50,7 +58,8 @@ export type DialogueConversationOutput = {
   status: 'success' | 'fallback'
   // v1.1 15-2: Q4도 자유 대화 수준의 교정·이탈 검지 표시를 위해 부가 정보를
   // optional로 전달. JSON 응답에서 파싱되며, mock/fallback에서는 생략 가능.
-  learnerGrammarNote?: string
+  // v1.1 16-10-2: 외국인 학습자 모국어가 지정되면 다국어 객체로 응답될 수 있음.
+  learnerGrammarNote?: MultilingualNote
   offTopicDetected?: boolean
 }
 

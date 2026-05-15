@@ -16,6 +16,8 @@ import {
   logUtterance,
   logAssessment,
 } from '@/src/lib/research/client-logger'
+import { useDisplayLanguage } from '@/src/hooks/use-display-language'
+import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
 
 const MIN_VALID_BLOB_SIZE = 3000
 
@@ -77,6 +79,8 @@ export type DialogueMissionPanelProps = {
   mode?: DialogueMode
   personaId?: string
   attemptId?: string
+  // v1.1 16-10-2: 학습자 모국어 — LLM 응답을 다국어로 받기 위해 전달.
+  motherTongue?: string | null
 }
 
 export function DialogueMissionPanel({
@@ -89,10 +93,12 @@ export function DialogueMissionPanel({
   mode = 'assessment',
   personaId,
   attemptId,
+  motherTongue,
 }: DialogueMissionPanelProps) {
   const router = useRouter()
   const recorder = useAudioRecorder()
   const { state: ttsState, play: ttsPlay, stop: ttsStop } = useTTS()
+  const { lang: displayLang } = useDisplayLanguage(motherTongue)
 
   const [panelStatus, setPanelStatus] = useState<DialogueMissionPanelStatus>('idle')
   const [playingTurnId, setPlayingTurnId] = useState<string | null>(null)
@@ -422,6 +428,7 @@ export function DialogueMissionPanel({
           latestStudentText: transcript,
           mode,
           personaId,
+          motherTongue,
         }),
         signal: dialogueAbort.signal,
       })
@@ -429,19 +436,29 @@ export function DialogueMissionPanel({
 
       let aiText = '네, 알겠습니다.'
       let aiProvider = 'fallback'
-      let learnerGrammarNote = ''
+      let learnerGrammarNote: import('@/src/providers/conversation').MultilingualNote = ''
       if (res.ok) {
         const data = await res.json()
         if (typeof data?.aiText === 'string' && data.aiText) aiText = data.aiText
         if (typeof data?.providerName === 'string') aiProvider = data.providerName
         if (typeof data?.learnerGrammarNote === 'string' && data.learnerGrammarNote.trim()) {
           learnerGrammarNote = data.learnerGrammarNote.trim()
+        } else if (data?.learnerGrammarNote && typeof data.learnerGrammarNote === 'object') {
+          const g = data.learnerGrammarNote as Record<string, unknown>
+          const pick = (k: string) => (typeof g[k] === 'string' ? (g[k] as string).trim() : '')
+          const obj = { ko: pick('ko'), en: pick('en'), vi: pick('vi'), ar: pick('ar') }
+          if (obj.ko || obj.en || obj.vi || obj.ar) learnerGrammarNote = obj
         }
       }
 
-      // v1.1 15-2: 학습자 turn에 NPC가 반환한 문법 교정 안내를 부착해 UI에 노출.
-      if (learnerGrammarNote) {
-        setTurns((prev) => prev.map((t) => (t.id === studentTurnId ? { ...t, grammarNote: learnerGrammarNote } : t)))
+      // v1.1 15-2 / 16-10-2: 학습자 turn에 NPC가 반환한 문법 교정 안내(다국어 가능) 부착.
+      const hasNote =
+        (typeof learnerGrammarNote === 'string' && learnerGrammarNote) ||
+        (typeof learnerGrammarNote === 'object' &&
+          (learnerGrammarNote.ko || learnerGrammarNote.en || learnerGrammarNote.vi || learnerGrammarNote.ar))
+      if (hasNote) {
+        const note = learnerGrammarNote
+        setTurns((prev) => prev.map((t) => (t.id === studentTurnId ? { ...t, grammarNote: note } : t)))
       }
 
       const aiTurn: DialogueTurn = {
@@ -798,14 +815,23 @@ export function DialogueMissionPanel({
                             발음 정확도 {turn.pronScore}/100
                           </span>
                         )}
-                        {turn.grammarNote && (
-                          <span
-                            className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 max-w-full"
-                            data-testid="student-grammar-note"
-                          >
-                            교정: {turn.grammarNote}
-                          </span>
-                        )}
+                        {turn.grammarNote && (() => {
+                          // v1.1 16-10-2: displayLang 우선, 비어 있으면 ko 폴백.
+                          const note =
+                            typeof turn.grammarNote === 'string'
+                              ? turn.grammarNote
+                              : (turn.grammarNote[displayLang] || turn.grammarNote.ko || '').trim()
+                          if (!note) return null
+                          return (
+                            <span
+                              className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 max-w-full"
+                              data-testid="student-grammar-note"
+                              dir={displayLang === 'ar' ? 'rtl' : undefined}
+                            >
+                              교정: {note}
+                            </span>
+                          )
+                        })()}
                       </div>
                     )}
                   </div>

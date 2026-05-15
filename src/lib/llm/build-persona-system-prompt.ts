@@ -16,6 +16,9 @@ export type BuildPersonaSystemPromptArgs = {
   availableToolNames: readonly string[]
   /** 종료 요약/피드백 모드(코치 시점) — true일 때 응답 원칙·도구·JSON 형식 섹션을 생략한다. */
   forSummary?: boolean
+  /** v1.1 16-10-2: 학습자 모국어 힌트(ko/en/vi/ar). 외국어이면 learner_correction.reason을
+   *  다국어 객체로 응답하도록 가이드한다. */
+  motherTongue?: string | null
 }
 
 function fewShotBlock(persona: Persona): string {
@@ -109,7 +112,19 @@ function correctionBlock(): string {
 - 오류가 없으면 짧은 칭찬 한 줄.`
 }
 
-function outputFormatBlock(): string {
+function outputFormatBlock(motherTongue?: string | null): string {
+  const mt = motherTongue?.trim().toLowerCase()
+  const isForeign = mt === 'en' || mt === 'vi' || mt === 'ar'
+  const langName = mt === 'en' ? 'English' : mt === 'vi' ? 'Vietnamese' : mt === 'ar' ? 'Arabic' : ''
+
+  // v1.1 16-10-2: 학습자 모국어가 외국어이면 reason을 다국어 객체로 응답하도록 가이드.
+  const reasonSchema = isForeign
+    ? `"reason": { "ko": "한국어 한 줄", "en": "english summary", "vi": "tóm tắt", "ar": "ملخص" }`
+    : `"reason": "교정 이유 또는 칭찬 (한 문장)"`
+  const reasonGuide = isForeign
+    ? `\n- 학습자 모국어 ${langName}(${mt}). reason은 다국어 객체로 응답하되 ko 키는 항상 채우고, 오류 없으면 모든 언어 빈 문자열.`
+    : ''
+
   return `
 
 [출력 형식 규칙]
@@ -120,6 +135,7 @@ function outputFormatBlock(): string {
 - 잘못된 예: **스타벅스 강남점**은 *인기* 많은 카페입니다.
 - 올바른 예: 그 중에서도 스타벅스 강남점이 가장 인기가 많아요.
 - (이 규칙은 텍스트 값 내용에만 적용됩니다. 아래 JSON 구조 자체의 중괄호·따옴표는 정상적으로 사용하세요.)
+- npc_response는 항상 한국어 그대로(학습 목적). 다국어는 reason에만 표시.${reasonGuide}
 
 [출력 형식]
 도구 호출이 끝나고 학습자에게 최종 답변할 때는 반드시 다음 JSON만 출력 (다른 텍스트, 코드 블록 금지):
@@ -128,7 +144,7 @@ function outputFormatBlock(): string {
   "learner_correction": {
     "original": "학습자 원본",
     "corrected": "자연스러운 교정 (원본과 같아도 됨)",
-    "reason": "교정 이유 또는 칭찬 (한 문장)"
+    ${reasonSchema}
   }
 }`
 }
@@ -161,7 +177,7 @@ function responsePrincipleBlock(): string {
  * 요약/피드백 라우트가 자체적으로 출력 형식을 덧붙일 수 있게 한다.
  */
 export function buildPersonaSystemPrompt(args: BuildPersonaSystemPromptArgs): string {
-  const { persona, topic, availableToolNames, forSummary } = args
+  const { persona, topic, availableToolNames, forSummary, motherTongue } = args
 
   const header = `당신은 한국어 학습자와 자유롭게 대화하는 한국 사람입니다.
 
@@ -185,6 +201,6 @@ ${persona.systemPromptTemplate}
     topicMaintenanceBlock(topic) +
     correctionBlock() +
     fewShotBlock(persona) +
-    outputFormatBlock()
+    outputFormatBlock(motherTongue)
   )
 }

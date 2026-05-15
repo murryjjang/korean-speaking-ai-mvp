@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   }
 
   const b = body as Record<string, unknown>
-  const { questionId, turns, latestStudentText, level, mode, personaId } = b
+  const { questionId, turns, latestStudentText, level, mode, personaId, motherTongue } = b
 
   if (typeof questionId !== 'string' || !questionId) {
     return Response.json({ error: 'missing_question_id' }, { status: 400 })
@@ -56,6 +56,7 @@ export async function POST(request: Request) {
     const safeMode =
       mode === 'practice' ? 'practice' : 'assessment'
     const safePersonaId = typeof personaId === 'string' ? personaId : undefined
+    const safeMotherTongue = typeof motherTongue === 'string' && motherTongue.trim() ? motherTongue.trim() : null
 
     const result = await provider.getDialogueResponse({
       questionId,
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
       latestStudentText,
       mode: safeMode,
       personaId: safePersonaId,
+      motherTongue: safeMotherTongue,
     })
 
     try {
@@ -110,6 +112,7 @@ export async function POST(request: Request) {
     try {
       const safeMode = mode === 'practice' ? 'practice' : 'assessment'
       const safePersonaId = typeof personaId === 'string' ? personaId : undefined
+      const safeMotherTongue = typeof motherTongue === 'string' && motherTongue.trim() ? motherTongue.trim() : null
       const fallbackProvider = new MockDialogueConversationProvider()
       const fallbackResult = await fallbackProvider.getDialogueResponse({
         questionId,
@@ -121,6 +124,7 @@ export async function POST(request: Request) {
         latestStudentText,
         mode: safeMode,
         personaId: safePersonaId,
+        motherTongue: safeMotherTongue,
       })
       return Response.json({
         aiText: fallbackResult.text,

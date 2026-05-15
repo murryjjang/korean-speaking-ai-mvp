@@ -116,11 +116,13 @@ export function SpeakingClient({
   questionSetId,
   setName,
   attemptId: incomingAttemptId,
+  motherTongue,
 }: {
   question: QuestionData
   questionSetId: string
   setName: string
   attemptId?: string
+  motherTongue?: string | null
 }) {
   const router = useRouter()
   const [attemptId] = useState(() => incomingAttemptId ?? crypto.randomUUID())
@@ -840,6 +842,7 @@ export function SpeakingClient({
           missionGoals={question.missionGoals ?? []}
           maxDialogueDurationSec={question.maxDialogueDurationSec ?? 180}
           attemptId={attemptId}
+          motherTongue={motherTongue}
         />
       )}
     </div>

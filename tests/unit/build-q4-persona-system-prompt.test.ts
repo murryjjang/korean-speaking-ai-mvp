@@ -178,4 +178,56 @@ describe('buildQ4PersonaSystemPrompt', () => {
     expect(out).toContain('어제 학교 가요')
     expect(out).toContain('카드로 교체')
   })
+
+  it('v1.1 16-10-2: motherTongue 미지정 시 한국어 단일 문자열 스키마', () => {
+    const out = buildQ4PersonaSystemPrompt({
+      persona: cafe(),
+      aiRole: '카페 점원',
+      aiInformation: '',
+      missionGoals: ['음료 선택'],
+      conversationHistory: [],
+    })
+    expect(out).toContain('"learner_grammar_note": "문법 교정 안내 또는 빈 문자열"')
+    expect(out).not.toContain('다국어 객체로 응답')
+  })
+
+  it('v1.1 16-10-2: motherTongue="ko"는 다국어 분기 X (한국어 모어 화자)', () => {
+    const out = buildQ4PersonaSystemPrompt({
+      persona: cafe(),
+      aiRole: '카페 점원',
+      aiInformation: '',
+      missionGoals: ['음료 선택'],
+      conversationHistory: [],
+      motherTongue: 'ko',
+    })
+    expect(out).toContain('"learner_grammar_note": "문법 교정 안내 또는 빈 문자열"')
+  })
+
+  it('v1.1 16-10-2: motherTongue="vi" → 다국어 객체 스키마 + 베트남어 가이드', () => {
+    const out = buildQ4PersonaSystemPrompt({
+      persona: cafe(),
+      aiRole: '카페 점원',
+      aiInformation: '',
+      missionGoals: ['음료 선택'],
+      conversationHistory: [],
+      motherTongue: 'vi',
+    })
+    expect(out).toContain('다국어 객체로 응답')
+    expect(out).toContain('Vietnamese')
+    expect(out).toContain('"learner_grammar_note": { "ko"')
+    expect(out).toContain('npc_utterance는 항상 한국어 그대로')
+  })
+
+  it('v1.1 16-10-2: motherTongue="ar" → 다국어 객체 + 아랍어 가이드', () => {
+    const out = buildQ4PersonaSystemPrompt({
+      persona: cafe(),
+      aiRole: '카페 점원',
+      aiInformation: '',
+      missionGoals: ['음료 선택'],
+      conversationHistory: [],
+      motherTongue: 'ar',
+    })
+    expect(out).toContain('Arabic')
+    expect(out).toContain('"learner_grammar_note": { "ko"')
+  })
 })

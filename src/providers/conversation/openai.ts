@@ -150,6 +150,7 @@ function buildSystemPrompt(input: DialogueConversationInput): string {
       aiInformation: input.aiInformation,
       missionGoals: input.missionGoals,
       conversationHistory: input.turns,
+      motherTongue: input.motherTongue ?? null,
     })
   }
   return SYSTEM_PROMPT_TEMPLATE
@@ -209,10 +210,18 @@ export class OpenAIDialogueConversationProvider implements DialogueConversationP
       throw new Error('OpenAI dialogue response: missing npc_utterance')
     }
 
-    // v1.1 15-2: learner_grammar_note·off_topic_detected를 호출부에 전달.
+    // v1.1 15-2 / 16-10-2: learner_grammar_note는 문자열 또는 다국어 객체 둘 다 허용.
     const grammarNoteRaw = obj.learner_grammar_note
-    const learnerGrammarNote =
-      typeof grammarNoteRaw === 'string' && grammarNoteRaw.trim() ? grammarNoteRaw.trim() : ''
+    let learnerGrammarNote: import('./index').MultilingualNote = ''
+    if (typeof grammarNoteRaw === 'string') {
+      learnerGrammarNote = grammarNoteRaw.trim()
+    } else if (grammarNoteRaw && typeof grammarNoteRaw === 'object') {
+      const g = grammarNoteRaw as Record<string, unknown>
+      const pick = (k: string) => (typeof g[k] === 'string' ? (g[k] as string).trim() : '')
+      const note = { ko: pick('ko'), en: pick('en'), vi: pick('vi'), ar: pick('ar') }
+      // 모두 빈 문자열이면 빈 문자열 단일로 정리.
+      learnerGrammarNote = note.ko || note.en || note.vi || note.ar ? note : ''
+    }
     const offTopicRaw = obj.off_topic_detected
     const offTopicDetected = typeof offTopicRaw === 'boolean' ? offTopicRaw : false
 

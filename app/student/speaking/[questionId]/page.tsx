@@ -5,6 +5,7 @@ import questionSetsJson from '@/src/content/question-sets.json'
 import questionTypesJson from '@/src/content/question-types.json'
 import { PageHeader } from '@/src/components/ui'
 import { getStudentVisibleAsset } from '@/src/content/assessment-assets'
+import { getCurrentParticipant } from '@/src/lib/research/session'
 import { SpeakingClient } from './speaking-client'
 
 // Canonical ID aliases — old short IDs redirect to canonical long IDs.
@@ -55,6 +56,10 @@ export default async function SpeakingQuestionPage({
       ? getStudentVisibleAsset(question.id)
       : undefined
 
+  // v1.1 16-10-2: 학습자 모국어를 클라이언트로 전달해 다국어 LLM 응답 활성화.
+  const participant = await getCurrentParticipant().catch(() => null)
+  const motherTongue = participant?.motherTongue ?? null
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
@@ -100,6 +105,7 @@ export default async function SpeakingQuestionPage({
         questionSetId={resolvedSet.id}
         setName={resolvedSet.name}
         attemptId={attemptId}
+        motherTongue={motherTongue}
       />
     </div>
   )
