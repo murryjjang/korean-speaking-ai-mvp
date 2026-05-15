@@ -53,8 +53,9 @@ describe('buildQ4PersonaSystemPrompt', () => {
     })
     expect(out).toContain('[응답 원칙]')
     expect(out).toContain('반말 절대 금지')
-    expect(out).toContain('[교정 역할]')
-    expect(out).toContain('learner_grammar_note 필드는 사용하지 말고')
+    expect(out).toContain('[교정 역할')
+    // v1.1 15-2: learner_grammar_note 필드를 사용하도록 정책 전환.
+    expect(out).toContain('learner_grammar_note에 한 줄로 정리')
     expect(out).toContain('"npc_utterance"')
     expect(out).toContain('"off_topic_detected"')
     expect(out).toContain('"learner_grammar_note"')
@@ -148,5 +149,33 @@ describe('buildQ4PersonaSystemPrompt', () => {
 
   it('Q4_MAX_HISTORY_TURNS는 10', () => {
     expect(__test__.Q4_MAX_HISTORY_TURNS).toBe(10)
+  })
+
+  it('v1.1 15-1: 주제 유지·회귀 — 엄격 적용 (이탈 카운트 + 다양화 표현)', () => {
+    const out = buildQ4PersonaSystemPrompt({
+      persona: cafe(),
+      aiRole: '카페 점원',
+      aiInformation: '',
+      missionGoals: ['음료 선택'],
+      conversationHistory: [],
+    })
+    expect(out).toContain('[주제 유지·회귀 — 엄격 적용]')
+    expect(out).toContain('이탈 카운트')
+    expect(out).toContain('이탈 1턴')
+    expect(out).toContain('이탈 2턴')
+    expect(out).toContain('주제 유지가 호응보다 우선')
+  })
+
+  it('v1.1 15-2: 시제·어휘·문법 교정 가이드(예시 포함)', () => {
+    const out = buildQ4PersonaSystemPrompt({
+      persona: cafe(),
+      aiRole: '카페 점원',
+      aiInformation: '',
+      missionGoals: ['음료 선택'],
+      conversationHistory: [],
+    })
+    expect(out).toContain('자유 대화 수준으로 강화')
+    expect(out).toContain('어제 학교 가요')
+    expect(out).toContain('카드로 교체')
   })
 })

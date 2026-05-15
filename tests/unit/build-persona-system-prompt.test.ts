@@ -61,20 +61,32 @@ describe('buildPersonaSystemPrompt', () => {
     expect(out).not.toContain('[도구 활용]')
   })
 
-  it('주제 유지·회귀 원칙 + 회귀 표현 5종이 모두 포함된다', () => {
+  it('v1.1 15-1: 주제 유지·회귀 — 엄격 적용 + 회귀 표현 다양화', () => {
     const out = buildPersonaSystemPrompt({
       persona: seoyeon(),
       topic: '주말 계획',
       availableToolNames: [],
     })
-    expect(out).toContain('[주제 유지·회귀 원칙]')
+    expect(out).toContain('[주제 유지·회귀 — 엄격 적용]')
+    expect(out).toContain('이탈 카운트')
+    expect(out).toContain('이탈 1턴')
+    expect(out).toContain('이탈 2턴')
+    expect(out).toContain('주제 유지가 호응보다 우선')
     expect(out).toContain('근데 그래서')
     expect(out).toContain('아 맞다')
-    expect(out).toContain('그건 그렇고')
-    expect(out).toContain('그런데')
     expect(out).toContain('한 가지 더 말씀드리면')
-    // 3턴 이상 이탈 시 의향 확인 가이드 — 강요 X
-    expect(out).toContain('혹시 주말 계획 얘기 더 할래요?')
+    expect(out).toContain('다시 주말 계획 얘기로')
+  })
+
+  it('v1.1 15-2: 시제·어휘·문법 교정 가이드(예시 포함)', () => {
+    const out = buildPersonaSystemPrompt({
+      persona: seoyeon(),
+      topic: '주말 계획',
+      availableToolNames: [],
+    })
+    expect(out).toContain('시제·어휘·문법 교정 가이드')
+    expect(out).toContain('어제 학교 가요')
+    expect(out).toContain('카드로 교체')
   })
 
   it('Few-shot 예시 5종이 시나리오 라벨과 함께 렌더된다', () => {
@@ -136,7 +148,7 @@ describe('buildPersonaSystemPrompt', () => {
     expect(out).toContain('[Few-shot 예시')
     expect(out).not.toContain('[응답 원칙]')
     expect(out).not.toContain('[도구 활용]')
-    expect(out).not.toContain('[주제 유지·회귀 원칙]')
+    expect(out).not.toContain('[주제 유지·회귀 — 엄격 적용]')
     expect(out).not.toContain('"npc_response"')
   })
 
