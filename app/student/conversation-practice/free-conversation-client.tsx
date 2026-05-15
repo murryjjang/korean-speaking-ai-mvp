@@ -28,30 +28,30 @@ const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string }> = [
 
 // 선택 가능한 페르소나 (v1.1 단계 9: 4명 — 친구·도우미 × 여·남).
 // id는 src/lib/personas.ts의 personaId와 일치. UI 라벨은 캐릭터 이름(수아·재현·서연·영석)을
-// 노출하지 않고 역할·성별만 보여준다.
+// 전면에 노출하고 짧은 묘사로 보조한다 (성별 표시 폐기 — 13b).
 const AVAILABLE_PERSONAS: ReadonlyArray<{ id: string; label: string; description: string; emoji: string }> = [
   {
     id: 'friend_casual',
-    label: '친구 (여)',
-    description: '반말·친근체, 활발',
+    label: '수아',
+    description: '활발한 친구',
     emoji: '😊',
   },
   {
     id: 'friend_casual_male',
-    label: '친구 (남)',
-    description: '반말·친근체, 농담 잘함',
+    label: '재현',
+    description: '농담 잘하는 친구',
     emoji: '🙂',
   },
   {
     id: 'korean_life_helper',
-    label: '도우미 (여)',
-    description: '존댓말·정중, 디지털·트렌드',
+    label: '서연',
+    description: '친근한 안내자',
     emoji: '👋',
   },
   {
     id: 'korean_life_helper_male',
-    label: '도우미 (남)',
-    description: '존댓말·정중, 행정·절차',
+    label: '영석',
+    description: '꼼꼼한 안내자',
     emoji: '🧑‍💼',
   },
 ]
@@ -908,7 +908,7 @@ export function FreeConversationClient() {
               {topic}
             </p>
             <p className="text-[11px] text-text-muted truncate mt-0.5" data-testid="conversation-persona">
-              {personaMeta(personaId).emoji} {personaMeta(personaId).label}와 대화 중
+              {personaMeta(personaId).emoji} {personaMeta(personaId).label} ({personaMeta(personaId).description})와 대화 중
             </p>
           </div>
           <div className="text-right">
