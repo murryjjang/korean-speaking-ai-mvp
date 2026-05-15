@@ -10,7 +10,8 @@ function isPublicResearchPath(pathname: string): boolean {
   return (
     pathname === '/research' ||
     pathname === '/research/login' ||
-    pathname === '/research/admin/login'
+    pathname === '/research/admin/login' ||
+    pathname === '/research/consent/declined'
   )
 }
 
