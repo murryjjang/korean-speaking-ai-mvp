@@ -34,8 +34,17 @@ export function MultilingualFeedbackBlock({
     : feedbackKo
   const rtl = hasMultilingual && lang === 'ar'
 
+  // v1.1 단계 19.5 [D10]: emphasize 시각 표지 — 같은 헤더 토글이 모든 영역에
+  // 일관된 강조 상태를 부여하는지 e2e/단위에서 검증 가능하도록 data-emphasized
+  // 마커를 부착한다. lang === 'ko' 또는 다국어 데이터가 없으면 ko가 강조.
+  const emphasizedLang = hasMultilingual ? lang : 'ko'
+
   return (
-    <div className={className}>
+    <div
+      className={className}
+      data-bilingual-mode="emphasize"
+      data-emphasized-lang={emphasizedLang}
+    >
       {hasMultilingual && showToggle && (
         <div className="mb-2 flex justify-end">
           <DisplayLanguageToggle motherTongueHint={motherTongueHint} />

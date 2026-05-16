@@ -1340,10 +1340,23 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
               }
             />
             <CardBody className="space-y-3">
-              <div data-testid="summary-ko">
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">한국어</p>
-                <p className="text-sm text-text-primary leading-relaxed">{summary.summary_ko}</p>
-              </div>
+              {/* v1.1 단계 19.5 [D10]: emphasize 모드 — 선택 언어 명료, 비선택 흐림. */}
+              {(() => {
+                const hasMultilingual = !!summary.summary
+                const useDisplay = hasMultilingual && displayLang !== 'ko'
+                const koEmphasized = !useDisplay // displayLang=ko 또는 다국어 응답 없음
+                return (
+                  <div
+                    data-testid="summary-ko"
+                    data-bilingual-mode="emphasize"
+                    data-emphasized={koEmphasized || undefined}
+                    className={koEmphasized ? 'transition-opacity' : 'opacity-60 transition-opacity'}
+                  >
+                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">한국어</p>
+                    <p className="text-sm text-text-primary leading-relaxed">{summary.summary_ko}</p>
+                  </div>
+                )
+              })()}
               {/* 보조 언어 — 다국어 응답 있으면 displayLang 기반, 없으면 helperLang.
                   displayLang='ko' + 다국어 모드이면 KO 단일 보기로 둘째 칸은 숨긴다. */}
               {(() => {
@@ -1360,13 +1373,17 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                   ? pickText(summary.summary, displayLang)
                   : summary.summary_l1
                 const rtl = useDisplay ? isRTLDisplay(displayLang) : isRTL(helperLang)
+                const l1Emphasized = useDisplay // 외국어 토글 시 l1 강조
+                const dim = summaryLoading || !l1Emphasized
                 return (
                   <div
                     data-testid="summary-l1"
+                    data-bilingual-mode="emphasize"
+                    data-emphasized={l1Emphasized || undefined}
                     dir={rtl ? 'rtl' : 'ltr'}
                     lang={lang2}
                     style={rtl ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
-                    className={summaryLoading ? 'opacity-50 transition-opacity' : 'transition-opacity'}
+                    className={dim ? 'opacity-60 transition-opacity' : 'transition-opacity'}
                     aria-busy={summaryLoading || undefined}
                   >
                     <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1 flex items-center gap-1.5" dir="ltr">
@@ -1415,16 +1432,25 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                   { key: 'l1', label: L1_LABEL_KO[helperLang], testId: 'feedback-native', fb: summary.feedback_l1, dir: isRTL(helperLang) ? 'rtl' : 'ltr', code: helperLang },
                 ]
               })().map(({ key, label, testId, fb, dir, code }) => {
-                const dimmed = key === 'l1' && summaryLoading
+                // v1.1 단계 19.5 [D10]: emphasize 모드 — 선택 언어가 명료, 비선택은 흐림.
+                // displayLang=ko면 ko 강조 + l1 흐림. 비-ko면 그 반대.
+                const useDisplay = !!summary.feedback && displayLang !== 'ko'
+                const emphasized =
+                  (displayLang === 'ko' && key === 'ko') ||
+                  (useDisplay && key === 'l1' && code === displayLang) ||
+                  (!useDisplay && key === 'ko')
+                const dim = (key === 'l1' && summaryLoading) || !emphasized
                 return (
                 <div
                   key={key}
                   data-testid={testId}
+                  data-bilingual-mode="emphasize"
+                  data-emphasized={emphasized || undefined}
                   dir={dir}
                   lang={code}
                   style={dir === 'rtl' ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
-                  className={dimmed ? 'opacity-50 transition-opacity' : 'transition-opacity'}
-                  aria-busy={dimmed || undefined}
+                  className={dim ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+                  aria-busy={(key === 'l1' && summaryLoading) || undefined}
                 >
                   <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2" dir="ltr">{label}</p>
                   {fb.strengths.length > 0 && (

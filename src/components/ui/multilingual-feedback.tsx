@@ -53,7 +53,7 @@ export function MultilingualFeedback({
   const dir = isRTL(lang) ? 'rtl' : 'ltr'
 
   return (
-    <Card data-testid={testId}>
+    <Card data-testid={testId} data-bilingual-mode="emphasize" data-emphasized="true">
       <CardHeader
         title={title}
         description={description ?? '한국어 평가 내용을 보조 언어로 안내합니다.'}
