@@ -1,14 +1,6 @@
-// v1.1 단계 19.5 [D10]: BilingualText emphasize 모드 — 자유 대화 요약·평가 결과
-// 카드 전수 적용.
-//
-// 단계 18·19에서 부분 적용된 상태. 19.5에서:
-//  - 자유 대화 요약 카드 + 학습 피드백 카드에 data-bilingual-mode="emphasize"
-//    + data-emphasized 마커 부착 — 헤더 토글 1회로 모든 영역이 동시 강조 전환.
-//  - MultilingualFeedback (평가 결과 보조 카드)에 같은 마커.
-//  - MultilingualFeedbackBlock에 data-emphasized-lang 마커.
-//
-// 정적 검사로 마커가 존재하고 displayLang에 연동되는지 확인. 실제 토글 동작은
-// useDisplayLanguage 단위 테스트(stage19-i18n-d6-d8)로 이미 보호.
+// v1.1 단계 19.6 [D10-피드백, 자유대화, 평가결과]: 새 모델 — 한국어 본문 +
+// (보조 언어 != ko면) 작은 글씨 보조. 단계 19.5 emphasize/dim 모델은 폐기되고
+// 단순 supplement 모델로 통합됨.
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -19,56 +11,62 @@ function read(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf-8')
 }
 
-describe('[단계19.5-D10] 자유 대화 요약 카드 — emphasize 마커', () => {
+describe('[단계19.6-D10-피드백] 자유 대화 요약 카드 — 새 모델', () => {
   const src = read('app/student/conversation-practice/free-conversation-client.tsx')
 
-  it('summary-ko 컨테이너에 data-bilingual-mode="emphasize" + data-emphasized', () => {
-    expect(src).toMatch(/data-testid="summary-ko"[\s\S]{0,400}data-bilingual-mode="emphasize"/)
-    expect(src).toMatch(/data-testid="summary-ko"[\s\S]{0,400}data-emphasized/)
+  it('summary-ko 컨테이너에 BilingualText (multilingual prop) 적용', () => {
+    expect(src).toMatch(/testId="summary-ko"/)
+    // BilingualText 호출에 summary.summary multilingual 전달
+    const idx = src.indexOf('testId="summary-ko"')
+    expect(idx).toBeGreaterThan(0)
+    const block = src.slice(Math.max(0, idx - 500), idx + 400)
+    expect(block).toMatch(/<BilingualText/)
+    expect(block).toMatch(/multilingual=\{summary\.summary\s*\?\?\s*null\}/)
   })
 
-  it('summary-l1 컨테이너에 emphasize 마커', () => {
-    expect(src).toMatch(/data-testid="summary-l1"[\s\S]{0,400}data-bilingual-mode="emphasize"/)
-    expect(src).toMatch(/data-testid="summary-l1"[\s\S]{0,400}data-emphasized/)
+  it('학습 피드백 — BilingualListItem 기반 리스트 (strengths + next_steps)', () => {
+    expect(src).toMatch(/BilingualListItem/)
+    // strengths/next_steps 양쪽에 적용되어야 함
+    const c = src.match(/BilingualListItem/g)
+    expect((c?.length ?? 0)).toBeGreaterThanOrEqual(2)
   })
 
-  it('feedback 행 (ko/l1) 모두 emphasize 마커', () => {
-    expect(src).toMatch(/data-bilingual-mode="emphasize"[\s\S]{0,400}data-emphasized/)
-    // useDisplay/koEmphasized/l1Emphasized 로직 존재
-    expect(src).toMatch(/emphasized|useDisplay/)
-  })
-
-  it('비강조 행은 opacity-60 흐림', () => {
-    expect(src).toMatch(/opacity-60 transition-opacity/)
+  it('mode prop 호출 제거 (새 모델 — supplement-only)', () => {
+    expect(src).not.toMatch(/mode=['"]emphasize['"]/)
   })
 })
 
-describe('[단계19.5-D10] 평가 결과 보조 카드 — emphasize 마커', () => {
+describe('[단계19.6-평가결과] MultilingualFeedback — 새 보조 카드 모델', () => {
   const mf = read('src/components/ui/multilingual-feedback.tsx')
 
-  it('MultilingualFeedback Card에 data-bilingual-mode="emphasize" + data-emphasized', () => {
-    expect(mf).toMatch(/data-bilingual-mode="emphasize"/)
-    expect(mf).toMatch(/data-emphasized="true"/)
+  it('ko 선택 시 return null (보조 DOM 미존재)', () => {
+    expect(mf).toMatch(/displayLang\s*===\s*['"]ko['"][\s\S]{0,200}return\s+null/)
   })
 
-  it('headers 토글 useDisplayLanguage 구독 (단일 토글)', () => {
+  it('data-bilingual-supplement 마커 부착', () => {
+    expect(mf).toMatch(/data-bilingual-supplement/)
+  })
+
+  it('text-xs + opacity로 보조 스타일', () => {
+    expect(mf).toMatch(/text-xs/)
+    expect(mf).toMatch(/opacity-90|opacity-80/)
+  })
+
+  it('useDisplayLanguage 구독', () => {
     expect(mf).toMatch(/useDisplayLanguage/)
   })
 })
 
-describe('[단계19.5-D10] MultilingualFeedbackBlock — emphasize-lang 마커', () => {
+describe('[단계19.6-평가결과] MultilingualFeedbackBlock — 새 모델', () => {
   const mfb = read('src/components/multilingual-feedback-block.tsx')
 
-  it('컨테이너에 data-bilingual-mode + data-emphasized-lang', () => {
-    expect(mfb).toMatch(/data-bilingual-mode="emphasize"/)
-    expect(mfb).toMatch(/data-emphasized-lang=/)
+  it('BilingualText 위임', () => {
+    expect(mfb).toMatch(/import\s*\{\s*BilingualText/)
+    expect(mfb).toMatch(/<BilingualText/)
   })
 
-  it('emphasizedLang은 hasMultilingual=true면 lang, 아니면 ko', () => {
-    expect(mfb).toMatch(/hasMultilingual\s*\?\s*lang\s*:\s*['"]ko['"]/)
-  })
-
-  it('헤더 토글(useDisplayLanguage) 직접 구독', () => {
-    expect(mfb).toMatch(/useDisplayLanguage/)
+  it('showToggle prop은 호환 위해 유지되되 인라인 토글 렌더 X', () => {
+    // 인라인 DisplayLanguageToggle import 없음
+    expect(mfb).not.toMatch(/import\s*\{\s*DisplayLanguageToggle/)
   })
 })

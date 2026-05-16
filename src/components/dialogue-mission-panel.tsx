@@ -821,7 +821,8 @@ export function DialogueMissionPanel({
                           </span>
                         )}
                         {turn.grammarNote && (() => {
-                          // v1.1 단계 19 [D7]: BilingualText emphasize 모드로 ko + 모국어 동시 표시.
+                          // v1.1 단계 19.6 [D7]: 한국어 본문 + (보조 언어 != ko이고
+                          // 다국어 grammar_note가 있으면) 작은 글씨 보조. inline 변형.
                           const ko =
                             typeof turn.grammarNote === 'string'
                               ? turn.grammarNote
@@ -838,16 +839,16 @@ export function DialogueMissionPanel({
                               : null
                           return (
                             <span
-                              className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 max-w-full"
+                              className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 max-w-full inline-block"
                               data-testid="student-grammar-note"
                             >
                               <span className="font-medium me-1">교정:</span>
                               <BilingualText
                                 ko={ko}
                                 multilingual={multilingual}
-                                mode="emphasize"
                                 motherTongueHint={motherTongue}
-                                className="inline-block align-middle"
+                                inline
+                                className="align-middle"
                               />
                             </span>
                           )

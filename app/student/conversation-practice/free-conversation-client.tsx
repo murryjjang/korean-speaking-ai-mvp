@@ -3,11 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
-import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
-import { useDisplayLanguage } from '@/src/hooks/use-display-language'
-import { isRTLDisplay, pickText } from '@/src/lib/i18n/display-language'
+import { type FeedbackLanguage } from '@/src/lib/feedback-language'
 import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
-import { BilingualText } from '@/src/components/ui/bilingual-text'
+import { BilingualText, BilingualListItem } from '@/src/components/ui/bilingual-text'
 import { ToolResultCards } from '@/src/components/tool-result-cards'
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { getPersona } from '@/src/lib/personas'
@@ -178,10 +176,9 @@ function diffWordsInline(original: string, corrected: string): DiffSeg[] {
 }
 
 export function FreeConversationClient({ motherTongue = null }: { motherTongue?: string | null }) {
-  // 4 모드 공통 보조 언어 토글 — ar/en/vi. 페이지 상단 LanguageHelperToggle이 단일 소스.
+  // 4 모드 공통 보조 언어 (요약 fetch용 helperLang) — ar/en/vi 중 하나. UI 라벨은
+  // 19.6 새 모델에서 한국어 고정이므로 헤더 토글이 ko일 때도 fetch는 helperLang으로.
   const { lang: helperLang } = useLanguageHelper()
-  // v1.1 16-10: 4언어(KO/EN/VI/AR) 표시 언어 토글 — 다국어 요약·피드백을 즉시 전환.
-  const { lang: displayLang } = useDisplayLanguage(motherTongue)
 
   const [stage, setStage] = useState<Stage>('start')
   const [topic, setTopic] = useState('')
@@ -1157,7 +1154,8 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                         )
                       })}
                     </p>
-                    {/* v1.1 단계 19 [D7]: reason이 다국어 객체이면 emphasize 모드로 ko+모국어 동시 표시. */}
+                    {/* v1.1 단계 19.6 [D7]: 한국어 본문 + (보조 언어 != ko이고
+                        다국어 reason이 있으면) 작은 글씨 보조. */}
                     {(() => {
                       const r = t.correction.reason
                       if (typeof r === 'string') {
@@ -1169,7 +1167,6 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                         <BilingualText
                           ko={ko}
                           multilingual={r}
-                          mode="emphasize"
                           motherTongueHint={motherTongue}
                           className="opacity-80 mt-0.5"
                         />
@@ -1190,8 +1187,8 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                       <BilingualText
                         ko={ko}
                         multilingual={r}
-                        mode="emphasize"
                         motherTongueHint={motherTongue}
+                        inline
                         className="inline-block align-middle"
                       />
                     </div>
@@ -1340,138 +1337,79 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
               }
             />
             <CardBody className="space-y-3">
-              {/* v1.1 단계 19.5 [D10]: emphasize 모드 — 선택 언어 명료, 비선택 흐림. */}
-              {(() => {
-                const hasMultilingual = !!summary.summary
-                const useDisplay = hasMultilingual && displayLang !== 'ko'
-                const koEmphasized = !useDisplay // displayLang=ko 또는 다국어 응답 없음
-                return (
-                  <div
-                    data-testid="summary-ko"
-                    data-bilingual-mode="emphasize"
-                    data-emphasized={koEmphasized || undefined}
-                    className={koEmphasized ? 'transition-opacity' : 'opacity-60 transition-opacity'}
-                  >
-                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1">한국어</p>
-                    <p className="text-sm text-text-primary leading-relaxed">{summary.summary_ko}</p>
-                  </div>
-                )
-              })()}
-              {/* 보조 언어 — 다국어 응답 있으면 displayLang 기반, 없으면 helperLang.
-                  displayLang='ko' + 다국어 모드이면 KO 단일 보기로 둘째 칸은 숨긴다. */}
-              {(() => {
-                const hasMultilingual = !!summary.summary
-                if (hasMultilingual && displayLang === 'ko') return null
-                const useDisplay = hasMultilingual && displayLang !== 'ko'
-                const lang2: string = useDisplay ? displayLang : helperLang
-                const label = useDisplay
-                  ? (displayLang === 'en' ? 'English'
-                    : displayLang === 'vi' ? 'Tiếng Việt'
-                    : 'العربية')
-                  : L1_LABEL_KO[helperLang]
-                const text = useDisplay
-                  ? pickText(summary.summary, displayLang)
-                  : summary.summary_l1
-                const rtl = useDisplay ? isRTLDisplay(displayLang) : isRTL(helperLang)
-                const l1Emphasized = useDisplay // 외국어 토글 시 l1 강조
-                const dim = summaryLoading || !l1Emphasized
-                return (
-                  <div
-                    data-testid="summary-l1"
-                    data-bilingual-mode="emphasize"
-                    data-emphasized={l1Emphasized || undefined}
-                    dir={rtl ? 'rtl' : 'ltr'}
-                    lang={lang2}
-                    style={rtl ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
-                    className={dim ? 'opacity-60 transition-opacity' : 'transition-opacity'}
-                    aria-busy={summaryLoading || undefined}
-                  >
-                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-1 flex items-center gap-1.5" dir="ltr">
-                      <span>{label}</span>
-                      {summaryLoading && (
-                        <span
-                          className="inline-block w-3 h-3 border-2 border-text-muted border-t-transparent rounded-full animate-spin"
-                          data-testid="summary-l1-spinner"
-                          aria-hidden="true"
-                        />
-                      )}
-                    </p>
-                    <p className="text-sm text-text-primary leading-relaxed">{text}</p>
-                  </div>
-                )
-              })()}
+              {/* v1.1 단계 19.6 [BiText, 자유대화]: 한국어 본문 + (보조 언어 != ko이고
+                  다국어 응답이 있으면) 작은 보조 텍스트. ko 선택 시 보조 DOM 미존재. */}
+              <BilingualText
+                ko={summary.summary_ko}
+                multilingual={summary.summary ?? null}
+                motherTongueHint={motherTongue}
+                testId="summary-ko"
+                className={summaryLoading ? 'opacity-70 transition-opacity' : 'transition-opacity'}
+              />
+              {summaryLoading && (
+                <span
+                  className="inline-block w-3 h-3 border-2 border-text-muted border-t-transparent rounded-full animate-spin"
+                  data-testid="summary-l1-spinner"
+                  aria-hidden="true"
+                />
+              )}
             </CardBody>
           </Card>
 
           <Card data-testid="conversation-feedback">
             <CardHeader title="학습 피드백" />
             <CardBody className="space-y-4">
-              {((): Array<{
-                key: string
-                label: string
-                testId: string
-                fb: SummaryFeedback
-                dir: 'rtl' | 'ltr'
-                code: string
-              }> => {
-                // v1.1 16-10-5: 다국어 응답 있고 displayLang가 외국어면 그 언어를 사용.
-                const useDisplay = !!summary.feedback && displayLang !== 'ko'
-                if (useDisplay && summary.feedback) {
-                  const fb2 = summary.feedback[displayLang] ?? summary.feedback.ko
-                  const label =
-                    displayLang === 'en' ? 'English' :
-                    displayLang === 'vi' ? 'Tiếng Việt' :
-                    displayLang === 'ar' ? 'العربية' : '한국어'
-                  return [
-                    { key: 'ko', label: '한국어', testId: 'feedback-korean', fb: summary.feedback_ko, dir: 'ltr', code: 'ko' },
-                    { key: 'l1', label, testId: 'feedback-native', fb: fb2, dir: isRTLDisplay(displayLang) ? 'rtl' : 'ltr', code: displayLang },
-                  ]
-                }
-                return [
-                  { key: 'ko', label: '한국어', testId: 'feedback-korean', fb: summary.feedback_ko, dir: 'ltr', code: 'ko' },
-                  { key: 'l1', label: L1_LABEL_KO[helperLang], testId: 'feedback-native', fb: summary.feedback_l1, dir: isRTL(helperLang) ? 'rtl' : 'ltr', code: helperLang },
-                ]
-              })().map(({ key, label, testId, fb, dir, code }) => {
-                // v1.1 단계 19.5 [D10]: emphasize 모드 — 선택 언어가 명료, 비선택은 흐림.
-                // displayLang=ko면 ko 강조 + l1 흐림. 비-ko면 그 반대.
-                const useDisplay = !!summary.feedback && displayLang !== 'ko'
-                const emphasized =
-                  (displayLang === 'ko' && key === 'ko') ||
-                  (useDisplay && key === 'l1' && code === displayLang) ||
-                  (!useDisplay && key === 'ko')
-                const dim = (key === 'l1' && summaryLoading) || !emphasized
-                return (
-                <div
-                  key={key}
-                  data-testid={testId}
-                  data-bilingual-mode="emphasize"
-                  data-emphasized={emphasized || undefined}
-                  dir={dir}
-                  lang={code}
-                  style={dir === 'rtl' ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
-                  className={dim ? 'opacity-60 transition-opacity' : 'transition-opacity'}
-                  aria-busy={(key === 'l1' && summaryLoading) || undefined}
-                >
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2" dir="ltr">{label}</p>
-                  {fb.strengths.length > 0 && (
-                    <div className="mb-2">
-                      <p className="text-xs font-semibold text-emerald-700 mb-1" dir="ltr">잘한 점</p>
-                      <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
-                        {fb.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  {fb.next_steps.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-amber-700 mb-1" dir="ltr">다음 연습 시</p>
-                      <ul className="text-xs text-text-primary space-y-1 list-disc list-inside">
-                        {fb.next_steps.map((s, i) => <li key={i}>{s}</li>)}
-                      </ul>
-                    </div>
-                  )}
+              {/* v1.1 단계 19.6 [D10-피드백]: 한국어 본문 리스트 + (보조 언어 != ko이고
+                  다국어 feedback 응답이 있으면) 각 항목 아래 작은 보조 텍스트. ko 선택
+                  시 보조 DOM 미존재. */}
+              {summary.feedback_ko.strengths.length > 0 && (
+                <div data-testid="feedback-korean" data-section="strengths">
+                  <p className="text-xs font-semibold text-emerald-700 mb-1">잘한 점</p>
+                  <ul className="text-sm text-text-primary space-y-1.5 list-disc list-inside">
+                    {summary.feedback_ko.strengths.map((s, i) => (
+                      <BilingualListItem
+                        key={i}
+                        ko={s}
+                        multilingual={
+                          summary.feedback
+                            ? {
+                                ko: s,
+                                en: summary.feedback.en?.strengths[i],
+                                vi: summary.feedback.vi?.strengths[i],
+                                ar: summary.feedback.ar?.strengths[i],
+                              }
+                            : null
+                        }
+                        motherTongueHint={motherTongue}
+                      />
+                    ))}
+                  </ul>
                 </div>
-                )
-              })}
+              )}
+              {summary.feedback_ko.next_steps.length > 0 && (
+                <div data-testid="feedback-next-steps" data-section="next-steps">
+                  <p className="text-xs font-semibold text-amber-700 mb-1">다음 연습 시</p>
+                  <ul className="text-sm text-text-primary space-y-1.5 list-disc list-inside">
+                    {summary.feedback_ko.next_steps.map((s, i) => (
+                      <BilingualListItem
+                        key={i}
+                        ko={s}
+                        multilingual={
+                          summary.feedback
+                            ? {
+                                ko: s,
+                                en: summary.feedback.en?.next_steps[i],
+                                vi: summary.feedback.vi?.next_steps[i],
+                                ar: summary.feedback.ar?.next_steps[i],
+                              }
+                            : null
+                        }
+                        motherTongueHint={motherTongue}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardBody>
           </Card>
 
