@@ -1,5 +1,7 @@
-// v1.1 단계 10-2 / 16-10-6: 참여자 사전 발급 코드 로그인 (KO/EN/VI/AR).
+// v1.1 단계 10-2 / 16-10-6 / 18 [I]: 참여자 사전 발급 코드 로그인 (KO/EN/VI/AR).
+// 단계 18 [I]: KDLI 로고·중앙 정렬·카드 디자인을 /login과 통일.
 
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 
 import { loginWithCode } from './actions'
@@ -121,94 +123,129 @@ export default async function ResearchLoginPage({ searchParams }: { searchParams
   }
 
   return (
-    <main
-      className="max-w-md mx-auto px-4 py-10"
+    <div
+      className="min-h-screen flex items-center justify-center bg-surface px-4 py-10"
       data-testid="research-login-page"
       dir={rtl ? 'rtl' : undefined}
     >
-      <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-text-primary">{t.title}</h1>
-          <p className="text-sm text-text-secondary mt-1">{t.subtitle}</p>
+      <main className="w-full max-w-sm">
+        {/* 단계 18 [I]: /login과 동일한 KDLI 로고·중앙 정렬·타이틀 폰트. */}
+        <div className="flex flex-col items-center gap-4 mb-8">
+          <Image
+            src="/logos/kdli-seal-512.png"
+            alt="KDLI - Korea Defense Language Institute"
+            width={384}
+            height={384}
+            priority
+            className="h-40 w-40"
+          />
+          <h1 className="text-2xl font-semibold text-text-primary tracking-tight text-center">
+            {t.title}
+          </h1>
+          <p className="text-sm text-text-secondary text-center">{t.subtitle}</p>
         </div>
-        {/* v1.1 16-10-6: 로그인 전 페이지에서도 4언어 토글 노출 */}
-        <div
-          className="inline-flex rounded-md border border-border overflow-hidden text-xs"
-          role="group"
-          aria-label={t.langLabel}
-          data-testid="login-locale-toggle"
+
+        {/* 4언어 토글 — 카드 위 중앙 배치 */}
+        <div className="flex justify-center mb-4">
+          <div
+            className="inline-flex rounded-md border border-border overflow-hidden text-xs"
+            role="group"
+            aria-label={t.langLabel}
+            data-testid="login-locale-toggle"
+          >
+            {(['ko', 'en', 'vi', 'ar'] as Lang[]).map((code) => (
+              <a
+                key={code}
+                href={`/research/login?lang=${code}${redirectTo ? `&redirectTo=${encodeURIComponent(redirectTo)}` : ''}`}
+                className={`px-2.5 py-1.5 ${
+                  lang === code
+                    ? 'bg-primary-600 text-white font-semibold'
+                    : 'bg-white text-text-secondary hover:bg-slate-50'
+                }`}
+                aria-current={lang === code ? 'page' : undefined}
+                data-testid={`login-locale-${code}`}
+              >
+                {LOCALE_LABEL[code]}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <form
+          action={action}
+          className="bg-surface-raised rounded-xl border border-border p-6 space-y-4"
         >
-          {(['ko', 'en', 'vi', 'ar'] as Lang[]).map((code) => (
-            <a
-              key={code}
-              href={`/research/login?lang=${code}${redirectTo ? `&redirectTo=${encodeURIComponent(redirectTo)}` : ''}`}
-              className={`px-2.5 py-1.5 ${
-                lang === code
-                  ? 'bg-primary-600 text-white font-semibold'
-                  : 'bg-white text-text-secondary hover:bg-slate-50'
-              }`}
-              aria-current={lang === code ? 'page' : undefined}
-              data-testid={`login-locale-${code}`}
+          {error ? (
+            <div
+              role="alert"
+              className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2"
+              data-testid="login-error"
             >
-              {LOCALE_LABEL[code]}
-            </a>
-          ))}
-        </div>
-      </div>
+              {error === 'not_found'
+                ? t.errors.not_found
+                : error === 'invalid_pin'
+                  ? t.errors.invalid_pin
+                  : error === 'invalid_code'
+                    ? t.errors.invalid_code
+                    : t.errors.other}
+            </div>
+          ) : null}
 
-      {error ? (
-        <p className="mt-4 text-sm text-red-600" data-testid="login-error">
-          {error === 'not_found'
-            ? t.errors.not_found
-            : error === 'invalid_pin'
-              ? t.errors.invalid_pin
-              : error === 'invalid_code'
-                ? t.errors.invalid_code
-                : t.errors.other}
+          <div className="space-y-1">
+            <label
+              htmlFor="research-login-code"
+              className="block text-sm font-medium text-text-primary"
+            >
+              {t.codeLabel}
+            </label>
+            <input
+              id="research-login-code"
+              name="code"
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              required
+              placeholder="P001"
+              className="w-full border border-border rounded-md px-3 py-2 text-sm bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary-500"
+              data-testid="input-participant-code"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label
+              htmlFor="research-login-pin"
+              className="block text-sm font-medium text-text-primary"
+            >
+              {t.pinLabel}
+            </label>
+            <input
+              id="research-login-pin"
+              name="pin"
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={4}
+              placeholder={t.pinPlaceholder}
+              className="w-full border border-border rounded-md px-3 py-2 text-sm bg-surface-raised focus:outline-none focus:ring-2 focus:ring-primary-500"
+              data-testid="input-participant-pin"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-primary-700 text-white rounded-md px-4 py-2 text-sm font-medium hover:bg-primary-800 transition-colors"
+            data-testid="btn-research-login"
+          >
+            {t.submit}
+          </button>
+        </form>
+
+        <p className="mt-3 text-xs text-center">
+          <a href="/research/admin/login" className="text-primary-600 hover:underline">
+            {t.adminLink}
+          </a>
         </p>
-      ) : null}
-
-      <form action={action} className="mt-6 space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium text-text-secondary">{t.codeLabel}</span>
-          <input
-            name="code"
-            type="text"
-            inputMode="text"
-            autoComplete="off"
-            required
-            placeholder="P001"
-            className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            data-testid="input-participant-code"
-          />
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium text-text-secondary">{t.pinLabel}</span>
-          <input
-            name="pin"
-            type="password"
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={4}
-            placeholder={t.pinPlaceholder}
-            className="mt-1 block w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            data-testid="input-participant-pin"
-          />
-        </label>
-        <button
-          type="submit"
-          className="w-full rounded-md bg-primary-600 text-white text-sm font-medium px-4 py-2 hover:bg-primary-700"
-          data-testid="btn-research-login"
-        >
-          {t.submit}
-        </button>
-      </form>
-
-      <p className="mt-2 text-xs">
-        <a href="/research/admin/login" className="text-primary-600 hover:underline">
-          {t.adminLink}
-        </a>
-      </p>
-    </main>
+      </main>
+    </div>
   )
 }

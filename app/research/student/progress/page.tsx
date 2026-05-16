@@ -14,6 +14,8 @@ import {
 import { getCurrentParticipant } from '@/src/lib/research/session'
 import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
 import { Localized, LocalizedDuration } from '@/src/components/ui/localized'
+import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
+import { getPersona } from '@/src/lib/personas'
 import { ModeDonut, DailyBars, ScoreLine } from '@/src/components/research/progress-charts'
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { MODE_LABELS } from '@/src/lib/i18n/dashboard-labels'
@@ -104,9 +106,24 @@ export default async function StudentProgressPage() {
     )
     .sort((a, b) => a.at - b.at)
 
+  // 단계 18 [C3]: 최근 세션을 풍부화 — 페르소나·점수·핵심 주제를 함께 표시.
+  // sessionsWithAssessments에서 미리 fetch된 assessment 데이터를 활용해 N+1 호출 방지.
+  const assessmentsBySession = new Map(
+    sessionsWithAssessments.map(({ session, assessments }) => [session.id, assessments]),
+  )
   const recent = [...sessions]
     .sort((a, b) => new Date(b.sessionStartedAt).getTime() - new Date(a.sessionStartedAt).getTime())
     .slice(0, 8)
+    .map((s) => {
+      const meta = s.metaJson ?? {}
+      const personaId = typeof meta.personaId === 'string' ? meta.personaId : null
+      const persona = personaId ? getPersona(personaId) : null
+      const topic = typeof meta.topic === 'string' ? meta.topic : null
+      const scoreTotal = (assessmentsBySession.get(s.id) ?? [])
+        .map((a) => a.scoreTotal)
+        .find((v): v is number => typeof v === 'number')
+      return { session: s, persona, topic, scoreTotal: scoreTotal ?? null }
+    })
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8" data-testid="research-student-progress">
@@ -245,17 +262,55 @@ export default async function StudentProgressPage() {
             />
           </p>
         ) : (
-          <ul className="text-sm space-y-1.5" data-testid="recent-sessions">
-            {recent.map((s) => (
-              <li key={s.id} className="flex items-center gap-2 text-text-secondary">
-                <span className="text-xs text-text-muted whitespace-nowrap">
-                  {new Date(s.sessionStartedAt).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                </span>
-                <span>·</span>
-                <span>{MODE_LABEL_KO[s.mode] ?? s.mode}</span>
-                {s.sessionEndedAt
-                  ? <span className="text-xs text-emerald-600 ml-2">(<Localized spec={{ kind: 'page', key: 'completed' }} motherTongueHint={participant.motherTongue} />)</span>
-                  : <span className="text-xs text-yellow-600 ml-2">(<Localized spec={{ kind: 'page', key: 'inProgress' }} motherTongueHint={participant.motherTongue} />)</span>}
+          <ul className="space-y-2" data-testid="recent-sessions">
+            {recent.map(({ session: s, persona, topic, scoreTotal }) => (
+              <li
+                key={s.id}
+                className="rounded-md border border-border bg-surface px-3 py-2"
+                data-testid="recent-session-card"
+              >
+                <div className="flex items-start gap-3">
+                  {persona ? (
+                    <PersonaAvatar personaId={persona.personaId} size={32} />
+                  ) : (
+                    <div
+                      aria-hidden="true"
+                      className="w-8 h-8 rounded-full bg-primary-50 inline-flex items-center justify-center text-xs text-primary-700"
+                    >
+                      {(MODE_LABEL_KO[s.mode] ?? s.mode).slice(0, 1)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap text-xs text-text-muted">
+                      <span className="whitespace-nowrap">
+                        {new Date(s.sessionStartedAt).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span className="font-medium text-text-secondary">{MODE_LABEL_KO[s.mode] ?? s.mode}</span>
+                      {persona && (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span className="text-text-secondary">{persona.nameKo}</span>
+                        </>
+                      )}
+                      {s.sessionEndedAt
+                        ? <span className="text-emerald-600 ml-auto">(<Localized spec={{ kind: 'page', key: 'completed' }} motherTongueHint={participant.motherTongue} />)</span>
+                        : <span className="text-yellow-600 ml-auto">(<Localized spec={{ kind: 'page', key: 'inProgress' }} motherTongueHint={participant.motherTongue} />)</span>}
+                    </div>
+                    <div className="mt-1 flex items-baseline gap-3">
+                      {topic ? (
+                        <p className="text-sm text-text-primary truncate">{topic}</p>
+                      ) : (
+                        <p className="text-sm text-text-muted">—</p>
+                      )}
+                      {scoreTotal !== null && (
+                        <p className="text-xs font-semibold text-primary-700 tabular-nums ml-auto" data-testid="recent-session-score">
+                          {scoreTotal}점
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
