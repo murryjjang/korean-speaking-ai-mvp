@@ -37,6 +37,7 @@ type AvataaarOptions = {
   clothing?: string[]
   hairColor?: string[]
   eyebrows?: string[]
+  skinColor?: string[]
 }
 
 // DiceBear 9.x avataaars `top` 유효값 (스키마 발췌):
@@ -46,19 +47,30 @@ type AvataaarOptions = {
 // straight01, straight02, straightAndStrand, bigHair,
 // frizzle, shaggy, shaggyMullet, shortCurly, shortFlat, shortRound,
 // shortWaved, sides, theCaesar, theCaesarAndSidePart
+//
+// v1.1 단계 19.5 [E.1]: avataaars 9.x skinColor 팔레트 =
+//   614335 (dark brown), ae5d29 (brown), d08b5b (tan),
+//   edb98a (light), f8d25c (yellow), fd9841 (medium), ffdbb4 (fair)
+// 시드 기본값은 임의 분포라 흑인풍으로 출력될 수 있어 한국인 톤 3종만 화이트리스트
+// (edb98a/f8d25c/ffdbb4). 4명 페르소나 모두 같은 3개 옵션을 받는다.
+
 const PERSONA_OPTIONS: Record<string, AvataaarOptions> = {
   // 여성 (sua, seoyeon) — 긴 머리 계열 + 수염 0
   friend_casual: {
-    top: ['straight01', 'straight02', 'bob'],
+    top: ['straight02', 'bob'],
     facialHairProbability: 0,
     clothing: ['hoodie', 'shirtCrewNeck'],
     hairColor: ['2c1b18', '4a312c'],
+    skinColor: ['edb98a', 'f8d25c', 'ffdbb4'],
+    eyebrows: ['default', 'defaultNatural'],
   },
   korean_life_helper: {
-    top: ['bigHair', 'curly', 'longButNotTooLong'],
+    top: ['longButNotTooLong', 'straightAndStrand'],
     facialHairProbability: 0,
     clothing: ['blazerAndShirt', 'shirtVNeck'],
     hairColor: ['2c1b18', '4a312c'],
+    skinColor: ['edb98a', 'f8d25c', 'ffdbb4'],
+    eyebrows: ['default', 'defaultNatural'],
   },
   // 남성 (jaehyun, youngseok) — 짧은 머리 + 옵션 수염
   friend_casual_male: {
@@ -67,13 +79,17 @@ const PERSONA_OPTIONS: Record<string, AvataaarOptions> = {
     facialHairProbability: 50,
     clothing: ['hoodie', 'shirtCrewNeck'],
     hairColor: ['2c1b18'],
+    skinColor: ['edb98a', 'f8d25c', 'ffdbb4'],
+    eyebrows: ['default', 'defaultNatural'],
   },
   korean_life_helper_male: {
-    top: ['shortRound', 'frizzle'],
-    facialHair: ['moustacheFancy', 'beardLight'],
-    facialHairProbability: 70,
+    top: ['shortRound', 'shortFlat'],
+    facialHair: ['beardLight'],
+    facialHairProbability: 50,
     clothing: ['blazerAndShirt'],
     hairColor: ['2c1b18'],
+    skinColor: ['edb98a', 'f8d25c', 'ffdbb4'],
+    eyebrows: ['default', 'defaultNatural'],
   },
 }
 
@@ -88,6 +104,7 @@ function optionsToParams(opts?: AvataaarOptions): string {
   addList('clothing', opts.clothing)
   addList('hairColor', opts.hairColor)
   addList('eyebrows', opts.eyebrows)
+  addList('skinColor', opts.skinColor)
   if (typeof opts.facialHairProbability === 'number') {
     parts.push(`facialHairProbability=${opts.facialHairProbability}`)
   }
