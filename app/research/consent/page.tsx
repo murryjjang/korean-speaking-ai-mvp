@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation'
 import { CONSENT_TEXTS, type ConsentLocale } from '@/src/lib/research/consent-text'
 import { getCurrentParticipant } from '@/src/lib/research/session'
 import { inferDisplayLanguageFromMotherTongue } from '@/src/lib/i18n/display-language'
+import { KdliBrand } from '@/src/components/layout/kdli-brand'
 
 import { recordConsent, declineConsent } from './actions'
 
@@ -132,6 +133,8 @@ export default async function ConsentPage() {
       data-testid="research-consent-page"
       dir={rtl ? 'rtl' : undefined}
     >
+      {/* v1.1 단계 19.8 [로고]: 리서치 동의서 헤더 KDLI 사각형 로고 노출 */}
+      <KdliBrand className="mb-4" />
       {/* v1.1 단계 19.7 [D6.7-5번째]: locale 토글 UI 제거 — mother_tongue 단독 결정.
           사용자가 변경할 수 없으며, 가입 시 결정된 mother_tongue 값으로 표시. */}
       <header>

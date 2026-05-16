@@ -9,6 +9,7 @@ import {
   listAllUtterances,
   listParticipants,
 } from '@/src/lib/research/repository'
+import { KdliBrand } from '@/src/components/layout/kdli-brand'
 
 import { clearAdminSessionAction } from './actions'
 
@@ -42,6 +43,8 @@ export default async function AdminHomePage() {
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-8" data-testid="research-admin-home">
+      {/* v1.1 단계 19.8 [로고]: 리서치 관리자 헤더 KDLI 로고 노출 */}
+      <KdliBrand subtitle="시험운영 — 관리자" className="mb-4" />
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">시험운영 관리자</h1>

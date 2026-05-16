@@ -20,6 +20,7 @@ import { LocalizedModeDonut } from '@/src/components/research/localized-mode-don
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { MODE_LABELS, scoreLevelKey } from '@/src/lib/i18n/dashboard-labels'
 import { LocalizedModeLabel, LocalizedScore } from '@/src/components/ui/localized-extras'
+import { KdliBrand } from '@/src/components/layout/kdli-brand'
 
 import { logoutAction } from '../actions'
 
@@ -128,6 +129,8 @@ export default async function StudentProgressPage() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8 space-y-8" data-testid="research-student-progress">
+      {/* v1.1 단계 19.8 [로고]: 리서치 모드 헤더에 KDLI 사각형 로고 노출 */}
+      <KdliBrand subtitle="시험운영 — 학습 진척" className="mb-2" />
       <header className="flex items-start justify-between gap-3 flex-wrap pb-4 border-b border-border">
         <div>
           <h1 className="text-xl font-bold text-text-primary">
