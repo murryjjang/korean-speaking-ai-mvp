@@ -3,6 +3,7 @@
 // 본인 누적 학습 시간·모드별 사용 분포·점수 추이·최근 세션 목록.
 // 동기 부여 요소는 절제된 수준(이번 주 X분)으로만 표시. 과한 게임화 X.
 
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
@@ -12,26 +13,23 @@ import {
 } from '@/src/lib/research/repository'
 import { getCurrentParticipant } from '@/src/lib/research/session'
 import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
+import { Localized, LocalizedDuration } from '@/src/components/ui/localized'
 import { ModeDonut, DailyBars, ScoreLine } from '@/src/components/research/progress-charts'
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
+import { MODE_LABELS } from '@/src/lib/i18n/dashboard-labels'
 
 import { logoutAction } from '../actions'
 
-const MODE_LABEL: Record<string, string> = {
-  free_conversation: '자유 대화',
-  q1_repeat: 'q1 낭독',
-  q2_describe: 'q2 설명',
-  q3_picture: 'q3 그림',
-  q4_dialogue: 'q4 대화',
-  presentation: '발표',
-  reading: '읽기',
-}
-
-function fmtMinutes(sec: number): string {
-  if (sec < 60) return `${sec}초`
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  return s === 0 ? `${m}분` : `${m}분 ${s}초`
+// 정적 매핑 (도넛 차트 라벨용 — 차트는 서버 렌더 시 ko 기본).
+// 헤더 토글에 즉시 반응하는 라벨은 <Localized/> 컴포넌트로 렌더.
+const MODE_LABEL_KO: Record<string, string> = {
+  free_conversation: MODE_LABELS.free_conversation.ko,
+  q1_repeat: MODE_LABELS.q1_repeat.ko,
+  q2_describe: MODE_LABELS.q2_describe.ko,
+  q3_picture: MODE_LABELS.q3_picture.ko,
+  q4_dialogue: MODE_LABELS.q4_dialogue.ko,
+  presentation: MODE_LABELS.presentation.ko,
+  reading: MODE_LABELS.reading.ko,
 }
 
 // v1.1 25-4: 최근 7일(오늘 포함) 일자별 세션 카운트 — DailyBars 입력.
@@ -114,13 +112,22 @@ export default async function StudentProgressPage() {
     <main className="max-w-2xl mx-auto px-4 py-8" data-testid="research-student-progress">
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">학습 진척 상황</h1>
+          <h1 className="text-xl font-bold text-text-primary">
+            <Localized
+              spec={{ kind: 'page', key: 'progressTitle' }}
+              motherTongueHint={participant.motherTongue}
+            />
+          </h1>
           <p className="text-sm text-text-secondary mt-1">
-            참여자 코드: <span className="font-mono">{participant.participantCode}</span>
+            <Localized
+              spec={{ kind: 'page', key: 'participantCode' }}
+              motherTongueHint={participant.motherTongue}
+            />
+            : <span className="font-mono">{participant.participantCode}</span>
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* v1.1 16-10-5: 표시 언어 토글 — 모국어 자동 적용, 명시 선택 시 유지. */}
+          {/* 단계 18 [D8] 헤더 토글 — 모국어 자동 적용, 명시 선택 시 유지. */}
           <DisplayLanguageToggle motherTongueHint={participant.motherTongue} />
           {/* v1.1 26-4: 진척 종합 PDF 다운로드 */}
           <PdfDownloadButton
@@ -134,7 +141,10 @@ export default async function StudentProgressPage() {
               className="px-3 py-1.5 rounded-md border border-border bg-surface text-sm text-text-secondary hover:bg-slate-50"
               data-testid="btn-participant-logout"
             >
-              로그아웃
+              <Localized
+                spec={{ kind: 'page', key: 'logout' }}
+                motherTongueHint={participant.motherTongue}
+              />
             </button>
           </form>
         </div>
@@ -143,21 +153,53 @@ export default async function StudentProgressPage() {
       <div id="research-progress-pdf-target">
 
       <section className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="student-stats">
-        <Stat label="총 세션" value={String(sessions.length)} />
-        <Stat label="누적 학습 시간" value={fmtMinutes(totalSec)} />
-        <Stat label="이번 주" value={fmtMinutes(weekSec)} />
-        <Stat label="평가 횟수" value={String(scorePoints.length)} />
+        <Stat
+          labelSpec={{ kind: 'kpi', key: 'totalSessions' }}
+          motherTongueHint={participant.motherTongue}
+          value={<>{String(sessions.length)}</>}
+        />
+        <Stat
+          labelSpec={{ kind: 'kpi', key: 'cumulativeTime' }}
+          motherTongueHint={participant.motherTongue}
+          value={
+            <LocalizedDuration
+              totalSeconds={totalSec}
+              motherTongueHint={participant.motherTongue}
+            />
+          }
+        />
+        <Stat
+          labelSpec={{ kind: 'kpi', key: 'thisWeek' }}
+          motherTongueHint={participant.motherTongue}
+          value={
+            <LocalizedDuration
+              totalSeconds={weekSec}
+              motherTongueHint={participant.motherTongue}
+            />
+          }
+        />
+        <Stat
+          labelSpec={{ kind: 'kpi', key: 'assessmentCount' }}
+          motherTongueHint={participant.motherTongue}
+          value={<>{String(scorePoints.length)}</>}
+        />
       </section>
 
       {sessions.length > 0 ? (
         <section className="mt-6">
-          <h2 className="text-sm font-semibold text-text-primary mb-2">모드별 사용 분포</h2>
-          {/* v1.1 25-4: 도넛 + 범례 시각화 */}
+          <h2 className="text-sm font-semibold text-text-primary mb-2">
+            <Localized
+              spec={{ kind: 'chart', key: 'modeDistribution' }}
+              motherTongueHint={participant.motherTongue}
+            />
+          </h2>
+          {/* v1.1 25-4: 도넛 + 범례 시각화 — 차트 라벨은 KO 고정(이미지 캡처 안정성).
+              헤더 토글에 즉시 반응하는 라벨은 위 <h2>가 담당. */}
           <div data-testid="mode-distribution">
             <ModeDonut
-              data={Object.keys(MODE_LABEL)
+              data={Object.keys(MODE_LABEL_KO)
                 .filter((m) => (modeCounts[m] ?? 0) > 0)
-                .map((m) => ({ label: MODE_LABEL[m], value: modeCounts[m] ?? 0 }))}
+                .map((m) => ({ label: MODE_LABEL_KO[m], value: modeCounts[m] ?? 0 }))}
             />
           </div>
         </section>
@@ -165,7 +207,12 @@ export default async function StudentProgressPage() {
 
       {sessions.length > 0 ? (
         <section className="mt-6">
-          <h2 className="text-sm font-semibold text-text-primary mb-2">최근 7일 학습 활동</h2>
+          <h2 className="text-sm font-semibold text-text-primary mb-2">
+            <Localized
+              spec={{ kind: 'chart', key: 'last7Days' }}
+              motherTongueHint={participant.motherTongue}
+            />
+          </h2>
           {/* 일별 막대 차트 — 오늘 포함 7일 */}
           <DailyBars data={buildDailyBuckets(sessions)} />
         </section>
@@ -173,15 +220,30 @@ export default async function StudentProgressPage() {
 
       {scorePoints.length > 0 ? (
         <section className="mt-6">
-          <h2 className="text-sm font-semibold text-text-primary mb-2">점수 추이</h2>
+          <h2 className="text-sm font-semibold text-text-primary mb-2">
+            <Localized
+              spec={{ kind: 'chart', key: 'scoreTrend' }}
+              motherTongueHint={participant.motherTongue}
+            />
+          </h2>
           <ScoreLine points={scorePoints.map((p) => ({ at: p.at, score: p.score }))} />
         </section>
       ) : null}
 
       <section className="mt-6">
-        <h2 className="text-sm font-semibold text-text-primary mb-2">최근 세션</h2>
+        <h2 className="text-sm font-semibold text-text-primary mb-2">
+          <Localized
+            spec={{ kind: 'chart', key: 'recentSessions' }}
+            motherTongueHint={participant.motherTongue}
+          />
+        </h2>
         {recent.length === 0 ? (
-          <p className="text-sm text-text-muted" data-testid="no-sessions">아직 세션이 없습니다. 아래 학습 모드 중 하나를 선택해 시작하세요.</p>
+          <p className="text-sm text-text-muted" data-testid="no-sessions">
+            <Localized
+              spec={{ kind: 'page', key: 'noSessionsMsg' }}
+              motherTongueHint={participant.motherTongue}
+            />
+          </p>
         ) : (
           <ul className="text-sm space-y-1.5" data-testid="recent-sessions">
             {recent.map((s) => (
@@ -190,10 +252,10 @@ export default async function StudentProgressPage() {
                   {new Date(s.sessionStartedAt).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                 </span>
                 <span>·</span>
-                <span>{MODE_LABEL[s.mode] ?? s.mode}</span>
+                <span>{MODE_LABEL_KO[s.mode] ?? s.mode}</span>
                 {s.sessionEndedAt
-                  ? <span className="text-xs text-emerald-600 ml-2">(완료)</span>
-                  : <span className="text-xs text-yellow-600 ml-2">(진행 중)</span>}
+                  ? <span className="text-xs text-emerald-600 ml-2">(<Localized spec={{ kind: 'page', key: 'completed' }} motherTongueHint={participant.motherTongue} />)</span>
+                  : <span className="text-xs text-yellow-600 ml-2">(<Localized spec={{ kind: 'page', key: 'inProgress' }} motherTongueHint={participant.motherTongue} />)</span>}
               </li>
             ))}
           </ul>
@@ -202,7 +264,12 @@ export default async function StudentProgressPage() {
       </div>{/* /research-progress-pdf-target */}
 
       <section className="mt-8">
-        <h2 className="text-sm font-semibold text-text-primary mb-2">학습 시작</h2>
+        <h2 className="text-sm font-semibold text-text-primary mb-2">
+          <Localized
+            spec={{ kind: 'chart', key: 'startLearning' }}
+            motherTongueHint={participant.motherTongue}
+          />
+        </h2>
         <nav className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link
             href="/student/conversation-practice"
@@ -255,10 +322,22 @@ export default async function StudentProgressPage() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  labelSpec,
+  motherTongueHint,
+  value,
+}: {
+  labelSpec: Parameters<typeof Localized>[0]['spec']
+  motherTongueHint?: string | null
+  value: ReactNode
+}) {
+  // data-testid은 라벨 텍스트 대신 KPI 키로 — 언어 토글 시 테스트가 깨지지 않도록.
+  const testKey = labelSpec.kind === 'kpi' ? labelSpec.key : 'stat'
   return (
-    <div className="rounded-lg border border-border bg-surface p-3" data-testid={`stat-${label}`}>
-      <p className="text-xs text-text-muted">{label}</p>
+    <div className="rounded-lg border border-border bg-surface p-3" data-testid={`stat-${testKey}`}>
+      <p className="text-xs text-text-muted">
+        <Localized spec={labelSpec} motherTongueHint={motherTongueHint} />
+      </p>
       <p className="mt-1 text-lg font-semibold text-text-primary tabular-nums">{value}</p>
     </div>
   )

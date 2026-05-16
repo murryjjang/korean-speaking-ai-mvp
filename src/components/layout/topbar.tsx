@@ -6,6 +6,8 @@ import type { UserRole } from "./app-shell";
 interface TopbarProps {
   role: UserRole;
   userName?: string;
+  /** 단계 18 [D6]: 첫 진입 시 표시 언어 자동 적용 (KO/EN/VI/AR). */
+  motherTongueHint?: string;
 }
 
 const roleConfig: Record<
@@ -17,7 +19,7 @@ const roleConfig: Record<
   admin: { label: "관리자", variant: "default" },
 };
 
-export function Topbar({ role, userName }: TopbarProps) {
+export function Topbar({ role, userName, motherTongueHint }: TopbarProps) {
   const { label, variant } = roleConfig[role];
 
   return (
@@ -43,8 +45,11 @@ export function Topbar({ role, userName }: TopbarProps) {
 
       <div className="flex items-center gap-3">
         {/* 단계 18 [D8]: 학습자 헤더에 단일 4언어(KO/EN/VI/AR) 토글.
-            이 토글이 본문(요약·교정·결과)·KPI·차트 라벨 표시 모드를 모두 결정. */}
-        {role === "student" && <DisplayLanguageToggle />}
+            이 토글이 본문(요약·교정·결과)·KPI·차트 라벨 표시 모드를 모두 결정.
+            [D6]: 학습자 모국어를 힌트로 전달해 첫 진입 시 자동 적용. */}
+        {role === "student" && (
+          <DisplayLanguageToggle motherTongueHint={motherTongueHint} />
+        )}
         {userName && (
           <span className="hidden sm:inline text-xs text-text-secondary truncate max-w-[12rem]">
             {userName}
