@@ -88,28 +88,51 @@ function topicMaintenanceBlock(topic: string): string {
 }
 
 function correctionBlock(): string {
+  // 단계 18 [K] 교정 정책 명문화 — 자유 대화에서 "교정 강도"를 두 단계로 분기.
+  // docs/free-conversation-correction-policy.md 정책과 동기화. correction_severity
+  // 필드를 통해 클라이언트가 미세 호응 vs 의미 오류 카드를 차등 표시한다.
   return `
 
 [교정 역할 — 매우 중요]
-- 학습자 발화가 한국어 모어 화자에게 자연스럽게 들리면 절대로 교정하지 마세요. 이때 corrected는 original과 글자까지 100% 동일하게 두고, reason은 "자연스럽게 잘 말씀하셨어요." 같은 짧은 칭찬으로 채웁니다.
-- 작은 차이(조사 1개 차이, 어미 살짝 어색, 띄어쓰기)도 교정하지 않습니다. 큰 변경(명백한 비표준 표현, 명확한 문법 오류, 단어 자체가 잘못된 경우)에서만 corrected를 변경합니다.
+- 학습자 발화가 한국어 모어 화자에게 자연스럽게 들리면 절대로 교정하지 마세요. 이때 corrected는 original과 글자까지 100% 동일하게 두고, reason은 "자연스럽게 잘 말씀하셨어요." 같은 짧은 칭찬으로 채우고 correction_severity는 "none"입니다.
 - 의심스러우면 교정하지 마세요.
 
-[학습자 발화 — 시제·어휘·문법 교정 가이드]
-학습자 발화에 명백한 시제·어휘·문법 오류가 있을 때:
-1) 먼저 자연스럽게 호응합니다.
-2) 같은 응답 안에서 올바른 표현을 NPC 본인의 말로 사용해 간접 교정합니다.
-3) 명백한 오류는 괄호로 짧게 교정 안내한 뒤 곧바로 대화를 이어갑니다.
+[학습자 발화 — 시제·어휘·문법 교정 가이드 (단계 18 강도 분류)]
+정책: 미세한 어색함은 자연스럽게 호응만, 의미를 바꾸는 오류는 짧은 설명을 함께 제공.
+correction_severity 필드(none|minor|meaning_error)로 표시합니다.
+
+1) "minor": 학습자 의도가 명확하고 의미가 통하지만 더 자연스러운 표현이 있는 경우.
+   - 조사·어미·시제 미세 차이, 자연스러운 어순 추천, 띄어쓰기 등.
+   - corrected에 더 자연스러운 표현을 넣되, NPC 응답에서는 별도 설명 없이 자연스럽게 호응만 합니다.
+   - reason은 한 줄 짧은 안내. 예: "'일 조각'보다 '한 조각'이 자연스러워요." (설명 X, 간단 비교만)
+   - npc_response 자체에는 교정 안내 텍스트를 넣지 않습니다 — 자연스러운 호응만.
+
+2) "meaning_error": 단어·문법 오류로 의미가 달라지거나 듣는 사람이 헷갈리는 경우.
+   - 명확한 비표준 표현, 단어 자체 잘못, 시제·태/존비 오류가 의미를 바꿈.
+   - corrected를 바꾸고, reason에 짧은 설명을 포함합니다. 예: "'교체'는 바꾼다는 뜻이라 결제 상황에서는 '결제'가 맞아요."
+   - npc_response에서도 1문장 이내로 자연스럽게 짚어주세요.
+
+3) "none": 오류 없음. corrected = original 그대로, reason은 짧은 칭찬.
 
 예시:
-- 학습자: "어제 학교 가요"
+- 학습자: "어제 학교 가요"  (시제 오류)
+  severity: "meaning_error"
+  corrected: "어제 학교 갔어요"
   NPC: "아 어제 학교 갔구나~ ('갔어요'가 맞아) 어떤 수업 들었어?"
-- 학습자: "카드로 교체할게요"
-  NPC: "아 카드로 결제하시는 거죠? ('교체'는 바꾼다는 뜻이라 결제할 때는 '결제'예요)"
 
-교정은 자연스럽고 짧게(한 문장 이내). reason 필드에는 다음 규칙대로 작성:
-- 명확한 오류가 있으면 한 줄 정리 — 예: "'가요' → '갔어요' (과거 시제)".
-- 오류가 없으면 짧은 칭찬 한 줄.`
+- 학습자: "조각 케이크 일 조각 주세요"  (어색한 어순/관형어)
+  severity: "minor"
+  corrected: "조각 케이크 한 조각 주세요"
+  reason: "'일 조각'보다 '한 조각'이 자연스러워요."
+  NPC: "네, 조각 케이크 한 조각 준비해 드릴게요." (설명 없이 호응)
+
+- 학습자: "카드로 교체할게요"  (어휘 오류 — 의미 변화)
+  severity: "meaning_error"
+  corrected: "카드로 결제할게요"
+  reason: "'교체'는 바꾼다는 뜻이라 결제 상황에서는 '결제'가 맞아요."
+  NPC: "아, 카드로 결제하시는 거죠? ('교체'는 '바꾸다' 뜻이라 결제에는 '결제'를 써요)"
+
+교정은 자연스럽고 짧게(한 문장 이내).`
 }
 
 function outputFormatBlock(motherTongue?: string | null): string {
@@ -144,6 +167,7 @@ function outputFormatBlock(motherTongue?: string | null): string {
   "learner_correction": {
     "original": "학습자 원본",
     "corrected": "자연스러운 교정 (원본과 같아도 됨)",
+    "correction_severity": "none | minor | meaning_error",
     ${reasonSchema}
   }
 }`
