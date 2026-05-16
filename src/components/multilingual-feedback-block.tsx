@@ -1,9 +1,13 @@
 'use client'
 
-// v1.1 16-10-5: 다국어 학습자 피드백 블록 — DisplayLanguageToggle과 함께 사용.
+// v1.1 16-10-5: 다국어 학습자 피드백 블록 — 단계 18부터 헤더 단일 토글 정책.
 //
 // 다국어 피드백(`feedback_multilingual.{ko,en,vi,ar}`)이 있으면 토글로 즉시 전환.
 // 없으면 단일 ko 텍스트만 표시.
+//
+// 단계 18 [D8]: 본문 내 인라인 토글은 기본 비활성화. 헤더의
+// DisplayLanguageToggle이 표시 언어를 결정한다. showToggle을 명시적으로 true로
+// 넘기는 호출부가 있을 때만 호환 모드로 인라인 토글을 노출한다 (점진 제거 대상).
 
 import { useDisplayLanguage } from '@/src/hooks/use-display-language'
 import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
@@ -14,7 +18,7 @@ export function MultilingualFeedbackBlock({
   multilingual,
   motherTongueHint,
   className,
-  showToggle = true,
+  showToggle = false,
 }: {
   feedbackKo: string
   multilingual?: MultilingualText | null

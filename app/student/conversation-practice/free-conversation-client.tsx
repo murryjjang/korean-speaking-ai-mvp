@@ -5,7 +5,6 @@ import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
 import { useDisplayLanguage } from '@/src/hooks/use-display-language'
-import { DisplayLanguageToggle } from '@/src/components/ui/display-language-toggle'
 import { isRTLDisplay, pickText } from '@/src/lib/i18n/display-language'
 import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
 import { ToolResultCards } from '@/src/components/tool-result-cards'
@@ -1292,10 +1291,7 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
               title="대화 요약"
               action={
                 <div className="flex items-center gap-2">
-                  {/* v1.1 16-10-5: 다국어 응답 있을 때만 4언어 토글 노출. */}
-                  {summary.summary && (
-                    <DisplayLanguageToggle motherTongueHint={motherTongue} />
-                  )}
+                  {/* 단계 18 [D8]: 본문 인라인 토글 제거 — 헤더 단일 토글로 통일. */}
                   <Badge variant="info" size="sm">
                     {summary.source === 'llm' ? 'AI 요약' : '샘플 요약'}
                   </Badge>

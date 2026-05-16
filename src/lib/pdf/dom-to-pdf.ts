@@ -9,6 +9,12 @@
 //   downloadBlob(pdfBlob, 'session.pdf')
 //
 // 호출 측은 항상 클라이언트('use client') 컴포넌트에서만 사용한다.
+//
+// v1.1 단계 18 [G]: Tailwind v4 기본 팔레트가 oklch()를 사용하기 때문에
+// html2canvas v1.4.1이 색 파싱에 실패해 PDF 생성이 전체적으로 깨졌다. 캡처
+// 직전 onclone 훅에서 모든 요소의 색 관련 computed style을 rgb()로 인라인
+// 오버라이드해 우회한다. (브라우저가 이미 oklch를 rgb로 컴포지션할 수 있다는
+// 사실을 canvas 2D fillStyle 파서로 흡수.)
 
 export type RenderPdfOptions = {
   fileName: string
@@ -25,6 +31,71 @@ export type RenderPdfOptions = {
 const A4_WIDTH_MM = 210
 const A4_HEIGHT_MM = 297
 const DEFAULT_MARGIN_MM = 12
+
+// 컬러 표현을 포함할 수 있는 컴퓨티드 스타일 프로퍼티.
+// border 가족과 outline, text-decoration 색까지 포함해 가능한 한 모든 oklch 사용처를 잡는다.
+const COLOR_STYLE_PROPS = [
+  'color',
+  'backgroundColor',
+  'borderColor',
+  'borderTopColor',
+  'borderRightColor',
+  'borderBottomColor',
+  'borderLeftColor',
+  'outlineColor',
+  'textDecorationColor',
+  'caretColor',
+  'fill',
+  'stroke',
+] as const
+
+/** v1.1 단계 18 [G]: html2canvas v1.4.1이 거부하는 색 함수 식별. 테스트 노출. */
+export const UNSUPPORTED_COLOR_FN = /\b(oklch|oklab|lab|lch|color-mix|color)\s*\(/i
+
+/**
+ * canvas 2D fillStyle 파서를 이용해 어떤 CSS 색 값이든 rgb()/rgba() 형식으로 변환.
+ * 브라우저(Chrome 111+, Safari 15.4+)가 oklch·color-mix 등을 이미 지원하므로
+ * fillStyle을 통해 정규화된 rgb 문자열을 얻을 수 있다. 파싱 실패 시 null 반환.
+ */
+export function toBrowserRgb(value: string, ctx: CanvasRenderingContext2D): string | null {
+  try {
+    ctx.fillStyle = '#000000' // reset
+    ctx.fillStyle = value
+    const out = ctx.fillStyle
+    if (typeof out !== 'string') return null
+    // 변환 성공 시 fillStyle은 '#hhhhhh' 또는 'rgba(...)'를 반환.
+    return out
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 캡처 대상 클론 문서의 모든 요소에 대해 oklch/lab/color-mix를 rgb 인라인 스타일로 치환.
+ * Tailwind v4 기본 팔레트가 oklch를 쓰기 때문에 한 곳이라도 잡지 못하면 html2canvas가 throw.
+ */
+export function inlineUnsupportedColors(doc: Document): void {
+  // 색 정규화에 사용할 임시 2D 컨텍스트 — onclone 안에서 1개만 생성.
+  const probe = doc.createElement('canvas').getContext('2d')
+  if (!probe) return
+
+  const all = doc.querySelectorAll<HTMLElement>('*')
+  for (const el of Array.from(all)) {
+    const computed = doc.defaultView?.getComputedStyle(el)
+    if (!computed) continue
+    for (const prop of COLOR_STYLE_PROPS) {
+      const raw = computed[prop as keyof CSSStyleDeclaration] as string | undefined
+      if (typeof raw !== 'string' || !raw) continue
+      if (!UNSUPPORTED_COLOR_FN.test(raw)) continue
+      const rgb = toBrowserRgb(raw, probe)
+      if (!rgb) continue
+      // 인라인 스타일 우선순위가 가장 높으므로 클론에만 적용해도 안전.
+      const styleProp = prop as keyof CSSStyleDeclaration
+      // setProperty가 카멜케이스를 받아들이지 않는 브라우저가 있어 element.style[...] 사용.
+      ;(el.style as unknown as Record<string, string>)[styleProp as string] = rgb
+    }
+  }
+}
 
 export async function renderDomToPdf(
   element: HTMLElement,
@@ -47,11 +118,11 @@ export async function renderDomToPdf(
     backgroundColor,
     useCORS: true,
     logging: false,
-    // 어떤 oklch() 등 modern CSS는 html2canvas v1이 못 읽을 수 있으니 onclone에서 폴백 처리.
+    // html2canvas v1.4.1은 oklch/lab/color-mix 같은 modern CSS color를 못 읽는다.
+    // onclone에서 클론 문서를 순회하며 모든 요소의 색 관련 computed style을 rgb로 인라인 치환.
     onclone: (doc) => {
-      // 모든 요소의 색상 함수를 보정 — 일부 oklch/colorMix를 hex로 안전화하지 않으면
-      // html2canvas가 throw할 수 있다. CSS 변수가 보존되도록 :root 색상은 그대로 둔다.
       doc.documentElement.style.background = backgroundColor
+      inlineUnsupportedColors(doc)
     },
   })
 

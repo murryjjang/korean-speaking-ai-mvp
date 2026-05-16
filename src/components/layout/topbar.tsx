@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { Badge } from "@/src/components/ui/badge";
-import { LanguageHelperToggle } from "@/src/components/ui/language-helper-toggle";
+import { DisplayLanguageToggle } from "@/src/components/ui/display-language-toggle";
 import type { UserRole } from "./app-shell";
 
 interface TopbarProps {
@@ -42,8 +42,9 @@ export function Topbar({ role, userName }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* 23-i 추가-3: 보조 언어 토글 — 학습자에게만 노출 (교수자/관리자 화면은 유지). */}
-        {role === "student" && <LanguageHelperToggle />}
+        {/* 단계 18 [D8]: 학습자 헤더에 단일 4언어(KO/EN/VI/AR) 토글.
+            이 토글이 본문(요약·교정·결과)·KPI·차트 라벨 표시 모드를 모두 결정. */}
+        {role === "student" && <DisplayLanguageToggle />}
         {userName && (
           <span className="hidden sm:inline text-xs text-text-secondary truncate max-w-[12rem]">
             {userName}
