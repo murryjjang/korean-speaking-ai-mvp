@@ -72,7 +72,8 @@ export function BilingualText({
     )
   }
 
-  const koEmphasized = lang === 'ko'
+  // showBoth=true 시점에서 lang은 항상 비-ko (위 분기에서 lang === 'ko' 케이스 처리).
+  // 외국어 측이 강조 대상이므로 ko는 보조 표시.
   return (
     <div
       className={className}
@@ -81,21 +82,13 @@ export function BilingualText({
       data-emphasis={lang}
     >
       <p
-        className={
-          koEmphasized
-            ? 'text-foreground leading-relaxed'
-            : 'text-sm text-text-muted opacity-70 leading-relaxed'
-        }
+        className="text-sm text-text-muted opacity-70 leading-relaxed"
         lang="ko"
       >
         {ko}
       </p>
       <p
-        className={
-          !koEmphasized
-            ? 'text-foreground leading-relaxed mt-1.5'
-            : 'text-sm text-text-muted opacity-70 leading-relaxed mt-1.5'
-        }
+        className="text-foreground leading-relaxed mt-1.5"
         dir={rtl ? 'rtl' : undefined}
         lang={lang}
         style={rtl ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
