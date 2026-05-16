@@ -98,16 +98,22 @@ describe('[단계19-D8.1] MultilingualFeedback — 헤더 단일 토글 직접 �
   })
 })
 
-describe('[단계19-D6.4] DirHtmlSync — html dir 동기화', () => {
+// v1.1 단계 19.6 [RTL]: 단계 19에서 DirHtmlSync가 documentElement.dir을 'rtl'로
+// 토글했지만 19.6 모델은 페이지 레이아웃을 ko/ltr로 고정한다(보조 언어는 텍스트
+// 내부에서만 RTL). D6.4의 의미가 반전되어 회귀 보호 방향도 반전.
+describe('[단계19.6-RTL] DirHtmlSync — 페이지 RTL 적용 중단', () => {
   const src = readFileSync(
     join(process.cwd(), 'src/components/i18n/dir-html-sync.tsx'),
     'utf-8',
   )
 
-  it('useDisplayLanguage 구독 + isRTLDisplay 분기 + documentElement.dir 설정', () => {
-    expect(src).toMatch(/useDisplayLanguage/)
-    expect(src).toMatch(/isRTLDisplay/)
-    expect(src).toMatch(/documentElement/)
-    expect(src).toMatch(/\.dir\s*=/)
+  it('useDisplayLanguage 구독 없음 (페이지 dir/lang은 ko/ltr 고정)', () => {
+    expect(src).not.toMatch(/useDisplayLanguage/)
+    expect(src).not.toMatch(/isRTLDisplay/)
+  })
+
+  it('documentElement.dir은 항상 ltr, lang은 항상 ko', () => {
+    expect(src).toMatch(/\.dir\s*=\s*['"]ltr['"]/)
+    expect(src).toMatch(/\.lang\s*=\s*['"]ko['"]/)
   })
 })
