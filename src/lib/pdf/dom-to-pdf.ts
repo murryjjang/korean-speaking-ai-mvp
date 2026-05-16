@@ -13,8 +13,12 @@
 // v1.1 단계 18 [G]: Tailwind v4 기본 팔레트가 oklch()를 사용하기 때문에
 // html2canvas v1.4.1이 색 파싱에 실패해 PDF 생성이 전체적으로 깨졌다. 캡처
 // 직전 onclone 훅에서 모든 요소의 색 관련 computed style을 rgb()로 인라인
-// 오버라이드해 우회한다. (브라우저가 이미 oklch를 rgb로 컴포지션할 수 있다는
-// 사실을 canvas 2D fillStyle 파서로 흡수.)
+// 오버라이드해 우회했지만, 단계 19에서 운영 검증 결과 3개 화면 모두 여전히
+// 실패 — getComputedStyle 폴백이 일부 속성에서 oklch를 잡지 못했다.
+//
+// v1.1 단계 19 [G]: html2canvas-pro로 교체. v1.4.1의 modern fork로 oklch/lab/
+// color-mix/color()를 네이티브 파싱. 폴백 `inlineUnsupportedColors`는 belt-
+// and-suspenders로 유지 (호스트 브라우저가 modern color를 안 지원하는 경우 대비).
 
 export type RenderPdfOptions = {
   fileName: string
@@ -107,8 +111,9 @@ export async function renderDomToPdf(
   const backgroundColor = options.backgroundColor ?? '#FAF9F5'
 
   // 동적 로드 — SSR/번들 사이즈 영향 최소화.
+  // 단계 19: html2canvas-pro (modern fork)로 교체. oklch/lab/color-mix 네이티브 지원.
   const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
-    import('html2canvas'),
+    import('html2canvas-pro'),
     import('jspdf'),
   ])
 
@@ -118,8 +123,8 @@ export async function renderDomToPdf(
     backgroundColor,
     useCORS: true,
     logging: false,
-    // html2canvas v1.4.1은 oklch/lab/color-mix 같은 modern CSS color를 못 읽는다.
-    // onclone에서 클론 문서를 순회하며 모든 요소의 색 관련 computed style을 rgb로 인라인 치환.
+    // html2canvas-pro가 modern CSS color를 직접 처리하지만, 그래도 일부 환경
+    // (구 브라우저, 비표준 폴리필) 대비 보조 폴백을 둔다.
     onclone: (doc) => {
       doc.documentElement.style.background = backgroundColor
       inlineUnsupportedColors(doc)

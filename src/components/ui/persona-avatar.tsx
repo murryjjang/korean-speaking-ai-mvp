@@ -7,8 +7,12 @@
 // 스타일: avataaars (사람형). 행정·외부 협력은 약간 격식 있는 변종 사용.
 //
 // 단계 18 [E]: 시드만으로는 성별이 모호하게 출력될 수 있어 페르소나별로 명시적
-// top/facialHair/clothe 옵션을 고정. 여성은 LongHair* + Clear, 남성은 ShortHair*
-// + 옵션 수염으로 시각 차이 강화.
+// top/facialHair/clothing 옵션을 고정.
+//
+// 단계 19 [E]: DiceBear 9.x avataaars 스키마 변경 — 8.x의 longHair*/shortHair* prefix는
+// 9.x에서 모두 거부(HTTP 400). 9.x에서는 bob/bun/curly/bigHair/straight01/straight02/
+// shortFlat/shortRound/theCaesar/frizzle 등으로 평탄화됨. 여성=긴머리 계열, 남성=짧은
+// 머리 계열로 시각 차이 유지.
 
 import { useState } from 'react'
 
@@ -35,30 +39,37 @@ type AvataaarOptions = {
   eyebrows?: string[]
 }
 
+// DiceBear 9.x avataaars `top` 유효값 (스키마 발췌):
+// hat, hijab, turban, winterHat1, winterHat02~04,
+// bob, bun, curly, curvy, dreads, dreads01, dreads02,
+// frida, fro, froBand, longButNotTooLong, miaWallace, shavedSides,
+// straight01, straight02, straightAndStrand, bigHair,
+// frizzle, shaggy, shaggyMullet, shortCurly, shortFlat, shortRound,
+// shortWaved, sides, theCaesar, theCaesarAndSidePart
 const PERSONA_OPTIONS: Record<string, AvataaarOptions> = {
-  // 여성 (sua, seoyeon) — 긴 머리 + 수염 0
+  // 여성 (sua, seoyeon) — 긴 머리 계열 + 수염 0
   friend_casual: {
-    top: ['longHairStraight', 'longHairStraight2', 'longHairBob'],
+    top: ['straight01', 'straight02', 'bob'],
     facialHairProbability: 0,
     clothing: ['hoodie', 'shirtCrewNeck'],
     hairColor: ['2c1b18', '4a312c'],
   },
   korean_life_helper: {
-    top: ['longHairBigHair', 'longHairBob', 'longHairCurly'],
+    top: ['bigHair', 'curly', 'longButNotTooLong'],
     facialHairProbability: 0,
     clothing: ['blazerAndShirt', 'shirtVNeck'],
     hairColor: ['2c1b18', '4a312c'],
   },
-  // 남성 (jaehyun, youngseok) — 짧은 머리, 옵션 수염
+  // 남성 (jaehyun, youngseok) — 짧은 머리 + 옵션 수염
   friend_casual_male: {
-    top: ['shortHairShortFlat', 'shortHairTheCaesar'],
+    top: ['shortFlat', 'theCaesar'],
     facialHair: ['beardLight'],
     facialHairProbability: 50,
     clothing: ['hoodie', 'shirtCrewNeck'],
     hairColor: ['2c1b18'],
   },
   korean_life_helper_male: {
-    top: ['shortHairShortRound', 'shortHairFrizzle'],
+    top: ['shortRound', 'frizzle'],
     facialHair: ['moustacheFancy', 'beardLight'],
     facialHairProbability: 70,
     clothing: ['blazerAndShirt'],

@@ -11,6 +11,8 @@ function getFfmpegPath(): string {
   }
 
   // 1. resolve relative to project root — reliable across Next.js dev/prod
+  // 단계 19 [Issues0]: fs 호출은 요청 시점에만 일어나지만 Turbopack NFT는 정적 분석에서
+  // 이를 잡지 못한다. next.config.ts의 serverExternalPackages + turbopack.ignoreIssue로 해소.
   const cwdPath = path.join(process.cwd(), 'node_modules', 'ffmpeg-static', 'ffmpeg')
   if (existsSync(cwdPath)) {
     _ffmpegPath = cwdPath
@@ -20,7 +22,7 @@ function getFfmpegPath(): string {
   // 2. fall back to what the package reports (may be virtualised in Next.js dev)
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const reported = (require('ffmpeg-static') as string | null) ?? null
+    const reported = (require(/*turbopackIgnore: true*/ 'ffmpeg-static') as string | null) ?? null
     if (reported && existsSync(reported)) {
       _ffmpegPath = reported
       return reported
