@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useActionState } from 'react'
 import { loginAction, type LoginState } from './actions'
 
@@ -14,14 +13,18 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center gap-4 mb-8">
+          {/* v1.1 단계 19.5 [L.4]: 원본 벡터 입수 전 임시 placeholder SVG.
+              PNG 에지 안티앨리어싱 아티팩트 차단을 위해 벡터로 교체.
+              next/image의 SVG 보안 제약을 우회하기 위해 일반 <img> 사용. */}
           <div className="flex justify-center">
-            <Image
-              src="/logos/kdli-seal-512.png"
-              alt="KDLI - Korea Defense Language Institute"
-              width={384}
-              height={384}
-              priority
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logos/kdli-placeholder.svg"
+              alt="KDLI - Korea Defense Language Institute (placeholder)"
+              width={160}
+              height={160}
               className="h-40 w-40"
+              data-testid="kdli-logo"
             />
           </div>
           <h1 className="text-2xl font-semibold text-text-primary tracking-tight">

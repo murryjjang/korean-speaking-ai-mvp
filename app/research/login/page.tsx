@@ -1,7 +1,6 @@
 // v1.1 단계 10-2 / 16-10-6 / 18 [I]: 참여자 사전 발급 코드 로그인 (KO/EN/VI/AR).
 // 단계 18 [I]: KDLI 로고·중앙 정렬·카드 디자인을 /login과 통일.
 
-import Image from 'next/image'
 import { redirect } from 'next/navigation'
 
 import { loginWithCode } from './actions'
@@ -129,15 +128,18 @@ export default async function ResearchLoginPage({ searchParams }: { searchParams
       dir={rtl ? 'rtl' : undefined}
     >
       <main className="w-full max-w-sm">
-        {/* 단계 18 [I]: /login과 동일한 KDLI 로고·중앙 정렬·타이틀 폰트. */}
+        {/* 단계 18 [I]: /login과 동일한 KDLI 로고·중앙 정렬·타이틀 폰트.
+            단계 19.5 [L.4]: 원본 벡터 입수 전 임시 placeholder SVG로 교체.
+            next/image의 SVG 보안 제약을 우회하기 위해 일반 <img> 사용. */}
         <div className="flex flex-col items-center gap-4 mb-8">
-          <Image
-            src="/logos/kdli-seal-512.png"
-            alt="KDLI - Korea Defense Language Institute"
-            width={384}
-            height={384}
-            priority
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logos/kdli-placeholder.svg"
+            alt="KDLI - Korea Defense Language Institute (placeholder)"
+            width={160}
+            height={160}
             className="h-40 w-40"
+            data-testid="kdli-logo"
           />
           <h1 className="text-2xl font-semibold text-text-primary tracking-tight text-center">
             {t.title}
