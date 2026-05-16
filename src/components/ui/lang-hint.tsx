@@ -8,6 +8,8 @@ export type LangHintItem = { lang: string; text: string }
 interface LangHintProps {
   items: LangHintItem[]
   label?: string
+  /** v1.1 단계 19.7 [아키텍처]: 보조 언어는 mother_tongue 단독. 호출부가 직접 전달. */
+  motherTongue?: string | null
 }
 
 // Languages that require right-to-left text direction.
@@ -17,12 +19,13 @@ function getTextDir(lang: string): 'rtl' | 'ltr' {
   return RTL_LANG_CODES.has(lang.toUpperCase()) ? 'rtl' : 'ltr'
 }
 
-export function LangHint({ items, label = '도움말 보기' }: LangHintProps) {
+export function LangHint({ items, label = '도움말 보기', motherTongue }: LangHintProps) {
   const [open, setOpen] = useState(false)
-  const { lang: helper } = useLanguageHelper()
+  const { lang: helper } = useLanguageHelper(motherTongue)
 
   if (items.length === 0) return null
-  const targetLang = helper.toUpperCase()
+  // mother_tongue=ko/매칭 실패 시 helper=null → 'EN' 폴백.
+  const targetLang = (helper ?? 'en').toUpperCase()
   // 선택 언어와 일치하는 항목만 표시. 없으면 EN 폴백 (해당 언어 데이터 없는 페이지 보호).
   let visible = items.filter((it) => it.lang.toUpperCase() === targetLang)
   if (visible.length === 0) {

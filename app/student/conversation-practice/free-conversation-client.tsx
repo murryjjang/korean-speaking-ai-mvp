@@ -176,9 +176,10 @@ function diffWordsInline(original: string, corrected: string): DiffSeg[] {
 }
 
 export function FreeConversationClient({ motherTongue = null }: { motherTongue?: string | null }) {
-  // 4 모드 공통 보조 언어 (요약 fetch용 helperLang) — ar/en/vi 중 하나. UI 라벨은
-  // 19.6 새 모델에서 한국어 고정이므로 헤더 토글이 ko일 때도 fetch는 helperLang으로.
-  const { lang: helperLang } = useLanguageHelper()
+  // v1.1 단계 19.7 [아키텍처]: motherTongue 단독 결정. LLM 요약 fetch는 en/vi/ar이 필요하므로
+  // ko/매칭 실패면 디폴트 'en'으로 fetch만 진행 (보조 카드는 BilingualText가 ko면 자동 숨김).
+  const { lang: helperLangRaw } = useLanguageHelper(motherTongue)
+  const helperLang = helperLangRaw ?? 'en'
 
   const [stage, setStage] = useState<Stage>('start')
   const [topic, setTopic] = useState('')

@@ -476,9 +476,11 @@ function PresentationTimeGuide({ elapsedSec, targetSec }: { elapsedSec: number; 
 }
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────────────
-export function PresentationPracticeClient() {
-  // 4 모드 공통 보조 언어 토글 (ar/en/vi). 페이지 상단 LanguageHelperToggle이 단일 소스.
-  const { lang: helperLang } = useLanguageHelper()
+// v1.1 단계 19.7 [아키텍처]: motherTongue prop을 RSC에서 받아 보조 언어 단독 결정.
+export function PresentationPracticeClient({ motherTongue }: { motherTongue?: string | null } = {}) {
+  const { lang: helperLangRaw } = useLanguageHelper(motherTongue)
+  const helperLang = helperLangRaw ?? 'en'
+  const showSupplement = helperLangRaw !== null
   const [level, setLevel] = useState<(typeof LEVEL_OPTIONS)[number]>('초급')
   const [topic, setTopic] = useState(DEFAULT_TOPIC)
   const [script, setScript] = useState(DEFAULT_SCRIPT)
@@ -1351,7 +1353,7 @@ export function PresentationPracticeClient() {
               )}
             </div>
 
-            {correctionResult.source === 'mock' && (
+            {correctionResult.source === 'mock' && showSupplement && (
               <div
                 dir={isRTL(helperLang) ? 'rtl' : 'ltr'}
                 lang={helperLang}
@@ -1700,10 +1702,15 @@ export function PresentationPracticeClient() {
               next_steps: native.improve,
             }
             const l1Dir = isRTL(helperLang) ? 'rtl' : 'ltr'
-            const blocks = [
-              { label: '한국어', testId: 'feedback-korean', fb: koFb, dir: 'ltr' as const, code: 'ko', isL1: false },
-              { label: L1_LABEL_KO[helperLang], testId: 'feedback-native', fb: l1Fb, dir: l1Dir, code: helperLang, isL1: true },
-            ]
+            // v1.1 단계 19.7 [아키텍처]: 모국어 보조 카드는 mother_tongue이 en/vi/ar일 때만.
+            const blocks = showSupplement
+              ? [
+                  { label: '한국어', testId: 'feedback-korean', fb: koFb, dir: 'ltr' as const, code: 'ko', isL1: false },
+                  { label: L1_LABEL_KO[helperLang], testId: 'feedback-native', fb: l1Fb, dir: l1Dir, code: helperLang, isL1: true },
+                ]
+              : [
+                  { label: '한국어', testId: 'feedback-korean', fb: koFb, dir: 'ltr' as const, code: 'ko', isL1: false },
+                ]
             return blocks.map(({ label, testId, fb, dir, code, isL1 }) => {
               const dimmed = isL1 && evaluateLoading
               return (

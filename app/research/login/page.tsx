@@ -118,7 +118,10 @@ export default async function ResearchLoginPage({ searchParams }: { searchParams
     if (!ok.success) {
       redirect(`/research/login?error=${encodeURIComponent(ok.reason)}&redirectTo=${encodeURIComponent(redirectTo)}&lang=${lang}`)
     }
-    redirect(ok.consentRequired ? `/research/consent?locale=${lang}` : redirectTo)
+    // v1.1 단계 19.7 [아키텍처]: ?locale=${lang} 강제 부착 제거.
+    // 동의서는 학습자 mother_tongue 단독으로 표시 언어를 결정한다 — 로그인 페이지의
+    // UI 언어 토글이 동의서 본문 언어를 덮어쓰는 4연속 실패의 근본 원인이었다.
+    redirect(ok.consentRequired ? '/research/consent' : redirectTo)
   }
 
   return (

@@ -531,9 +531,13 @@ function ReadingResultPassage({
 }
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────────────
-export function ReadingPracticeClient() {
-  // 4 모드 공통 보조 언어 토글 (ar/en/vi). 페이지 상단 LanguageHelperToggle이 단일 소스.
-  const { lang: helperLang } = useLanguageHelper()
+// v1.1 단계 19.7 [아키텍처]: motherTongue prop을 RSC에서 받아 보조 언어 단독 결정.
+// helperLang은 mother_tongue이 en/vi/ar 중 하나면 그 값, ko/매칭 실패면 null.
+export function ReadingPracticeClient({ motherTongue }: { motherTongue?: string | null } = {}) {
+  const { lang: helperLangRaw } = useLanguageHelper(motherTongue)
+  // 호환을 위해 helperLang에 fallback 'en'을 두지만 보조 카드 표시 여부는 별도 플래그.
+  const helperLang = helperLangRaw ?? 'en'
+  const showSupplement = helperLangRaw !== null
   const [phase, setPhase] = useState<'setup' | 'practice' | 'result'>('setup')
   const [speed, setSpeed] = useState<SpeedOption>(1.0)
   const [difficulty, setDifficulty] = useState('easy')
@@ -1000,9 +1004,11 @@ export function ReadingPracticeClient() {
       {phase === 'practice' && (
         <>
           <div className="flex flex-wrap items-center gap-3">
-            <Badge variant="info" size="sm">
-              {L1_LABEL_KO[helperLang]}
-            </Badge>
+            {showSupplement && (
+              <Badge variant="info" size="sm">
+                {L1_LABEL_KO[helperLang]}
+              </Badge>
+            )}
             <Badge variant="default" size="sm">속도 {speed}x</Badge>
             <button
               onClick={reset}
@@ -1473,8 +1479,9 @@ export function ReadingPracticeClient() {
                 </div>
               </div>
 
-              {/* 모국어 피드백 — 보조 언어 토글로 선택된 1개만 표시 (ar/en/vi) */}
-              {(() => {
+              {/* v1.1 단계 19.7 [아키텍처]: 모국어 보조 피드백 — mother_tongue이 en/vi/ar이면 표시.
+                  ko/매칭 실패면 showSupplement=false로 카드 자체 미렌더. */}
+              {showSupplement && (() => {
                 const text = finalScore >= 80
                   ? (NATIVE_FEEDBACK_GOOD[helperLang] ?? NATIVE_FEEDBACK_GOOD['en'])
                   : (NATIVE_FEEDBACK_IMPROVE[helperLang] ?? NATIVE_FEEDBACK_IMPROVE['en'])

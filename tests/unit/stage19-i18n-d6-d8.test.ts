@@ -68,17 +68,18 @@ describe('[단계19-D6.5] 점수 단위 — 4언어 완비', () => {
   })
 })
 
-describe('[단계19-D6] useDisplayLanguage — getServerSnapshot이 모국어 추론', () => {
-  it('hook 소스에 inferDisplayLanguageFromMotherTongue가 getSnapshot/getServerSnapshot에 인라인됨', () => {
+describe('[단계19.7-아키텍처] useDisplayLanguage — mother_tongue 단독 진실원', () => {
+  it('hook 소스에 inferDisplayLanguageFromMotherTongue 사용 + localStorage 미참조', () => {
     const src = readFileSync(
       join(process.cwd(), 'src/hooks/use-display-language.ts'),
       'utf-8',
     )
-    // useEffect 기반 storage 초기화는 단계 19에서 제거되었어야 함 (snapshot에서 즉시 추론).
-    // react import에 useEffect 없음 확인 (주석은 허용).
+    expect(src).toMatch(/inferDisplayLanguageFromMotherTongue/)
+    // 19.7: localStorage·EventTarget·useSyncExternalStore 일체 제거 — pure 함수.
+    expect(src).not.toMatch(/localStorage/)
+    expect(src).not.toMatch(/useSyncExternalStore/)
+    expect(src).not.toMatch(/EventTarget/)
     expect(src).not.toMatch(/import\s*\{[^}]*useEffect[^}]*\}\s*from\s*['"]react['"]/)
-    expect(src).toMatch(/getServerSnapshot[\s\S]{0,500}inferDisplayLanguageFromMotherTongue/)
-    expect(src).toMatch(/getSnapshot[\s\S]{0,500}inferDisplayLanguageFromMotherTongue/)
   })
 })
 

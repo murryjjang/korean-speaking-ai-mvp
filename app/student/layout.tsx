@@ -12,9 +12,6 @@ const navItems: NavItem[] = [
 
 export default async function StudentLayout({ children }: { children: ReactNode }) {
   let userName: string | undefined;
-  // 단계 18 [D6]: 학습자 모국어를 헤더 토글 motherTongueHint로 전달해 첫 진입 시
-  // KO/EN/VI/AR로 자동 적용. 사용자가 한 번이라도 명시 선택하면 이후로는 무시된다.
-  let motherTongueHint: string | undefined;
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -25,33 +22,21 @@ export default async function StudentLayout({ children }: { children: ReactNode 
       if (user) {
         const { data: profile } = await supabase
           .from("user_profiles")
-          .select("display_name, student_id")
+          .select("display_name")
           .eq("user_id", user.id)
-          .single<{ display_name: string | null; student_id: string | null }>();
+          .single<{ display_name: string | null }>();
         userName = profile?.display_name ?? user.email ?? undefined;
-        // students.native_language → 헤더 토글 자동 적용 힌트.
-        if (profile?.student_id) {
-          const { data: student } = await supabase
-            .from("students")
-            .select("native_language, ui_support_language")
-            .eq("id", profile.student_id)
-            .single<{ native_language: string | null; ui_support_language: string | null }>();
-          motherTongueHint =
-            student?.ui_support_language ?? student?.native_language ?? undefined;
-        }
       }
     }
   } catch {
     // Silently ignore — no user info shown
   }
 
+  // v1.1 단계 19.7 [아키텍처]: 헤더 토글 제거 — motherTongueHint는 더 이상 헤더에
+  // 전달하지 않는다. 보조 언어는 mother_tongue 단독으로 결정되고, 각 학습 화면이
+  // RSC에서 motherTongue을 직접 클라이언트 prop으로 전달한다.
   return (
-    <AppShell
-      role="student"
-      navItems={navItems}
-      userName={userName}
-      motherTongueHint={motherTongueHint}
-    >
+    <AppShell role="student" navItems={navItems} userName={userName}>
       {children}
     </AppShell>
   );

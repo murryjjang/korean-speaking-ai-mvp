@@ -13,6 +13,5 @@ export { PageHeader } from "./page-header";
 export { EmptyState } from "./empty-state";
 export { LangHint } from "./lang-hint";
 export type { LangHintItem } from "./lang-hint";
-export { LanguageHelperToggle } from "./language-helper-toggle";
 export { MultilingualFeedback } from "./multilingual-feedback";
 export type { MultilingualFeedbackData } from "./multilingual-feedback";

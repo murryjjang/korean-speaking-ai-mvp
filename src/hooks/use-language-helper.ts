@@ -1,64 +1,36 @@
 'use client'
 
-// 4 모드(읽기·발표·생성형 대화·말하기 평가) 공통 보조 언어 토글.
-// localStorage로 지속, 동일 탭 EventTarget으로 컴포넌트 간 동기화.
-// 23-i 추가-3에서 'off'/'en'/'vi' 였으나, 데모 통일 작업 후 ar/en/vi 3개로 좁힘.
+// v1.1 단계 19.7 [아키텍처]: mother_tongue 단일 진실원 — 학습 보조 언어 hook.
+//
+// 단계 18~19.6에선 localStorage('kspai:lang:helper')에 명시 선택을 저장했다.
+// 19.7부터는 보조 언어를 학습자가 변경할 수 없고, mother_tongue 값이 단독으로
+// 결정한다. mother_tongue이 한국어(ko)이면 보조 영역은 표시되지 않으므로
+// `lang`은 null이다 — 호출부는 null 체크로 보조 카드를 스킵해야 한다.
 
-import { useCallback, useSyncExternalStore } from 'react'
+import { useMemo } from 'react'
 import {
-  DEFAULT_FEEDBACK_LANGUAGE,
   isFeedbackLanguage,
   type FeedbackLanguage,
 } from '@/src/lib/feedback-language'
+import { inferDisplayLanguageFromMotherTongue } from '@/src/lib/i18n/display-language'
 
-// 외부 호환을 위해 LangHelper alias 유지. 새 코드는 FeedbackLanguage 직접 사용 권장.
+// 외부 호환을 위해 LangHelper alias 유지.
 export type LangHelper = FeedbackLanguage
 
-const STORAGE_KEY = 'kspai:lang:helper'
-const DEFAULT_LANG: FeedbackLanguage = DEFAULT_FEEDBACK_LANGUAGE
-
-const channel: EventTarget | null =
-  typeof window !== 'undefined' ? new EventTarget() : null
-
-function getSnapshot(): FeedbackLanguage {
-  if (typeof window === 'undefined') return DEFAULT_LANG
-  try {
-    const v = window.localStorage.getItem(STORAGE_KEY)
-    return isFeedbackLanguage(v) ? v : DEFAULT_LANG
-  } catch {
-    return DEFAULT_LANG
-  }
-}
-
-function getServerSnapshot(): FeedbackLanguage {
-  return DEFAULT_LANG
-}
-
-function subscribe(onStoreChange: () => void): () => void {
-  if (typeof window === 'undefined') return () => {}
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY) onStoreChange()
-  }
-  const onLocal = () => onStoreChange()
-  window.addEventListener('storage', onStorage)
-  channel?.addEventListener('kspai:lang-changed', onLocal)
-  return () => {
-    window.removeEventListener('storage', onStorage)
-    channel?.removeEventListener('kspai:lang-changed', onLocal)
-  }
-}
-
-export function useLanguageHelper(): {
-  lang: FeedbackLanguage
+/**
+ * @param motherTongueHint 학습자 모국어. 코드(en/vi/ar) 또는 자연어("English" 등).
+ *                         ko/매칭 실패면 null 반환 — 보조 카드 미표시.
+ */
+export function useLanguageHelper(motherTongueHint?: string | null): {
+  lang: FeedbackLanguage | null
   setLang: (lang: FeedbackLanguage) => void
 } {
-  const lang = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
-  const setLang = useCallback((next: FeedbackLanguage) => {
-    if (!isFeedbackLanguage(next)) return
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next)
-    } catch { /* noop */ }
-    channel?.dispatchEvent(new Event('kspai:lang-changed'))
-  }, [])
-  return { lang, setLang }
+  const lang = useMemo<FeedbackLanguage | null>(() => {
+    const display = inferDisplayLanguageFromMotherTongue(motherTongueHint)
+    if (!display) return null
+    return isFeedbackLanguage(display) ? display : null
+  }, [motherTongueHint])
+  return { lang, setLang: noop }
 }
+
+function noop(): void { /* mother_tongue 단일 진실원 — 사용자 변경 불가. */ }

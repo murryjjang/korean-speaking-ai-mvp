@@ -1,7 +1,13 @@
-// v1.1 단계 10-3 / 16-3·16-4: 학습자 동의 화면 + 언어 토글 + 본문 서식.
+// v1.1 단계 19.7 [D6.7-5번째]: 동의서를 mother_tongue 단독으로 표시.
 //
-// 본문 텍스트(consent-text.ts)는 hash 무결성 유지를 위해 그대로 두고, 표시만
-// 섹션 헤더(bold + underline) + 리스트 항목으로 풍부하게 렌더한다.
+// 단계 18·19·19.5·19.6에서 4연속 실패의 진짜 원인은 login → consent redirect URL에
+// `?locale=${lang}` 강제 부착이 mother_tongue 추론을 압살한 것. 19.7에서는:
+//  1) login redirect의 URL 파라미터 제거 (login/page.tsx)
+//  2) consent 페이지의 URL 파라미터 우선순위 제거 (이 파일)
+//  3) consent locale 토글 UI 제거 (사용자가 변경 불가)
+//  4) mother_tongue 단독 본문 (한국어 본문 없음 — 동의서는 학습 도구 아님)
+//
+// 본문 텍스트(consent-text.ts)는 hash 무결성 유지를 위해 그대로 둔다.
 
 import { redirect } from 'next/navigation'
 
@@ -10,8 +16,6 @@ import { getCurrentParticipant } from '@/src/lib/research/session'
 import { inferDisplayLanguageFromMotherTongue } from '@/src/lib/i18n/display-language'
 
 import { recordConsent, declineConsent } from './actions'
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 // 본문을 표시 전용으로 파싱: 첫 줄은 제목, [..]로 시작하는 줄은 섹션 헤더,
 // -로 시작하는 줄은 리스트, 그 외는 단락.
@@ -96,38 +100,28 @@ function renderConsentBody(body: string): React.ReactNode {
   )
 }
 
-const LOCALE_LABEL: Record<ConsentLocale, string> = {
-  ko: '한국어',
-  en: 'English',
-  vi: 'Tiếng Việt',
-  ar: 'العربية',
-}
-
-// 화면 상단 안내 문구 — 한국어 우선, 표시 언어가 그 외면 해당 언어로 보조.
-const I18N_TEXT: Record<ConsentLocale, { title: string; subtitle: string; pcLabel: string; agree: string; decline: string; lang: string }> = {
-  ko: { title: '시험운영 참여 동의', subtitle: '계속하기 전에 본문을 자세히 읽어주세요.', pcLabel: '참여자 코드', agree: '동의하고 시작', decline: '동의하지 않음', lang: '언어 선택' },
-  en: { title: 'Consent to Participate', subtitle: 'Please read carefully before continuing.', pcLabel: 'Participant code', agree: 'I agree and start', decline: 'I do not agree', lang: 'Language' },
-  vi: { title: 'Đồng ý tham gia thử nghiệm', subtitle: 'Vui lòng đọc kỹ trước khi tiếp tục.', pcLabel: 'Mã người tham gia', agree: 'Tôi đồng ý và bắt đầu', decline: 'Tôi không đồng ý', lang: 'Ngôn ngữ' },
-  ar: { title: 'الموافقة على المشاركة', subtitle: 'يرجى القراءة بعناية قبل المتابعة.', pcLabel: 'رمز المشارك', agree: 'أوافق وأبدأ', decline: 'لا أوافق', lang: 'اللغة' },
+// 화면 상단 안내 문구 — 학습자 mother_tongue 단독.
+const I18N_TEXT: Record<ConsentLocale, { title: string; subtitle: string; pcLabel: string; agree: string; decline: string }> = {
+  ko: { title: '시험운영 참여 동의', subtitle: '계속하기 전에 본문을 자세히 읽어주세요.', pcLabel: '참여자 코드', agree: '동의하고 시작', decline: '동의하지 않음' },
+  en: { title: 'Consent to Participate', subtitle: 'Please read carefully before continuing.', pcLabel: 'Participant code', agree: 'I agree and start', decline: 'I do not agree' },
+  vi: { title: 'Đồng ý tham gia thử nghiệm', subtitle: 'Vui lòng đọc kỹ trước khi tiếp tục.', pcLabel: 'Mã người tham gia', agree: 'Tôi đồng ý và bắt đầu', decline: 'Tôi không đồng ý' },
+  ar: { title: 'الموافقة على المشاركة', subtitle: 'يرجى القراءة بعناية قبل المتابعة.', pcLabel: 'رمز المشارك', agree: 'أوافق وأبدأ', decline: 'لا أوافق' },
 }
 
 function isConsentLocale(v: unknown): v is ConsentLocale {
   return v === 'ko' || v === 'en' || v === 'vi' || v === 'ar'
 }
 
-export default async function ConsentPage({ searchParams }: { searchParams: SearchParams }) {
-  const params = await searchParams
-
+export default async function ConsentPage() {
   const participant = await getCurrentParticipant()
   if (!participant) redirect('/research/login')
   if (participant.consentStatus) redirect('/research/student/progress')
 
-  // v1.1 단계 19.5 [D6.7]: 동의서 mother_tongue 자동 적용.
-  // URL ?locale= 우선 → 없으면 학습자 모국어 → fallback ko.
+  // v1.1 단계 19.7 [D6.7-5번째]: mother_tongue 단독으로 locale 결정.
+  // 단계 19.5에서 추가된 URL ?locale= 우선순위는 login redirect가 강제로 ?locale=ko를
+  // 부착하던 문제로 4연속 무력화됐다. 19.7에서 URL 파라미터 영향력을 완전히 제거.
   const inferred = inferDisplayLanguageFromMotherTongue(participant.motherTongue)
-  const locale: ConsentLocale = isConsentLocale(params.locale)
-    ? params.locale
-    : (inferred && isConsentLocale(inferred) ? inferred : 'ko')
+  const locale: ConsentLocale = inferred && isConsentLocale(inferred) ? inferred : 'ko'
   const body = CONSENT_TEXTS[locale]
   const t = I18N_TEXT[locale]
   const rtl = locale === 'ar'
@@ -138,33 +132,12 @@ export default async function ConsentPage({ searchParams }: { searchParams: Sear
       data-testid="research-consent-page"
       dir={rtl ? 'rtl' : undefined}
     >
-      <header className="flex items-start justify-between gap-3 flex-wrap">
+      {/* v1.1 단계 19.7 [D6.7-5번째]: locale 토글 UI 제거 — mother_tongue 단독 결정.
+          사용자가 변경할 수 없으며, 가입 시 결정된 mother_tongue 값으로 표시. */}
+      <header>
         <div>
           <h1 className="text-2xl font-bold text-text-primary">{t.title}</h1>
           <p className="text-sm text-text-secondary mt-1">{t.subtitle}</p>
-        </div>
-        {/* v1.1 16-3 / 16-10-6: KO/EN/VI/AR 4언어 토글 */}
-        <div
-          className="inline-flex rounded-md border border-border overflow-hidden text-xs"
-          role="group"
-          aria-label={t.lang}
-          data-testid="consent-locale-toggle"
-        >
-          {(['ko', 'en', 'vi', 'ar'] as ConsentLocale[]).map((code) => (
-            <a
-              key={code}
-              href={`/research/consent?locale=${code}`}
-              className={`px-3 py-1.5 ${
-                locale === code
-                  ? 'bg-primary-600 text-white font-semibold'
-                  : 'bg-white text-text-secondary hover:bg-slate-50'
-              }`}
-              aria-current={locale === code ? 'page' : undefined}
-              data-testid={`link-toggle-consent-locale-${code}`}
-            >
-              {LOCALE_LABEL[code]}
-            </a>
-          ))}
         </div>
       </header>
 

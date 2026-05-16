@@ -58,18 +58,24 @@ describe('[단계19.6-UI고정] LocalizedModeDonut — ko 라벨 고정', () => 
   })
 })
 
-describe('[단계19.6-토글] DisplayLanguageToggle — "보조 언어" 라벨', () => {
-  const src = read('src/components/ui/display-language-toggle.tsx')
-
-  it('"보조 언어" 텍스트 라벨', () => {
-    expect(src).toMatch(/보조 언어/)
+describe('[단계19.7-아키텍처] 헤더 보조 언어 토글 — 완전 제거', () => {
+  it('display-language-toggle.tsx 파일이 더 이상 존재하지 않음', () => {
+    const filePath = join(process.cwd(), 'src/components/ui/display-language-toggle.tsx')
+    expect(() => readFileSync(filePath)).toThrow()
   })
 
-  it('한국어 포함 4개 옵션 노출 (DISPLAY_LANGUAGES 매핑)', () => {
-    expect(src).toMatch(/DISPLAY_LANGUAGES\.map/)
+  it('language-helper-toggle.tsx 파일이 더 이상 존재하지 않음', () => {
+    const filePath = join(process.cwd(), 'src/components/ui/language-helper-toggle.tsx')
+    expect(() => readFileSync(filePath)).toThrow()
   })
 
-  it('useDisplayLanguage 훅으로 상태 관리', () => {
-    expect(src).toMatch(/useDisplayLanguage/)
+  it('Topbar에서 DisplayLanguageToggle import 제거', () => {
+    const topbar = read('src/components/layout/topbar.tsx')
+    expect(topbar).not.toMatch(/DisplayLanguageToggle/)
+  })
+
+  it('research/student/progress 페이지에서 DisplayLanguageToggle import 제거', () => {
+    const progress = read('app/research/student/progress/page.tsx')
+    expect(progress).not.toMatch(/import\s*\{[^}]*DisplayLanguageToggle/)
   })
 })
