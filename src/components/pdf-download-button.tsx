@@ -44,13 +44,22 @@ export function PdfDownloadButton(props: PdfDownloadButtonProps) {
           : null
       if (!el) throw new Error('pdf_target_missing')
       if (beforeCapture) await beforeCapture()
-      // 폰트 로딩 안정화 — 한국어·아랍어 폰트 비동기 로딩이 끝난 후 캡처해야
-      // 첫 페이지에서 텍스트가 비어 보이지 않는다.
-      //
-      // v1.1 단계 19.5 [P]: next/font로 self-host된 Noto Sans Arabic은 페이지에
-      // 사용되는 시점에 lazy 로드된다. 캡처 대상 안에 lang="ar" 요소가 있으면
-      // 그 요소가 실제 페이지에 마운트되어 있어야 폰트 로드가 트리거되므로,
-      // beforeCapture 후 한 번 더 fonts.ready를 기다린다.
+
+      // v1.1 단계 19.7 [PDF-아랍어]: html2canvas-pro로 아랍어를 raster할 때 폰트가
+      // swap 전이라 시스템 폴백으로 그려져 shaping이 깨지는 사례가 2단계(19.5·19.6)
+      // 연속 발생. fonts.ready만으론 next/font의 lazy unicode-range fetch가 보장
+      // 안 되므로, 캡처 대상에 lang="ar" 요소가 있으면 명시적으로 Noto Sans Arabic
+      // 글꼴 로드를 강제(load API)한 뒤 fonts.ready로 마무리.
+      const hasArabic = !!el.querySelector('[lang="ar"], [dir="rtl"]')
+      if (hasArabic && document.fonts && typeof document.fonts.load === 'function') {
+        try {
+          // 임의의 아랍어 글리프를 사용해 폰트 fetch 트리거.
+          await Promise.all([
+            document.fonts.load('400 16px "Noto Sans Arabic"', 'الموافقة'),
+            document.fonts.load('600 16px "Noto Sans Arabic"', 'الموافقة'),
+          ])
+        } catch { /* fonts.load 미지원 환경은 fonts.ready로 폴백 */ }
+      }
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready
       }
