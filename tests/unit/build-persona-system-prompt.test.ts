@@ -78,13 +78,15 @@ describe('buildPersonaSystemPrompt', () => {
     expect(out).toContain('다시 주말 계획 얘기로')
   })
 
-  it('v1.1 15-2: 시제·어휘·문법 교정 가이드(예시 포함)', () => {
+  it('v1.1 15-2 / 단계19 LLM-1: 시제 검증 + 교정 강도 분류(예시 포함)', () => {
     const out = buildPersonaSystemPrompt({
       persona: seoyeon(),
       topic: '주말 계획',
       availableToolNames: [],
     })
-    expect(out).toContain('시제·어휘·문법 교정 가이드')
+    // 단계 19에서 "시제·어휘·문법 교정 가이드" → "시제 검증 규칙" + "강도 분류"로 재구성.
+    expect(out).toContain('시제 검증 규칙')
+    expect(out).toContain('강도 분류')
     expect(out).toContain('어제 학교 가요')
     expect(out).toContain('카드로 교체')
   })
