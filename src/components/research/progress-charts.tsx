@@ -2,6 +2,10 @@
 //
 // 도넛(모드별 분포) / 일별 막대(최근 7일 세션 수) / 점수 추이 라인.
 // 데이터가 적으면 가볍게 비어 보이지 않도록 안내 문구 폴백.
+//
+// v1.1 단계 19 [L2]: SVG width="100%" + viewBox 좁음으로 컨테이너가 넓어지면
+// 텍스트가 비례 확대돼 너무 커 보임. 학술 톤(OPIc/TOPIK 점수 리포트)에 맞춰
+// 차트 컨테이너 max-w-sm/md로 제한 + viewBox 텍스트 fontSize 작게 유지.
 
 import React from 'react'
 
@@ -102,42 +106,44 @@ export function DailyBars({
   const barWidth = width / data.length - 4
 
   return (
-    <svg
-      width="100%"
-      viewBox={`0 0 ${width} ${height + 24}`}
-      preserveAspectRatio="xMidYMid meet"
-      role="img"
-      aria-label="일별 학습 활동"
-      data-testid="daily-bars-svg"
-    >
-      {data.map((d, i) => {
-        const h = (d.value / max) * height
-        const x = i * (width / data.length) + 2
-        return (
-          <g key={i}>
-            <rect
-              x={x}
-              y={height - h}
-              width={barWidth}
-              height={h}
-              fill="#5B7EE3"
-              rx={2}
-            >
-              <title>{`${d.date}: ${d.value} 세션`}</title>
-            </rect>
-            <text
-              x={x + barWidth / 2}
-              y={height + 14}
-              textAnchor="middle"
-              fontSize="9"
-              fill="#7B8190"
-            >
-              {d.date.slice(5)}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
+    <div className="max-w-sm">
+      <svg
+        width="100%"
+        viewBox={`0 0 ${width} ${height + 24}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="일별 학습 활동"
+        data-testid="daily-bars-svg"
+      >
+        {data.map((d, i) => {
+          const h = (d.value / max) * height
+          const x = i * (width / data.length) + 2
+          return (
+            <g key={i}>
+              <rect
+                x={x}
+                y={height - h}
+                width={barWidth}
+                height={h}
+                fill="#5B7EE3"
+                rx={2}
+              >
+                <title>{`${d.date}: ${d.value} 세션`}</title>
+              </rect>
+              <text
+                x={x + barWidth / 2}
+                y={height + 14}
+                textAnchor="middle"
+                fontSize="9"
+                fill="#7B8190"
+              >
+                {d.date.slice(5)}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
   )
 }
 
@@ -162,25 +168,27 @@ export function ScoreLine({
   const path = points2d.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')
 
   return (
-    <svg
-      width="100%"
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="xMidYMid meet"
-      role="img"
-      aria-label="점수 추이"
-      data-testid="score-line-svg"
-    >
-      {/* gridline 50/100 */}
-      <line x1={pad} y1={toY(50)} x2={width - pad} y2={toY(50)} stroke="#E5E7EB" strokeDasharray="2 3" />
-      <line x1={pad} y1={toY(100)} x2={width - pad} y2={toY(100)} stroke="#E5E7EB" strokeDasharray="2 3" />
-      <path d={path} stroke="#7C5BE3" strokeWidth={2} fill="none" />
-      {points2d.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={3} fill="#7C5BE3">
-          <title>{`${p.s}점`}</title>
-        </circle>
-      ))}
-      <text x={pad} y={toY(100) + 9} fontSize="9" fill="#7B8190">100</text>
-      <text x={pad} y={toY(50) + 9} fontSize="9" fill="#7B8190">50</text>
-    </svg>
+    <div className="max-w-sm">
+      <svg
+        width="100%"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="점수 추이"
+        data-testid="score-line-svg"
+      >
+        {/* gridline 50/100 */}
+        <line x1={pad} y1={toY(50)} x2={width - pad} y2={toY(50)} stroke="#E5E7EB" strokeDasharray="2 3" />
+        <line x1={pad} y1={toY(100)} x2={width - pad} y2={toY(100)} stroke="#E5E7EB" strokeDasharray="2 3" />
+        <path d={path} stroke="#7C5BE3" strokeWidth={2} fill="none" />
+        {points2d.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={3} fill="#7C5BE3">
+            <title>{`${p.s}점`}</title>
+          </circle>
+        ))}
+        <text x={pad} y={toY(100) + 9} fontSize="9" fill="#7B8190">100</text>
+        <text x={pad} y={toY(50) + 9} fontSize="9" fill="#7B8190">50</text>
+      </svg>
+    </div>
   )
 }

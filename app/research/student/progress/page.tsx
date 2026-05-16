@@ -128,8 +128,8 @@ export default async function StudentProgressPage() {
     })
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-8" data-testid="research-student-progress">
-      <header className="flex items-start justify-between gap-3 flex-wrap">
+    <main className="max-w-3xl mx-auto px-4 py-8 space-y-8" data-testid="research-student-progress">
+      <header className="flex items-start justify-between gap-3 flex-wrap pb-4 border-b border-border">
         <div>
           <h1 className="text-xl font-bold text-text-primary">
             <Localized
@@ -169,9 +169,9 @@ export default async function StudentProgressPage() {
         </div>
       </header>
 
-      <div id="research-progress-pdf-target">
+      <div id="research-progress-pdf-target" className="space-y-8">
 
-      <section className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="student-stats">
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="student-stats">
         <Stat
           labelSpec={{ kind: 'kpi', key: 'totalSessions' }}
           motherTongueHint={participant.motherTongue}
@@ -205,7 +205,7 @@ export default async function StudentProgressPage() {
       </section>
 
       {sessions.length > 0 ? (
-        <section className="mt-6">
+        <section className="pt-6 border-t border-border/60">
           <h2 className="text-sm font-semibold text-text-primary mb-2">
             <Localized
               spec={{ kind: 'chart', key: 'modeDistribution' }}
@@ -225,7 +225,7 @@ export default async function StudentProgressPage() {
       ) : null}
 
       {sessions.length > 0 ? (
-        <section className="mt-6">
+        <section className="pt-6 border-t border-border/60">
           <h2 className="text-sm font-semibold text-text-primary mb-2">
             <Localized
               spec={{ kind: 'chart', key: 'last7Days' }}
@@ -238,7 +238,7 @@ export default async function StudentProgressPage() {
       ) : null}
 
       {scorePoints.length > 0 ? (
-        <section className="mt-6">
+        <section className="pt-6 border-t border-border/60">
           <h2 className="text-sm font-semibold text-text-primary mb-2">
             <Localized
               spec={{ kind: 'chart', key: 'scoreTrend' }}
@@ -249,7 +249,7 @@ export default async function StudentProgressPage() {
         </section>
       ) : null}
 
-      <section className="mt-6">
+      <section className="pt-6 border-t border-border/60">
         <h2 className="text-sm font-semibold text-text-primary mb-2">
           <Localized
             spec={{ kind: 'chart', key: 'recentSessions' }}
@@ -329,7 +329,7 @@ export default async function StudentProgressPage() {
       </section>
       </div>{/* /research-progress-pdf-target */}
 
-      <section className="mt-8">
+      <section className="pt-6 border-t border-border">
         <h2 className="text-sm font-semibold text-text-primary mb-2">
           <Localized
             spec={{ kind: 'chart', key: 'startLearning' }}
@@ -388,7 +388,7 @@ export default async function StudentProgressPage() {
         </nav>
       </section>
 
-      <section className="mt-8">
+      <section className="pt-6 border-t border-border">
         <h2 className="text-sm font-semibold text-text-primary mb-2">
           <Localized spec={{ kind: 'dataDownload', key: 'sectionTitle' }} motherTongueHint={participant.motherTongue} />
         </h2>

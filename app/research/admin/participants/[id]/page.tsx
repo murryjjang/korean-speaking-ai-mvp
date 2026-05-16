@@ -22,6 +22,19 @@ const MODE_LABEL: Record<string, string> = {
   reading: '읽기',
 }
 
+// 단계 19 [L3]: mother_tongue 코드를 친화적 라벨로 표시 ("ko" → "한국어 (KO)").
+function formatMotherTongue(v: string | null | undefined): string {
+  if (!v) return '-'
+  const t = v.trim().toLowerCase()
+  const map: Record<string, string> = {
+    ko: '한국어 (KO)',
+    en: '영어 (EN)',
+    vi: '베트남어 (VI)',
+    ar: '아랍어 (AR)',
+  }
+  return map[t] ?? v
+}
+
 export default async function ParticipantDetailPage({ params }: { params: Params }) {
   const { id } = await params
   const participant = await getParticipantById(id)
@@ -57,7 +70,7 @@ export default async function ParticipantDetailPage({ params }: { params: Params
           </h1>
           <p className="text-sm text-text-secondary mt-1">
             {participant.name ?? '(이름 미입력)'} · {participant.nationality ?? '국적 미입력'} ·{' '}
-            {participant.koreanLevel ?? '한국어 수준 미입력'} · 모국어 {participant.motherTongue ?? '-'}
+            {participant.koreanLevel ?? '한국어 수준 미입력'} · 모국어 {formatMotherTongue(participant.motherTongue)}
           </p>
         </div>
         <Link href="/research/admin/participants" className="text-sm text-primary-600 hover:underline">← 목록</Link>
@@ -110,10 +123,10 @@ export default async function ParticipantDetailPage({ params }: { params: Params
             <table className="min-w-full text-sm border border-border rounded-md" data-testid="sessions-table">
               <thead className="bg-slate-50 text-left">
                 <tr>
-                  <th className="px-3 py-2 font-medium">시작</th>
-                  <th className="px-3 py-2 font-medium">모드</th>
-                  <th className="px-3 py-2 font-medium">지속</th>
-                  <th className="px-3 py-2 font-medium">평가 점수</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">시작</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">모드</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">지속</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">평가 점수</th>
                   <th className="px-3 py-2 font-medium">메타</th>
                 </tr>
               </thead>
@@ -130,8 +143,8 @@ export default async function ParticipantDetailPage({ params }: { params: Params
                   return (
                     <tr key={s.id} className="border-t border-border align-top" data-testid={`session-row-${s.id}`}>
                       <td className="px-3 py-2 text-xs text-text-muted whitespace-nowrap">{new Date(s.sessionStartedAt).toLocaleString('ko-KR')}</td>
-                      <td className="px-3 py-2">{MODE_LABEL[s.mode] ?? s.mode}</td>
-                      <td className="px-3 py-2 text-xs tabular-nums">{duration !== null ? `${duration}초` : '진행 중'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{MODE_LABEL[s.mode] ?? s.mode}</td>
+                      <td className="px-3 py-2 text-xs tabular-nums whitespace-nowrap">{duration !== null ? `${duration}초` : '진행 중'}</td>
                       <td className="px-3 py-2 text-xs tabular-nums">{scoreLine || '-'}</td>
                       <td className="px-3 py-2 text-xs font-mono text-text-muted break-all">{JSON.stringify(s.metaJson)}</td>
                     </tr>
