@@ -65,7 +65,7 @@ export async function submitSpeaking(
   questionId: string,
   questionSetId: string,
   meta?: SpeakingSubmitMeta,
-): Promise<{ submissionId: string }> {
+): Promise<{ submissionId: string; llmEvalProvider: string; llmEvalModel: string | null }> {
   // ── 1. Resolve transcript ────────────────────────────────────────────────
   let sttResult: STTResult
   if (meta?.sttTranscript !== undefined) {
@@ -123,7 +123,7 @@ export async function submitSpeaking(
       saveAttemptSubmission(meta.attemptId, questionSetId, resolveId(questionId), submissionId)
     }
     // Supabase persistence intentionally skipped — no ai_evaluations for no-speech
-    return { submissionId }
+    return { submissionId, llmEvalProvider: 'mock', llmEvalModel: null }
   }
 
   // ── 2. Look up question — needed for type-aware pronunciation policy ─────────
@@ -324,5 +324,9 @@ export async function submitSpeaking(
     resultUrl: `/student/speaking/${questionId}/result?sub=${submissionId}${meta?.attemptId ? `&attemptId=${meta.attemptId}` : ''}`,
   })
 
-  return { submissionId }
+  return {
+    submissionId,
+    llmEvalProvider: record.llmEvalResult.providerName,
+    llmEvalModel: llmEvalRaw.model ?? null,
+  }
 }

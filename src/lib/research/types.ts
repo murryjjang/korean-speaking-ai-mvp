@@ -57,6 +57,8 @@ export type ResearchAssessment = {
   scoresDetail: Record<string, unknown>
   feedbackText: string | null
   pronunciationData: Record<string, unknown> | null
+  provider: string | null
+  model: string | null
   createdAt: string
 }
 
@@ -106,6 +108,9 @@ export type CreateAssessmentInput = {
   scoresDetail?: Record<string, unknown>
   feedbackText?: string | null
   pronunciationData?: Record<string, unknown> | null
+  /** v1.1 단계 18 [J]: 평가를 실제로 처리한 provider/model 추적. */
+  provider?: string | null
+  model?: string | null
 }
 
 export type CreateConsentLogInput = {

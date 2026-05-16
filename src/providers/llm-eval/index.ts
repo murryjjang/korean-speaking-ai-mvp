@@ -666,9 +666,49 @@ async function callOpenAI(
 export type EvaluateSpeakingResult = {
   detail: SpeakingEvalDetail
   providerName: string
+  /** Concrete model identifier used (only meaningful when providerName='openai'). */
+  model?: string
   latencyMs: number
   status: 'success' | 'fallback'
   errorMessage?: string
+}
+
+// v1.1 단계 18 [J]: provider 결정 + 부팅 로그 1회.
+// 허용 값 외에는 mock으로 폴백하고 WARN 로그를 남긴다. 부팅 후 첫 호출 시
+// 1회만 결정 결과를 로그에 남겨 운영자가 분기 동작을 확인할 수 있도록 한다.
+const ALLOWED_PROVIDERS = new Set(['openai', 'mock'])
+let bootLogged = false
+
+type ResolvedProvider = { provider: 'openai' | 'mock'; reason: string }
+
+function resolveProvider(): ResolvedProvider {
+  const raw = (process.env.LLM_EVAL_PROVIDER ?? '').trim().toLowerCase()
+  if (!raw) return { provider: 'mock', reason: 'unset' }
+  if (!ALLOWED_PROVIDERS.has(raw)) {
+    console.warn(
+      `[eval] LLM_EVAL_PROVIDER="${raw}" is not in {openai|mock} — falling back to mock.`,
+    )
+    return { provider: 'mock', reason: `unknown:${raw}` }
+  }
+  if (raw === 'openai' && !process.env.OPENAI_API_KEY) {
+    return { provider: 'mock', reason: 'openai_no_api_key' }
+  }
+  return { provider: raw as 'openai' | 'mock', reason: 'configured' }
+}
+
+function logProviderBootOnce(provider: 'openai' | 'mock', reason: string, model: string): void {
+  if (bootLogged) return
+  bootLogged = true
+  if (provider === 'openai') {
+    console.info(`[eval] LLM_EVAL_PROVIDER=openai → using OpenAI provider (model=${model})`)
+  } else {
+    console.info(`[eval] LLM_EVAL_PROVIDER=${reason === 'configured' ? 'mock' : reason} → using mock provider`)
+  }
+}
+
+/** Test-only: clear the once-only boot log latch so each test sees a fresh log. */
+export function _resetEvalBootLogForTests(): void {
+  bootLogged = false
 }
 
 /**
@@ -679,8 +719,9 @@ export async function evaluateSpeakingDetail(
   input: SpeakingEvalInput,
 ): Promise<EvaluateSpeakingResult> {
   const apiKey = process.env.OPENAI_API_KEY
-  const provider = process.env.LLM_EVAL_PROVIDER ?? 'mock'
   const model = process.env.OPENAI_EVAL_MODEL ?? 'gpt-4o-mini'
+  const { provider, reason } = resolveProvider()
+  logProviderBootOnce(provider, reason, model)
 
   if (provider !== 'openai' || !apiKey) {
     await new Promise((resolve) => setTimeout(resolve, 600))
@@ -695,7 +736,13 @@ export async function evaluateSpeakingDetail(
   const start = Date.now()
   try {
     const detail = await callOpenAI(input, apiKey, model)
-    return { detail, providerName: 'openai', latencyMs: Date.now() - start, status: 'success' }
+    return {
+      detail,
+      providerName: 'openai',
+      model,
+      latencyMs: Date.now() - start,
+      status: 'success',
+    }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     console.error('[llm-eval] OpenAI call failed, using mock fallback:', errorMessage)

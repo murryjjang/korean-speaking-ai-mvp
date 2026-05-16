@@ -124,6 +124,8 @@ type AssessmentRow = {
   scores_detail: Record<string, unknown>
   feedback_text: string | null
   pronunciation_data: Record<string, unknown> | null
+  provider: string | null
+  model: string | null
   created_at: string
 }
 
@@ -136,6 +138,8 @@ function mapAssessment(r: AssessmentRow): ResearchAssessment {
     scoresDetail: r.scores_detail ?? {},
     feedbackText: r.feedback_text,
     pronunciationData: r.pronunciation_data,
+    provider: r.provider ?? null,
+    model: r.model ?? null,
     createdAt: r.created_at,
   }
 }
@@ -445,6 +449,8 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<Re
         scores_detail: input.scoresDetail ?? {},
         feedback_text: input.feedbackText ?? null,
         pronunciation_data: input.pronunciationData ?? null,
+        provider: input.provider ?? null,
+        model: input.model ?? null,
       })
       .select()
       .single()

@@ -43,6 +43,8 @@ export async function POST(request: Request) {
     body.pronunciationData && typeof body.pronunciationData === 'object' && !Array.isArray(body.pronunciationData)
       ? (body.pronunciationData as Record<string, unknown>)
       : null
+  const provider = typeof body.provider === 'string' ? body.provider : null
+  const model = typeof body.model === 'string' ? body.model : null
 
   const row = await createAssessment({
     sessionId,
@@ -51,6 +53,8 @@ export async function POST(request: Request) {
     scoresDetail,
     feedbackText,
     pronunciationData,
+    provider,
+    model,
   })
 
   return Response.json({ ok: !!row })

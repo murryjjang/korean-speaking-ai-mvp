@@ -60,6 +60,9 @@ export type LogAssessmentInput = {
   scoresDetail?: Record<string, unknown>
   feedbackText?: string | null
   pronunciationData?: Record<string, unknown> | null
+  /** v1.1 단계 18 [J]: LLM 평가 provider/model 추적용. */
+  provider?: string | null
+  model?: string | null
 }
 
 export async function logAssessment(input: LogAssessmentInput): Promise<void> {
@@ -80,6 +83,9 @@ export type LogSingleTurnSessionInput = {
   scoresDetail?: Record<string, unknown>
   feedbackText?: string | null
   pronunciationData?: Record<string, unknown> | null
+  /** v1.1 단계 18 [J]: LLM 평가 provider/model 추적. */
+  provider?: string | null
+  model?: string | null
 }
 
 export async function logSingleTurnSession(input: LogSingleTurnSessionInput): Promise<void> {
@@ -99,6 +105,8 @@ export async function logSingleTurnSession(input: LogSingleTurnSessionInput): Pr
     scoresDetail: input.scoresDetail ?? {},
     feedbackText: input.feedbackText ?? null,
     pronunciationData: input.pronunciationData ?? null,
+    provider: input.provider ?? null,
+    model: input.model ?? null,
   })
   await endResearchSession(sessionId)
 }

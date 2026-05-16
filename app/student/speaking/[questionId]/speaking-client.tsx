@@ -368,16 +368,20 @@ export function SpeakingClient({
     }
 
     try {
-      const { submissionId } = await submitSpeaking(question.id, questionSetId, {
-        hasRecording: recorder.state === 'stopped' && recorder.blobUrl !== null,
-        recordingDurationSec: recorder.durationSec,
-        sttTranscript,
-        sttProviderName,
-        audioUrl,
-        pronunciationResult,
-        attemptId,
-        motherTongue,
-      })
+      const { submissionId, llmEvalProvider, llmEvalModel } = await submitSpeaking(
+        question.id,
+        questionSetId,
+        {
+          hasRecording: recorder.state === 'stopped' && recorder.blobUrl !== null,
+          recordingDurationSec: recorder.durationSec,
+          sttTranscript,
+          sttProviderName,
+          audioUrl,
+          pronunciationResult,
+          attemptId,
+          motherTongue,
+        },
+      )
 
       // v1.1 단계 10-5: 시험운영 로깅 — q1~q4 단일 턴 평가 세션 (fail-silent).
       void logSingleTurnSession({
@@ -391,6 +395,8 @@ export function SpeakingClient({
         },
         learnerText: sttTranscript ?? '(전사 없음)',
         audioUrl: audioUrl ?? null,
+        provider: llmEvalProvider,
+        model: llmEvalModel,
         scoreTotal: pronunciationResult?.normalizedScore ?? null,
         scoresDetail: pronunciationResult
           ? {
