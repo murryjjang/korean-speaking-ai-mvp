@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { DirHtmlSync } from "@/src/components/i18n/dir-html-sync";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -26,6 +27,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-background text-text-primary">
+        <DirHtmlSync />
         {children}
       </body>
     </html>

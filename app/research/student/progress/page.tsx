@@ -16,9 +16,11 @@ import { DisplayLanguageToggle } from '@/src/components/ui/display-language-togg
 import { Localized, LocalizedDuration } from '@/src/components/ui/localized'
 import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
 import { getPersona } from '@/src/lib/personas'
-import { ModeDonut, DailyBars, ScoreLine } from '@/src/components/research/progress-charts'
+import { DailyBars, ScoreLine } from '@/src/components/research/progress-charts'
+import { LocalizedModeDonut } from '@/src/components/research/localized-mode-donut'
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { MODE_LABELS } from '@/src/lib/i18n/dashboard-labels'
+import { LocalizedModeLabel, LocalizedScore } from '@/src/components/ui/localized-extras'
 
 import { logoutAction } from '../actions'
 
@@ -210,13 +212,13 @@ export default async function StudentProgressPage() {
               motherTongueHint={participant.motherTongue}
             />
           </h2>
-          {/* v1.1 25-4: 도넛 + 범례 시각화 — 차트 라벨은 KO 고정(이미지 캡처 안정성).
-              헤더 토글에 즉시 반응하는 라벨은 위 <h2>가 담당. */}
+          {/* v1.1 단계 19 [D6.5]: 차트 범례를 표시 언어에 맞춰 i18n. */}
           <div data-testid="mode-distribution">
-            <ModeDonut
-              data={Object.keys(MODE_LABEL_KO)
+            <LocalizedModeDonut
+              counts={Object.keys(MODE_LABEL_KO)
                 .filter((m) => (modeCounts[m] ?? 0) > 0)
-                .map((m) => ({ label: MODE_LABEL_KO[m], value: modeCounts[m] ?? 0 }))}
+                .map((m) => ({ mode: m, value: modeCounts[m] ?? 0 }))}
+              motherTongueHint={participant.motherTongue}
             />
           </div>
         </section>
@@ -286,7 +288,12 @@ export default async function StudentProgressPage() {
                         {new Date(s.sessionStartedAt).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </span>
                       <span aria-hidden="true">·</span>
-                      <span className="font-medium text-text-secondary">{MODE_LABEL_KO[s.mode] ?? s.mode}</span>
+                      <LocalizedModeLabel
+                        mode={s.mode}
+                        motherTongueHint={participant.motherTongue}
+                        className="font-medium text-text-secondary"
+                        fallback={MODE_LABEL_KO[s.mode] ?? s.mode}
+                      />
                       {persona && (
                         <>
                           <span aria-hidden="true">·</span>
@@ -304,8 +311,12 @@ export default async function StudentProgressPage() {
                         <p className="text-sm text-text-muted">—</p>
                       )}
                       {scoreTotal !== null && (
-                        <p className="text-xs font-semibold text-primary-700 tabular-nums ml-auto" data-testid="recent-session-score">
-                          {scoreTotal}점
+                        <p className="text-xs font-semibold text-primary-700 tabular-nums ml-auto">
+                          <LocalizedScore
+                            score={scoreTotal}
+                            motherTongueHint={participant.motherTongue}
+                            testId="recent-session-score"
+                          />
                         </p>
                       )}
                     </div>
@@ -331,38 +342,58 @@ export default async function StudentProgressPage() {
             className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50"
             data-testid="nav-free-conversation"
           >
-            <p className="text-sm font-semibold text-text-primary">생성형 자유 대화</p>
-            <p className="text-xs text-text-muted mt-1">페르소나 4명 중 선택해 일상 대화 연습</p>
+            <p className="text-sm font-semibold text-text-primary">
+              <Localized spec={{ kind: 'modeCard', key: 'freeConvTitle' }} motherTongueHint={participant.motherTongue} />
+            </p>
+            <p className="text-xs text-text-muted mt-1">
+              <Localized spec={{ kind: 'modeCard', key: 'freeConvSubtitle' }} motherTongueHint={participant.motherTongue} />
+            </p>
           </Link>
           <Link
             href="/student/speaking"
             className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50"
             data-testid="nav-speaking"
           >
-            <p className="text-sm font-semibold text-text-primary">말하기 평가 (q1~q4)</p>
-            <p className="text-xs text-text-muted mt-1">따라 읽기·묘사·그림 설명·대화</p>
+            <p className="text-sm font-semibold text-text-primary">
+              <Localized spec={{ kind: 'modeCard', key: 'speakingTitle' }} motherTongueHint={participant.motherTongue} />
+            </p>
+            <p className="text-xs text-text-muted mt-1">
+              <Localized spec={{ kind: 'modeCard', key: 'speakingSubtitle' }} motherTongueHint={participant.motherTongue} />
+            </p>
           </Link>
           <Link
             href="/student/presentation-practice"
             className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50"
             data-testid="nav-presentation"
           >
-            <p className="text-sm font-semibold text-text-primary">발표 연습</p>
+            <p className="text-sm font-semibold text-text-primary">
+              <Localized spec={{ kind: 'modeCard', key: 'presentationTitle' }} motherTongueHint={participant.motherTongue} />
+            </p>
+            <p className="text-xs text-text-muted mt-1">
+              <Localized spec={{ kind: 'modeCard', key: 'presentationSubtitle' }} motherTongueHint={participant.motherTongue} />
+            </p>
           </Link>
           <Link
             href="/student/reading-practice"
             className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50"
             data-testid="nav-reading"
           >
-            <p className="text-sm font-semibold text-text-primary">읽기 연습</p>
+            <p className="text-sm font-semibold text-text-primary">
+              <Localized spec={{ kind: 'modeCard', key: 'readingTitle' }} motherTongueHint={participant.motherTongue} />
+            </p>
+            <p className="text-xs text-text-muted mt-1">
+              <Localized spec={{ kind: 'modeCard', key: 'readingSubtitle' }} motherTongueHint={participant.motherTongue} />
+            </p>
           </Link>
         </nav>
       </section>
 
       <section className="mt-8">
-        <h2 className="text-sm font-semibold text-text-primary mb-2">내 데이터 다운로드</h2>
+        <h2 className="text-sm font-semibold text-text-primary mb-2">
+          <Localized spec={{ kind: 'dataDownload', key: 'sectionTitle' }} motherTongueHint={participant.motherTongue} />
+        </h2>
         <p className="text-xs text-text-muted leading-relaxed mb-3">
-          참여자 본인의 누적 세션·발화·평가 기록을 CSV로 다운로드합니다 (개인정보 보호 차원).
+          <Localized spec={{ kind: 'dataDownload', key: 'sectionDescription' }} motherTongueHint={participant.motherTongue} />
         </p>
         <a
           href="/api/research/student/export"
@@ -370,7 +401,7 @@ export default async function StudentProgressPage() {
           className="inline-block rounded-md border border-border bg-surface text-sm text-text-secondary font-medium px-4 py-2 hover:bg-slate-50"
           data-testid="btn-download-own-data"
         >
-          내 데이터 CSV 다운로드
+          <Localized spec={{ kind: 'page', key: 'downloadOwnData' }} motherTongueHint={participant.motherTongue} />
         </a>
       </section>
     </main>

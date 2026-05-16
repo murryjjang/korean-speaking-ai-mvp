@@ -116,6 +116,84 @@ export const MODE_LABELS = {
   } satisfies LabelMap,
 } as const
 
+// 모드 카드 (학습 시작 영역)
+export const MODE_CARD_LABELS = {
+  freeConvTitle: {
+    ko: '생성형 자유 대화',
+    en: 'Free Conversation',
+    vi: 'Trò chuyện tự do',
+    ar: 'محادثة حرة',
+  } satisfies LabelMap,
+  freeConvSubtitle: {
+    ko: '페르소나 4명 중 선택해 일상 대화 연습',
+    en: 'Pick a persona to practice daily conversation',
+    vi: 'Chọn nhân vật để luyện hội thoại hằng ngày',
+    ar: 'اختر شخصية لممارسة المحادثة اليومية',
+  } satisfies LabelMap,
+  speakingTitle: {
+    ko: '말하기 평가 (q1~q4)',
+    en: 'Speaking Assessment (Q1~Q4)',
+    vi: 'Đánh giá nói (Q1~Q4)',
+    ar: 'تقييم المحادثة (Q1~Q4)',
+  } satisfies LabelMap,
+  speakingSubtitle: {
+    ko: '따라 읽기·묘사·그림 설명·대화',
+    en: 'Read aloud, describe, picture, dialogue',
+    vi: 'Đọc to · Mô tả · Hình ảnh · Hội thoại',
+    ar: 'القراءة بصوت عال · الوصف · الصور · الحوار',
+  } satisfies LabelMap,
+  presentationTitle: {
+    ko: '발표 연습',
+    en: 'Presentation Practice',
+    vi: 'Luyện thuyết trình',
+    ar: 'تدريب العرض',
+  } satisfies LabelMap,
+  presentationSubtitle: {
+    ko: '주제 발표 연습 + 즉시 피드백',
+    en: 'Topic presentation with instant feedback',
+    vi: 'Thuyết trình chủ đề với phản hồi tức thì',
+    ar: 'عرض الموضوع مع ملاحظات فورية',
+  } satisfies LabelMap,
+  readingTitle: {
+    ko: '읽기 연습',
+    en: 'Reading Practice',
+    vi: 'Luyện đọc',
+    ar: 'تدريب القراءة',
+  } satisfies LabelMap,
+  readingSubtitle: {
+    ko: '한국어 본문 읽기 + 발음 점수',
+    en: 'Read Korean texts with pronunciation score',
+    vi: 'Đọc văn bản tiếng Hàn + điểm phát âm',
+    ar: 'قراءة النصوص الكورية مع درجة النطق',
+  } satisfies LabelMap,
+} as const
+
+// 데이터 다운로드 섹션
+export const DATA_DOWNLOAD_LABELS = {
+  sectionTitle: {
+    ko: '내 데이터 다운로드',
+    en: 'My Data Download',
+    vi: 'Tải dữ liệu của tôi',
+    ar: 'تنزيل بياناتي',
+  } satisfies LabelMap,
+  sectionDescription: {
+    ko: '참여자 본인의 누적 세션·발화·평가 기록을 CSV로 다운로드합니다 (개인정보 보호 차원).',
+    en: 'Download your own accumulated session, utterance, and assessment records as CSV (for data privacy).',
+    vi: 'Tải xuống các bản ghi phiên học, lời nói và đánh giá của bạn dưới dạng CSV (vì quyền riêng tư).',
+    ar: 'قم بتنزيل سجلات الجلسات والكلام والتقييمات الخاصة بك بصيغة CSV (لحماية الخصوصية).',
+  } satisfies LabelMap,
+} as const
+
+// 점수 단위 (X점 / X points)
+export const SCORE_UNIT_LABELS = {
+  scorePoints: {
+    ko: '점',
+    en: 'pts',
+    vi: 'điểm',
+    ar: 'نقطة',
+  } satisfies LabelMap,
+} as const
+
 // 페이지 헤더
 export const PAGE_LABELS = {
   progressTitle: {
@@ -182,6 +260,9 @@ export type DashboardLabelKey =
   | { kind: 'kpi'; key: keyof typeof KPI_LABELS }
   | { kind: 'chart'; key: keyof typeof CHART_LABELS }
   | { kind: 'mode'; key: keyof typeof MODE_LABELS }
+  | { kind: 'modeCard'; key: keyof typeof MODE_CARD_LABELS }
+  | { kind: 'dataDownload'; key: keyof typeof DATA_DOWNLOAD_LABELS }
+  | { kind: 'scoreUnit'; key: keyof typeof SCORE_UNIT_LABELS }
   | { kind: 'page'; key: keyof typeof PAGE_LABELS }
   | { kind: 'time'; key: keyof typeof TIME_UNITS }
 
@@ -193,6 +274,12 @@ export function getLabel(spec: DashboardLabelKey, lang: DisplayLanguage): string
       return CHART_LABELS[spec.key][lang]
     case 'mode':
       return MODE_LABELS[spec.key][lang]
+    case 'modeCard':
+      return MODE_CARD_LABELS[spec.key][lang]
+    case 'dataDownload':
+      return DATA_DOWNLOAD_LABELS[spec.key][lang]
+    case 'scoreUnit':
+      return SCORE_UNIT_LABELS[spec.key][lang]
     case 'page':
       return PAGE_LABELS[spec.key][lang]
     case 'time':

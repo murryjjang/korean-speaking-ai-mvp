@@ -1,11 +1,15 @@
 'use client'
 
 // 말하기 평가 결과 페이지(q1~q4)에서 정적 다국어 피드백을 보여주는 카드.
-// ar/en/vi 중 페이지 상단 LanguageHelperToggle로 선택된 1개만 노출 (한국어는 페이지 본문에 별도 표기).
-// 새 코드는 src/components/feedback/bilingual-feedback.tsx 사용을 권장.
+//
+// 단계 19 [D8.1]: 헤더 단일 토글(useDisplayLanguage) 직접 구독. 단계 18은 legacy
+// useLanguageHelper로 우회 동기화했지만 시연 중 라벨("영어 (ENGLISH)")과 콘텐츠
+// (베트남어) 불일치 회귀가 발생. 단계 19에서는 다음 동작:
+// - 헤더 토글이 'ko'면 카드 통째로 숨김 (모국어 한국어 학습자는 보조 언어 불필요).
+// - 헤더 토글이 외국어면 그 언어의 데이터+라벨 일관 표시.
 
 import { Card, CardHeader, CardBody } from './card'
-import { useLanguageHelper } from '@/src/hooks/use-language-helper'
+import { useDisplayLanguage } from '@/src/hooks/use-display-language'
 import {
   isRTL,
   L1_LABEL_KO,
@@ -25,6 +29,8 @@ interface Props {
   testId?: string
   title?: string
   description?: string
+  /** 학습자 모국어 힌트 — 명시 선택이 없으면 이 언어로 자동 표시. */
+  motherTongueHint?: string | null
 }
 
 export function MultilingualFeedback({
@@ -34,9 +40,14 @@ export function MultilingualFeedback({
   testId,
   title = '모국어 피드백',
   description,
+  motherTongueHint,
 }: Props) {
-  const { lang } = useLanguageHelper()
+  const { lang: displayLang } = useDisplayLanguage(motherTongueHint)
 
+  // ko는 본문이 이미 한국어로 표시되므로 보조 카드 비표시.
+  if (displayLang === 'ko') return null
+
+  const lang: FeedbackLanguage = displayLang
   const data: Record<FeedbackLanguage, MultilingualFeedbackData> = { vi, en, ar }
   const current = data[lang]
   const dir = isRTL(lang) ? 'rtl' : 'ltr'

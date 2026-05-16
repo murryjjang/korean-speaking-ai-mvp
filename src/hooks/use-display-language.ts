@@ -9,8 +9,13 @@
 // 표시 모순을 막기 위해 write-through 브리지를 적용한다. en/vi/ar로 바꾸면
 // language-helper도 같은 값을 갖고, ko로 바꾸면 language-helper는 그대로
 // 두어 다음에 비-ko로 돌아갈 때 마지막 외국어 선택을 유지한다.
+//
+// v1.1 단계 19 [D6]: 단계 18은 mother_tongue 추론을 useEffect에서 수행해 첫 렌더는
+// 항상 한국어로 보였다(시연 피드백: "한국어로 고정"). 단계 19에서는 추론을
+// getSnapshot/getServerSnapshot에 inline해 SSR 시점부터 즉시 학습자 모국어로
+// 렌더된다. 명시 선택(localStorage)이 있으면 그것이 최우선.
 
-import { useCallback, useEffect, useSyncExternalStore } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import {
   DEFAULT_DISPLAY_LANGUAGE,
   DisplayLanguage,
@@ -33,23 +38,6 @@ function readStoredLanguage(): DisplayLanguage | null {
   } catch {
     return null
   }
-}
-
-function readExplicitFlag(): boolean {
-  if (typeof window === 'undefined') return false
-  try {
-    return window.localStorage.getItem(EXPLICIT_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function getSnapshot(): DisplayLanguage {
-  return readStoredLanguage() ?? DEFAULT_DISPLAY_LANGUAGE
-}
-
-function getServerSnapshot(): DisplayLanguage {
-  return DEFAULT_DISPLAY_LANGUAGE
 }
 
 function subscribe(onStoreChange: () => void): () => void {
@@ -75,20 +63,20 @@ export function useDisplayLanguage(motherTongueHint?: string | null): {
   lang: DisplayLanguage
   setLang: (lang: DisplayLanguage) => void
 } {
-  const lang = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
-
-  // 명시 선택이 없으면 모국어 힌트로 한 번 초기화.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (readExplicitFlag()) return
-    if (readStoredLanguage()) return
-    const inferred = inferDisplayLanguageFromMotherTongue(motherTongueHint)
-    if (!inferred) return
-    try {
-      window.localStorage.setItem(STORAGE_KEY, inferred)
-    } catch { /* noop */ }
-    channel?.dispatchEvent(new Event('kspai:display-lang-changed'))
+  // 단계 19 [D6]: getSnapshot/getServerSnapshot에서 직접 추론해 SSR/hydration이
+  // 즉시 학습자 모국어를 사용하도록 한다. 명시 선택이 있으면 그것이 최우선.
+  const getSnapshot = useCallback((): DisplayLanguage => {
+    return (
+      readStoredLanguage() ??
+      inferDisplayLanguageFromMotherTongue(motherTongueHint) ??
+      DEFAULT_DISPLAY_LANGUAGE
+    )
   }, [motherTongueHint])
+  const getServerSnapshot = useCallback((): DisplayLanguage => {
+    return inferDisplayLanguageFromMotherTongue(motherTongueHint) ?? DEFAULT_DISPLAY_LANGUAGE
+  }, [motherTongueHint])
+
+  const lang = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   const setLang = useCallback((next: DisplayLanguage) => {
     if (!isDisplayLanguage(next)) return
