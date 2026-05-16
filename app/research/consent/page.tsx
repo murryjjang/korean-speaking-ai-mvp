@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation'
 
 import { CONSENT_TEXTS, type ConsentLocale } from '@/src/lib/research/consent-text'
 import { getCurrentParticipant } from '@/src/lib/research/session'
+import { inferDisplayLanguageFromMotherTongue } from '@/src/lib/i18n/display-language'
 
 import { recordConsent, declineConsent } from './actions'
 
@@ -116,14 +117,20 @@ function isConsentLocale(v: unknown): v is ConsentLocale {
 
 export default async function ConsentPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
-  const locale: ConsentLocale = isConsentLocale(params.locale) ? params.locale : 'ko'
-  const body = CONSENT_TEXTS[locale]
-  const t = I18N_TEXT[locale]
-  const rtl = locale === 'ar'
 
   const participant = await getCurrentParticipant()
   if (!participant) redirect('/research/login')
   if (participant.consentStatus) redirect('/research/student/progress')
+
+  // v1.1 단계 19.5 [D6.7]: 동의서 mother_tongue 자동 적용.
+  // URL ?locale= 우선 → 없으면 학습자 모국어 → fallback ko.
+  const inferred = inferDisplayLanguageFromMotherTongue(participant.motherTongue)
+  const locale: ConsentLocale = isConsentLocale(params.locale)
+    ? params.locale
+    : (inferred && isConsentLocale(inferred) ? inferred : 'ko')
+  const body = CONSENT_TEXTS[locale]
+  const t = I18N_TEXT[locale]
+  const rtl = locale === 'ar'
 
   return (
     <main
