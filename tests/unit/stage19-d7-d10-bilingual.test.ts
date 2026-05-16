@@ -80,7 +80,7 @@ describe('[단계19.6-D10] BilingualText 새 모델 회귀 보호', () => {
     expect(src).toMatch(/data-bilingual-supplement=\{\s*showSupplement\s*\?\s*lang\s*:\s*undefined\s*\}/)
   })
 
-  it('BilingualListItem 컴포넌트 export — 리스트용 변형', () => {
-    expect(src).toMatch(/export\s+function\s+BilingualListItem/)
+  it('BilingualListItem 컴포넌트 export — 리스트용 변형 (memo 래핑)', () => {
+    expect(src).toMatch(/export\s+const\s+BilingualListItem\s*=\s*memo\(/)
   })
 })

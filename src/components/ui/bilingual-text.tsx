@@ -13,10 +13,16 @@
 // 단계 18·19에서 사용한 emphasize/switch 모드 개념은 폐기. 호출부는 항상 한국어가
 // 본문이고 보조 언어는 보조라는 단일 의미로 사용한다.
 
+import { memo } from 'react'
+
 import { useDisplayLanguage } from '@/src/hooks/use-display-language'
 import { isRTLDisplay, type MultilingualText } from '@/src/lib/i18n/display-language'
 
-export function BilingualText({
+// v1.1 단계 19.6 [성능]: BilingualText를 메모이제이션해 토글 시 부모 컴포넌트
+// 재렌더가 발생해도 props가 동일하면 재실행을 건너뛴다. 토글 자체는 hook
+// 구독으로 lang을 갱신하므로 보조 영역만 빠르게 깜빡임 없이 전환된다.
+
+function BilingualTextImpl({
   ko,
   multilingual,
   motherTongueHint,
@@ -99,9 +105,11 @@ export function BilingualText({
   )
 }
 
+export const BilingualText = memo(BilingualTextImpl)
+
 // v1.1 단계 19.6 [BiText]: 리스트 항목용 보조 — strengths/next_steps 같은 리스트.
 // 한국어 항목을 본문으로, 보조 언어 항목을 같은 li 안에 작은 글씨로 한 줄 더 표시.
-export function BilingualListItem({
+function BilingualListItemImpl({
   ko,
   multilingual,
   motherTongueHint,
@@ -141,3 +149,5 @@ export function BilingualListItem({
     </li>
   )
 }
+
+export const BilingualListItem = memo(BilingualListItemImpl)

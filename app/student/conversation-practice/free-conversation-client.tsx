@@ -366,9 +366,10 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
     }
   }, [stopTimer])
 
-  // stage === 'end' 진입 또는 helperLang 변경 시 요약/피드백 재요청.
-  // turns, topic은 stage='end' 전환 시점에 이미 확정되어 있으므로 deps에서 제외하고
-  // stage·helperLang 변화에만 반응한다.
+  // v1.1 단계 19.6 [성능]: stage === 'end' 진입 시점에만 1회 fetch. 보조 언어 토글로
+  // 인한 재요청 제거(예전 helperLang 의존 → 토글 마다 LLM 재호출 → 5초+ 지연 원인).
+  // 새 모델은 multilingual 응답(summary.{ko,en,vi,ar} + feedback.{ko,en,vi,ar})으로
+  // 4개 언어를 한 번에 받아 BilingualText가 즉시 전환한다 (네트워크 호출 없음).
   useEffect(() => {
     if (stage !== 'end') {
       summaryFetchedRef.current = false
@@ -377,8 +378,6 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
       return
     }
     if (turns.length === 0) return
-    // React 19 set-state-in-effect 룰: fetchSummary가 본체에서 setState를 호출하므로
-    // 마이크로태스크에 미뤄 cascading render를 회피한다.
     queueMicrotask(() => {
       void fetchSummary(turns, topic, personaId, helperLang)
     })
@@ -386,7 +385,7 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
       summaryAbortRef.current?.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, helperLang])
+  }, [stage])
 
   useEffect(() => {
     if (stage !== 'chat') return
