@@ -7,6 +7,7 @@ import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-la
 import { useDisplayLanguage } from '@/src/hooks/use-display-language'
 import { isRTLDisplay, pickText } from '@/src/lib/i18n/display-language'
 import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
+import { BilingualText } from '@/src/components/ui/bilingual-text'
 import { ToolResultCards } from '@/src/components/tool-result-cards'
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { getPersona } from '@/src/lib/personas'
@@ -76,11 +77,15 @@ const PRON_EVAL_TOGGLE_KEY = 'kspai:free-conv:pron-eval'
 
 type ToolResultItem = { name: string; args: Record<string, unknown>; result: unknown }
 
+// v1.1 단계 19 [D7]: LLM이 reason을 string 또는 { ko, en, vi, ar } 객체로 반환.
+// 외국어 학습자에게는 다국어 객체로 응답하도록 가이드되어 있어 두 형태 모두 허용.
+type CorrectionReason = string | { ko: string; en?: string; vi?: string; ar?: string }
+
 type ChatTurn = {
   id: string
   role: 'ai' | 'student'
   text: string
-  correction?: { original: string; corrected: string; reason: string }
+  correction?: { original: string; corrected: string; reason: CorrectionReason }
   pronScore?: number // 23-h A-3: 토글 ON 시 학습자 발화의 Azure PA 점수
   // v1.1 25-2: NPC 응답이 사용한 도구 결과 (시각 카드용). AI 턴에만 첨부.
   toolResults?: ToolResultItem[]
@@ -612,7 +617,7 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
         npc_response: string
         tools_used?: string[]
         tool_results?: ToolResultItem[]
-        learner_correction?: { original: string; corrected: string; reason: string }
+        learner_correction?: { original: string; corrected: string; reason: CorrectionReason }
       }
       const elapsedMs = Date.now() - startAt
       // setState updater: PA 응답이 먼저 도착해 pronScore가 set됐을 수 있으므로,
@@ -1152,12 +1157,46 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                         )
                       })}
                     </p>
-                    <p className="opacity-80 mt-0.5">{t.correction.reason}</p>
+                    {/* v1.1 단계 19 [D7]: reason이 다국어 객체이면 emphasize 모드로 ko+모국어 동시 표시. */}
+                    {(() => {
+                      const r = t.correction.reason
+                      if (typeof r === 'string') {
+                        return <p className="opacity-80 mt-0.5">{r}</p>
+                      }
+                      const ko = (r.ko ?? '').trim()
+                      if (!ko) return null
+                      return (
+                        <BilingualText
+                          ko={ko}
+                          multilingual={r}
+                          mode="emphasize"
+                          motherTongueHint={motherTongue}
+                          className="opacity-80 mt-0.5"
+                        />
+                      )
+                    })()}
                   </div>
                 )}
-                {t.role === 'student' && t.correction && t.correction.corrected.trim() === t.correction.original.trim() && (
-                  <p className="mt-1 text-xs opacity-80">✓ {t.correction.reason}</p>
-                )}
+                {t.role === 'student' && t.correction && t.correction.corrected.trim() === t.correction.original.trim() && (() => {
+                  const r = t.correction.reason
+                  if (typeof r === 'string') {
+                    return <p className="mt-1 text-xs opacity-80">✓ {r}</p>
+                  }
+                  const ko = (r.ko ?? '').trim()
+                  if (!ko) return null
+                  return (
+                    <div className="mt-1 text-xs opacity-80">
+                      ✓{' '}
+                      <BilingualText
+                        ko={ko}
+                        multilingual={r}
+                        mode="emphasize"
+                        motherTongueHint={motherTongue}
+                        className="inline-block align-middle"
+                      />
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           ))}

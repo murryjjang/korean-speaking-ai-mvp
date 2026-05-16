@@ -16,8 +16,8 @@ import {
   logUtterance,
   logAssessment,
 } from '@/src/lib/research/client-logger'
-import { useDisplayLanguage } from '@/src/hooks/use-display-language'
 import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
+import { BilingualText } from '@/src/components/ui/bilingual-text'
 
 const MIN_VALID_BLOB_SIZE = 3000
 
@@ -98,7 +98,6 @@ export function DialogueMissionPanel({
   const router = useRouter()
   const recorder = useAudioRecorder()
   const { state: ttsState, play: ttsPlay, stop: ttsStop } = useTTS()
-  const { lang: displayLang } = useDisplayLanguage(motherTongue)
 
   const [panelStatus, setPanelStatus] = useState<DialogueMissionPanelStatus>('idle')
   const [playingTurnId, setPlayingTurnId] = useState<string | null>(null)
@@ -822,19 +821,34 @@ export function DialogueMissionPanel({
                           </span>
                         )}
                         {turn.grammarNote && (() => {
-                          // v1.1 16-10-2: displayLang 우선, 비어 있으면 ko 폴백.
-                          const note =
+                          // v1.1 단계 19 [D7]: BilingualText emphasize 모드로 ko + 모국어 동시 표시.
+                          const ko =
                             typeof turn.grammarNote === 'string'
                               ? turn.grammarNote
-                              : (turn.grammarNote[displayLang] || turn.grammarNote.ko || '').trim()
-                          if (!note) return null
+                              : (turn.grammarNote.ko ?? '').trim()
+                          if (!ko) return null
+                          const multilingual =
+                            typeof turn.grammarNote === 'object' && turn.grammarNote
+                              ? {
+                                  ko,
+                                  en: turn.grammarNote.en,
+                                  vi: turn.grammarNote.vi,
+                                  ar: turn.grammarNote.ar,
+                                }
+                              : null
                           return (
                             <span
                               className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 max-w-full"
                               data-testid="student-grammar-note"
-                              dir={displayLang === 'ar' ? 'rtl' : undefined}
                             >
-                              교정: {note}
+                              <span className="font-medium me-1">교정:</span>
+                              <BilingualText
+                                ko={ko}
+                                multilingual={multilingual}
+                                mode="emphasize"
+                                motherTongueHint={motherTongue}
+                                className="inline-block align-middle"
+                              />
                             </span>
                           )
                         })()}
