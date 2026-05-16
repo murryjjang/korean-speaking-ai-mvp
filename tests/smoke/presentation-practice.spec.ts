@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { loginAsResearchParticipant } from './_helpers/login'
 
 /**
  * Phase 10-E-9: 발표연습 시연 보강 smoke tests
@@ -19,6 +20,9 @@ test.describe('발표연습 데모 화면', () => {
 
   test.describe('발표연습 화면 구성', () => {
     test.beforeEach(async ({ page }) => {
+
+      
+      await loginAsResearchParticipant(page, 'P042', '1042')
       await page.goto('/student/presentation-practice')
       if (!page.url().includes('/presentation-practice')) test.skip()
     })
@@ -90,6 +94,9 @@ test.describe('발표연습 데모 화면', () => {
 
   test.describe('Phase 10-E-8-POLISH 발표연습 화면 보강', () => {
     test.beforeEach(async ({ page }) => {
+
+      
+      await loginAsResearchParticipant(page, 'P042', '1042')
       await page.goto('/student/presentation-practice')
       if (!page.url().includes('/presentation-practice')) test.skip()
     })
@@ -138,6 +145,9 @@ test.describe('발표연습 데모 화면', () => {
 
   test.describe('Phase 10-E-9 발표연습 시연 보강', () => {
     test.beforeEach(async ({ page }) => {
+
+      
+      await loginAsResearchParticipant(page, 'P042', '1042')
       await page.goto('/student/presentation-practice')
       if (!page.url().includes('/presentation-practice')) test.skip()
     })
@@ -174,7 +184,11 @@ test.describe('발표연습 데모 화면', () => {
       expect(koText).toContain('-아서/어서')
     })
 
-    test('AI 원고 교정하기 클릭 후 베트남어 설명이 표시된다', async ({ page }) => {
+    test('AI 원고 교정하기 클릭 후 베트남어 설명이 표시된다 (P042 로그인)', async ({ page }) => {
+
+      
+      await loginAsResearchParticipant(page, 'P042', '1042')
+      await page.goto('/student/presentation-practice')
       await page.getByTestId('btn-ai-correction').click()
       await expect(page.getByTestId('correction-native-explain')).toBeVisible()
       const viText = await page.getByTestId('correction-native-explain').textContent()
@@ -248,7 +262,11 @@ test.describe('발표연습 데모 화면', () => {
       expect(koText).toContain('발표 주제')
     })
 
-    test('모국어(베트남어) 피드백이 표시된다', async ({ page }) => {
+    test('모국어(베트남어) 피드백이 표시된다 (P042 로그인)', async ({ page }) => {
+
+      
+      await loginAsResearchParticipant(page, 'P042', '1042')
+      await page.goto('/student/presentation-practice')
       await page.getByTestId('btn-start-recording').click()
       await expect(page.getByTestId('feedback-native')).toBeVisible({ timeout: 3000 })
       const viText = await page.getByTestId('feedback-native').textContent()

@@ -4,16 +4,11 @@
 // 핵심 변경(PDF 아랍어·페르소나 외형·로고)을 실제 브라우저에서 한 번씩 확인.
 // 스냅샷 대신 정량적 측정(글자 폭·픽셀 비율·요소 노출)로 안정적인 보호.
 
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 
-async function setDisplayLanguage(page: Page, lang: 'ko' | 'ar') {
-  await page.addInitScript(([k]) => {
-    try {
-      window.localStorage.setItem('kspai:lang:display', k as string)
-      window.localStorage.setItem('kspai:lang:display:explicit', '1')
-    } catch { /* noop */ }
-  }, [lang])
-}
+// v1.1 단계 19.7 [검증 우회 차단]: localStorage 시드(setDisplayLanguage)는 더 이상
+// 표시 언어를 결정하지 못한다 — 19.7 hook이 mother_tongue 단독으로 결정. 회귀
+// 검증을 위해 이 spec은 직접 페이지 진입(인증 미요구 /dev/pdf-smoke)만 사용한다.
 
 test.describe('[단계19.5-L4] KDLI placeholder SVG 노출', () => {
   test('/login에 SVG 로고가 마운트', async ({ page }) => {
@@ -37,18 +32,15 @@ test.describe('[단계19.5-L4] KDLI placeholder SVG 노출', () => {
   })
 })
 
-test.describe('[단계19.6-RTL] 보조 언어 ar 선택 시에도 html.dir = ltr 유지', () => {
-  test('/dev/pdf-smoke ar locale에서 html.dir은 항상 ltr (페이지 RTL 적용 중단)', async ({ page }) => {
-    await setDisplayLanguage(page, 'ar')
+test.describe('[단계19.7-RTL] 페이지(html.dir)는 항상 ltr 고정', () => {
+  test('/dev/pdf-smoke 진입 시 html.dir = ltr', async ({ page }) => {
     await page.goto('/dev/pdf-smoke')
-    // 단계 19.6: 보조 언어가 ar이어도 페이지(html.dir)는 LTR 고정.
-    // 아랍어 텍스트 자체는 컨테이너 내부 dir="rtl"로 단어 단위 정상.
+    // 단계 19.6 이래 페이지 dir은 항상 LTR — 아랍어 텍스트는 컨테이너 내부 dir="rtl"만.
     await page.waitForFunction(
       () => document.documentElement.dir === 'ltr',
       undefined,
       { timeout: 5_000 },
     )
-    // PDF 캡처 컨테이너도 LTR 유지 (data-keep-ltr 마커).
     const target = page.getByTestId('pdf-smoke-target')
     await expect(target).toBeVisible()
   })

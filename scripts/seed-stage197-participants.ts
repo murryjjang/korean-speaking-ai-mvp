@@ -44,18 +44,42 @@ type Seed = {
   pin: string
 }
 
+// 이름은 ASCII 중립 — 분석 대시보드의 국가/언어 텍스트 검색과 충돌하지 않게.
 const SEEDS: Seed[] = [
-  { participantCode: 'P040', motherTongue: 'ko', name: '단계19.7-검증-한국어', pin: '1040' },
-  { participantCode: 'P041', motherTongue: 'en', name: '단계19.7-검증-영어',   pin: '1041' },
-  { participantCode: 'P042', motherTongue: 'vi', name: '단계19.7-검증-베트남어', pin: '1042' },
-  { participantCode: 'P043', motherTongue: 'ar', name: '단계19.7-검증-아랍어',   pin: '1043' },
+  { participantCode: 'P040', motherTongue: 'ko', name: 'stage197-seed-040', pin: '1040' },
+  { participantCode: 'P041', motherTongue: 'en', name: 'stage197-seed-041', pin: '1041' },
+  { participantCode: 'P042', motherTongue: 'vi', name: 'stage197-seed-042', pin: '1042' },
+  { participantCode: 'P043', motherTongue: 'ar', name: 'stage197-seed-043', pin: '1043' },
 ]
+
+// consent_status=false로 리셋하기 위해 admin client 직접 사용.
+import { getResearchAdminClient } from '../src/lib/research/supabase-admin-client'
+
+async function resetConsent(participantId: string): Promise<void> {
+  const client = getResearchAdminClient()
+  if (!client) return
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (client as any).from('research_participants').update({ consent_status: false, consent_at: null }).eq('id', participantId)
+}
+
+async function updateName(participantId: string, name: string): Promise<void> {
+  const client = getResearchAdminClient()
+  if (!client) return
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (client as any).from('research_participants').update({ name }).eq('id', participantId)
+}
 
 async function main(): Promise<void> {
   for (const s of SEEDS) {
     const existing = await getParticipantByCode(s.participantCode)
     if (existing) {
-      console.log(`SKIP  ${s.participantCode} 이미 존재 (mother_tongue=${existing.motherTongue}, consent=${existing.consentStatus})`)
+      if (existing.consentStatus) {
+        await resetConsent(existing.id)
+      }
+      if (existing.name !== s.name) {
+        await updateName(existing.id, s.name)
+      }
+      console.log(`UPSERT ${s.participantCode} (mother_tongue=${existing.motherTongue}, name=${s.name}, consent=false)`)
       continue
     }
     const pinHash = await hashPin(s.pin)

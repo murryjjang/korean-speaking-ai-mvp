@@ -13,15 +13,9 @@
 
 import { test, expect, type Page } from '@playwright/test'
 
-async function setDisplayLanguage(page: Page, lang: 'ko' | 'ar') {
-  // useDisplayLanguage가 명시 선택을 우선하므로 localStorage를 직접 시드.
-  await page.addInitScript(([k]) => {
-    try {
-      window.localStorage.setItem('kspai:lang:display', k as string)
-      window.localStorage.setItem('kspai:lang:display:explicit', '1')
-    } catch { /* noop */ }
-  }, [lang])
-}
+// v1.1 단계 19.7 [검증 우회 차단]: 단계 19.5·19.6에서 사용한 setDisplayLanguage
+// (localStorage 시드)는 19.7 hook에서 효력 없음. /dev/pdf-smoke는 인증 없이
+// 진입 가능한 dev 페이지이므로 직접 방문으로 충분히 검증.
 
 async function downloadPdfAndAssertValid(page: Page) {
   await expect(page.getByTestId('pdf-smoke-target')).toBeVisible()
@@ -63,18 +57,15 @@ test.describe('[단계19-G] PDF 다운로드', () => {
     await downloadPdfAndAssertValid(page)
   })
 
-  // 단계 19.6 [RTL]: 보조 언어가 ar이어도 html.dir은 항상 LTR (페이지 RTL 적용 중단).
-  // 아랍어 단락은 자체 dir="rtl"로 텍스트 내부에서만 RTL 정상.
-  test('/dev/pdf-smoke — ar locale (mother_tongue) 캡처도 성공', async ({ page }) => {
-    await setDisplayLanguage(page, 'ar')
+  // v1.1 단계 19.7 [RTL]: 페이지 html.dir은 항상 'ltr'. 아랍어 단락만 컨테이너
+  // 내부 dir="rtl"로 정상 표시. (19.6에서 이미 LTR 고정, 19.7에서 hook 단순화.)
+  test('/dev/pdf-smoke — 아랍어 단락 포함 페이지에서도 PDF 캡처 성공', async ({ page }) => {
     await page.goto('/dev/pdf-smoke')
-    // 단계 19.6: html.dir은 항상 'ltr' 유지 (보조 언어 ar 선택해도 페이지 RTL 적용 안 됨).
     await page.waitForFunction(
       () => document.documentElement.dir === 'ltr',
       undefined,
       { timeout: 5_000 },
     )
-    // PDF 캡처 컨테이너는 LTR 유지.
     await expect(page.locator('[data-testid="pdf-smoke-target"]')).toBeVisible()
     await downloadPdfAndAssertValid(page)
   })

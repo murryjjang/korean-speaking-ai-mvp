@@ -573,7 +573,7 @@ export function SpeakingClient({
             </div>
           )}
           {QUESTION_HINTS[question.id] && (
-            <LangHint items={QUESTION_HINTS[question.id]} label="모국어 도움말 보기" />
+            <LangHint items={QUESTION_HINTS[question.id]} label="모국어 도움말 보기" motherTongue={motherTongue} />
           )}
 
           {/* TTS 음성 안내 — dialogue_mission에서는 표시하지 않음 */}
@@ -651,7 +651,7 @@ export function SpeakingClient({
                     준비 시작
                   </Button>
                   <div className="mt-4 text-left">
-                    <LangHint items={RECORDING_HINTS} label="녹음 방법 도움말" />
+                    <LangHint items={RECORDING_HINTS} label="녹음 방법 도움말" motherTongue={motherTongue} />
                   </div>
                 </>
               )}

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { loginAsResearchParticipant } from './_helpers/login'
 
 /**
  * Auth route smoke tests.
@@ -63,9 +64,10 @@ test.describe('인증 우회 — Supabase 미설정 환경', () => {
 
     if (!page.url().includes('/student')) return
 
-    // 데스크톱 사이드바 기준 (default Playwright viewport > md breakpoint)
+    // v1.1 단계 19.7 [검증 갱신]: '미션 대화' 메뉴는 단계 19.6 정리로 제거.
+    // 현재 nav 구성: 내 학습 현황 / 말하기 평가 / 읽기연습 / 발표연습 / 생성형 대화.
     await expect(page.getByRole('link', { name: '말하기 평가' })).toBeVisible()
-    await expect(page.getByRole('link', { name: '미션 대화' })).toBeVisible()
+    await expect(page.getByRole('link', { name: '읽기연습' })).toBeVisible()
     await expect(page.getByRole('link', { name: '발표연습' }).first()).toBeVisible()
   })
 
@@ -113,7 +115,9 @@ test.describe('인증 우회 — Supabase 미설정 환경', () => {
     await expect(page.getByRole('button', { name: /녹음 안내 듣기/ })).toBeVisible()
   })
 
-  test('모국어 도움말 아랍어 RTL crash 없음', async ({ page }) => {
+  test('모국어 도움말 아랍어 RTL crash 없음 (P043 로그인)', async ({ page }) => {
+    // v1.1 단계 19.7: 아랍어 보조 도움말은 mother_tongue=ar 학습자에게만 표시.
+    await loginAsResearchParticipant(page, 'P043', '1043')
     await page.goto('/student/speaking/q-001')
 
     // 도움말 토글 클릭 — AR 텍스트 렌더링 시 crash 없어야 함

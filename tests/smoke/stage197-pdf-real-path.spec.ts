@@ -9,6 +9,7 @@
 
 import { test, expect, type Page, type Download } from '@playwright/test'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { resetParticipantConsent } from './_helpers/research-seed'
 
 type Case = {
   participantCode: string
@@ -49,6 +50,8 @@ async function saveDownload(download: Download, savePath: string): Promise<numbe
 test.describe('[단계19.7-PDF] 실제 사용자 경로 — 4 mother_tongue × 학습 진척 PDF', () => {
   for (const c of CASES) {
     test(`${c.participantCode} (mother_tongue=${c.motherTongue}) — 로그인 → 진척 페이지 → PDF 다운로드`, async ({ page }) => {
+      // 멱등성 — 매 테스트마다 consent_status를 false로 리셋.
+      await resetParticipantConsent(c.participantCode)
       await loginAndConsent(page, c.participantCode, c.pin)
 
       // 진척 페이지가 표시되어야 함

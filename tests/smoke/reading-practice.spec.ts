@@ -1,8 +1,12 @@
 import { test, expect } from '@playwright/test'
+import { loginAsResearchParticipant } from './_helpers/login'
 
 /**
  * Phase 10-E-7-A/B: 읽기연습 데모 smoke tests
- * SMOKE_TEST_MODE=1 환경에서 인증 없이 /student/reading-practice 접근.
+ * SMOKE_TEST_MODE=1 환경에서 /student/reading-practice 접근.
+ *
+ * v1.1 단계 19.7 [검증 갱신]: 보조 언어가 mother_tongue 단독으로 결정되므로,
+ * 베트남어 보조 피드백을 보려면 P042(vi) 자격증명으로 로그인 후 진입해야 한다.
  */
 
 test.describe('읽기연습 데모 화면', () => {
@@ -24,12 +28,9 @@ test.describe('읽기연습 데모 화면', () => {
       if (!page.url().includes('/reading-practice')) test.skip()
     })
 
-    test('학습자 모국어 선택 옵션이 표시된다', async ({ page }) => {
-      await expect(page.getByTestId('native-lang-select')).toBeVisible()
-      const select = page.getByTestId('native-lang-select')
-      await expect(select.locator('option[value="vi"]')).toBeAttached()
-      await expect(select.locator('option[value="en"]')).toBeAttached()
-    })
+    // v1.1 단계 19.7: 사용자 변경 가능한 모국어 셀렉트 UI 제거됨 (commit 9f8553d에서
+    // L1 selector drop). mother_tongue은 가입 시점 결정 — 학습 화면에서 변경 불가.
+    test.skip('학습자 모국어 선택 옵션이 표시된다 (UI 제거됨 — 19.7 단일 진실원)', () => {})
 
     test('AI 음성 속도 버튼 0.75x/0.9x/1.0x/1.1x/1.25x가 표시된다', async ({ page }) => {
       await expect(page.getByTestId('speed-0.75')).toBeVisible()
@@ -87,6 +88,9 @@ test.describe('읽기연습 데모 화면', () => {
 
   test.describe('result 단계 (demo fallback)', () => {
     test.beforeEach(async ({ page }) => {
+      // v1.1 단계 19.7: 베트남어 보조 피드백 검증을 위해 P042(vi)로 로그인.
+      // 로그인 안 하면 motherTongue=null → 보조 카드 미렌더 (19.7 모델 정상 동작).
+      await loginAsResearchParticipant(page, 'P042', '1042')
       await page.goto('/student/reading-practice')
       if (!page.url().includes('/reading-practice')) test.skip()
       await page.getByTestId('start-easy-reading').click()
@@ -106,7 +110,8 @@ test.describe('읽기연습 데모 화면', () => {
     test('Azure/발음평가 실패 시 큰 오류 대신 안내가 표시된다', async ({ page }) => {
       await expect(page.getByTestId('etri-fallback-notice')).toBeVisible()
       const text = await page.getByTestId('etri-fallback-notice').textContent()
-      expect(text).toContain('참고평가')
+      // UI에서 "참고 평가" (공백 포함) — 정규식으로 양쪽 다 허용.
+      expect(text).toMatch(/참고\s*평가/)
     })
 
     test('한국어 피드백과 학습자 모국어 피드백이 함께 표시된다', async ({ page }) => {

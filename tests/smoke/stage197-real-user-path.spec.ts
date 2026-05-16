@@ -10,6 +10,7 @@
 // 사전 조건: scripts/seed-stage197-participants.ts로 P040~P043이 발급되어 있어야 함.
 
 import { test, expect, type Page } from '@playwright/test'
+import { resetParticipantConsent } from './_helpers/research-seed'
 
 type Case = {
   participantCode: string
@@ -50,13 +51,9 @@ async function loginAsParticipant(page: Page, code: string, pin: string): Promis
 test.describe('[단계19.7-D6.7] 실제 사용자 경로 — 4 mother_tongue 동의서 표시', () => {
   for (const c of CASES) {
     test(`${c.participantCode} (mother_tongue=${c.motherTongue}) — URL 파라미터 없이 로그인 후 ${c.motherTongue} 동의서`, async ({ page }) => {
+      // 매 테스트마다 consent_status를 false로 리셋 — 멱등 검증.
+      await resetParticipantConsent(c.participantCode)
       await loginAsParticipant(page, c.participantCode, c.pin)
-
-      const onConsent = page.url().includes('/research/consent')
-      if (!onConsent) {
-        // consent 완료된 재실행 케이스 — 동의서 페이지를 한 번 더 방문해 표시 확인.
-        await page.goto('/research/consent')
-      }
 
       // ★★★ URL에 ?locale= 파라미터가 절대 없어야 함 — 19.7 핵심 변경 ★★★
       const consentUrl = new URL(page.url())
