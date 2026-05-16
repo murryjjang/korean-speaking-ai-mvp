@@ -19,7 +19,7 @@ import { getPersona } from '@/src/lib/personas'
 import { DailyBars, ScoreLine } from '@/src/components/research/progress-charts'
 import { LocalizedModeDonut } from '@/src/components/research/localized-mode-donut'
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
-import { MODE_LABELS } from '@/src/lib/i18n/dashboard-labels'
+import { MODE_LABELS, scoreLevelKey } from '@/src/lib/i18n/dashboard-labels'
 import { LocalizedModeLabel, LocalizedScore } from '@/src/components/ui/localized-extras'
 
 import { logoutAction } from '../actions'
@@ -173,12 +173,29 @@ export default async function StudentProgressPage() {
           내부의 다국어 라벨은 자체 dir 속성으로 RTL 회복 가능. */}
       <div
         id="research-progress-pdf-target"
-        className="space-y-8"
+        className="space-y-6"
         data-keep-ltr
         dir="ltr"
       >
 
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="student-stats">
+      {/* v1.1 단계 19.5 [L.1]: OPIc/TOPIK 식 종합 점수 박스 — 5건 이상 누적 시 표시.
+          그 외에는 placeholder 문구로 안내. */}
+      <OverallScoreBox
+        scorePoints={scorePoints}
+        motherTongueHint={participant.motherTongue}
+      />
+
+      <section
+        className="rounded-lg border border-border/40 bg-surface-raised p-5"
+        data-testid="student-stats-card"
+      >
+        <h2 className="text-sm font-semibold text-text-primary mb-3 pb-2 border-b border-border/40">
+          <Localized
+            spec={{ kind: 'overallScore', key: 'basedOn' }}
+            motherTongueHint={participant.motherTongue}
+          />
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="student-stats">
         <Stat
           labelSpec={{ kind: 'kpi', key: 'totalSessions' }}
           motherTongueHint={participant.motherTongue}
@@ -209,16 +226,14 @@ export default async function StudentProgressPage() {
           motherTongueHint={participant.motherTongue}
           value={<>{String(scorePoints.length)}</>}
         />
+        </div>
       </section>
 
       {sessions.length > 0 ? (
-        <section className="pt-6 border-t border-border/60">
-          <h2 className="text-sm font-semibold text-text-primary mb-2">
-            <Localized
-              spec={{ kind: 'chart', key: 'modeDistribution' }}
-              motherTongueHint={participant.motherTongue}
-            />
-          </h2>
+        <SectionCard
+          titleSpec={{ kind: 'chart', key: 'modeDistribution' }}
+          motherTongueHint={participant.motherTongue}
+        >
           {/* v1.1 단계 19 [D6.5]: 차트 범례를 표시 언어에 맞춰 i18n. */}
           <div data-testid="mode-distribution">
             <LocalizedModeDonut
@@ -228,41 +243,32 @@ export default async function StudentProgressPage() {
               motherTongueHint={participant.motherTongue}
             />
           </div>
-        </section>
+        </SectionCard>
       ) : null}
 
       {sessions.length > 0 ? (
-        <section className="pt-6 border-t border-border/60">
-          <h2 className="text-sm font-semibold text-text-primary mb-2">
-            <Localized
-              spec={{ kind: 'chart', key: 'last7Days' }}
-              motherTongueHint={participant.motherTongue}
-            />
-          </h2>
+        <SectionCard
+          titleSpec={{ kind: 'chart', key: 'last7Days' }}
+          motherTongueHint={participant.motherTongue}
+        >
           {/* 일별 막대 차트 — 오늘 포함 7일 */}
           <DailyBars data={buildDailyBuckets(sessions)} />
-        </section>
+        </SectionCard>
       ) : null}
 
       {scorePoints.length > 0 ? (
-        <section className="pt-6 border-t border-border/60">
-          <h2 className="text-sm font-semibold text-text-primary mb-2">
-            <Localized
-              spec={{ kind: 'chart', key: 'scoreTrend' }}
-              motherTongueHint={participant.motherTongue}
-            />
-          </h2>
+        <SectionCard
+          titleSpec={{ kind: 'chart', key: 'scoreTrend' }}
+          motherTongueHint={participant.motherTongue}
+        >
           <ScoreLine points={scorePoints.map((p) => ({ at: p.at, score: p.score }))} />
-        </section>
+        </SectionCard>
       ) : null}
 
-      <section className="pt-6 border-t border-border/60">
-        <h2 className="text-sm font-semibold text-text-primary mb-2">
-          <Localized
-            spec={{ kind: 'chart', key: 'recentSessions' }}
-            motherTongueHint={participant.motherTongue}
-          />
-        </h2>
+      <SectionCard
+        titleSpec={{ kind: 'chart', key: 'recentSessions' }}
+        motherTongueHint={participant.motherTongue}
+      >
         {recent.length === 0 ? (
           <p className="text-sm text-text-muted" data-testid="no-sessions">
             <Localized
@@ -333,16 +339,13 @@ export default async function StudentProgressPage() {
             ))}
           </ul>
         )}
-      </section>
+      </SectionCard>
       </div>{/* /research-progress-pdf-target */}
 
-      <section className="pt-6 border-t border-border">
-        <h2 className="text-sm font-semibold text-text-primary mb-2">
-          <Localized
-            spec={{ kind: 'chart', key: 'startLearning' }}
-            motherTongueHint={participant.motherTongue}
-          />
-        </h2>
+      <SectionCard
+        titleSpec={{ kind: 'chart', key: 'startLearning' }}
+        motherTongueHint={participant.motherTongue}
+      >
         <nav className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link
             href="/student/conversation-practice"
@@ -393,12 +396,12 @@ export default async function StudentProgressPage() {
             </p>
           </Link>
         </nav>
-      </section>
+      </SectionCard>
 
-      <section className="pt-6 border-t border-border">
-        <h2 className="text-sm font-semibold text-text-primary mb-2">
-          <Localized spec={{ kind: 'dataDownload', key: 'sectionTitle' }} motherTongueHint={participant.motherTongue} />
-        </h2>
+      <SectionCard
+        titleSpec={{ kind: 'dataDownload', key: 'sectionTitle' }}
+        motherTongueHint={participant.motherTongue}
+      >
         <p className="text-xs text-text-muted leading-relaxed mb-3">
           <Localized spec={{ kind: 'dataDownload', key: 'sectionDescription' }} motherTongueHint={participant.motherTongue} />
         </p>
@@ -410,8 +413,95 @@ export default async function StudentProgressPage() {
         >
           <Localized spec={{ kind: 'page', key: 'downloadOwnData' }} motherTongueHint={participant.motherTongue} />
         </a>
-      </section>
+      </SectionCard>
     </main>
+  )
+}
+
+// v1.1 단계 19.5 [L.5]: 학술 톤 카드 — 흰 배경 + 부드러운 1px 경계 + 통일된 padding.
+// 진척 페이지의 모든 콘텐츠 섹션을 같은 카드 패턴으로 정렬한다.
+function SectionCard({
+  titleSpec,
+  motherTongueHint,
+  children,
+}: {
+  titleSpec: Parameters<typeof Localized>[0]['spec']
+  motherTongueHint?: string | null
+  children: ReactNode
+}) {
+  return (
+    <section
+      className="rounded-lg border border-border/40 bg-surface-raised p-5"
+      data-testid="progress-section-card"
+    >
+      <h2 className="text-sm font-semibold text-text-primary mb-3 pb-2 border-b border-border/40">
+        <Localized spec={titleSpec} motherTongueHint={motherTongueHint} />
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+// v1.1 단계 19.5 [L.1]: OPIc/TOPIK 식 종합 점수 박스.
+// 평균 점수(큰 숫자) + 등급 배지 + 누적 횟수. 5건 미만이면 placeholder.
+function OverallScoreBox({
+  scorePoints,
+  motherTongueHint,
+}: {
+  scorePoints: { at: number; score: number; mode: string }[]
+  motherTongueHint?: string | null
+}) {
+  const count = scorePoints.length
+  const MIN_SAMPLES = 5
+  if (count < MIN_SAMPLES) {
+    return (
+      <section
+        className="rounded-lg border border-border/40 bg-surface-raised p-6 text-center"
+        data-testid="overall-score-box"
+        data-state="insufficient"
+      >
+        <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
+          <Localized spec={{ kind: 'overallScore', key: 'title' }} motherTongueHint={motherTongueHint} />
+        </p>
+        <p className="text-sm text-text-secondary" data-testid="overall-score-insufficient">
+          <Localized spec={{ kind: 'overallScore', key: 'insufficient' }} motherTongueHint={motherTongueHint} />
+        </p>
+      </section>
+    )
+  }
+  const avg = scorePoints.reduce((s, p) => s + p.score, 0) / count
+  const ratio = Math.min(1, Math.max(0, avg / 100))
+  const levelKey = scoreLevelKey(ratio)
+  return (
+    <section
+      className="rounded-lg border border-border/40 bg-surface-raised p-6"
+      data-testid="overall-score-box"
+      data-state="ready"
+    >
+      <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
+        <Localized spec={{ kind: 'overallScore', key: 'title' }} motherTongueHint={motherTongueHint} />
+      </p>
+      <div className="flex items-end gap-4 flex-wrap">
+        <span
+          className="text-5xl font-bold text-primary-700 tabular-nums leading-none"
+          data-testid="overall-score-value"
+        >
+          {Math.round(avg)}
+        </span>
+        <span className="text-base text-text-muted mb-1">/ 100</span>
+        <span
+          className="ml-auto inline-flex items-center rounded-md bg-primary-50 text-primary-700 text-xs font-medium px-2.5 py-1"
+          data-testid="overall-score-level"
+        >
+          <Localized spec={{ kind: 'scoreLevel', key: levelKey }} motherTongueHint={motherTongueHint} />
+        </span>
+      </div>
+      <p className="mt-3 text-xs text-text-muted">
+        <Localized spec={{ kind: 'overallScore', key: 'basedOn' }} motherTongueHint={motherTongueHint} />
+        : {count}{' '}
+        <Localized spec={{ kind: 'overallScore', key: 'assessmentsUnit' }} motherTongueHint={motherTongueHint} />
+      </p>
+    </section>
   )
 }
 

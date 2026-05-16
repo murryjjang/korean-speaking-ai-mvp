@@ -194,6 +194,85 @@ export const SCORE_UNIT_LABELS = {
   } satisfies LabelMap,
 } as const
 
+// v1.1 단계 19.5 [L.1]: OPIc/TOPIK 식 종합 점수 박스 라벨
+export const OVERALL_SCORE_LABELS = {
+  title: {
+    ko: '종합 점수',
+    en: 'Overall Score',
+    vi: 'Điểm tổng',
+    ar: 'النتيجة الإجمالية',
+  } satisfies LabelMap,
+  level: {
+    ko: '수준',
+    en: 'Level',
+    vi: 'Cấp độ',
+    ar: 'المستوى',
+  } satisfies LabelMap,
+  basedOn: {
+    ko: '평가 누적',
+    en: 'Based on',
+    vi: 'Dựa trên',
+    ar: 'بناءً على',
+  } satisfies LabelMap,
+  assessmentsUnit: {
+    ko: '건',
+    en: 'assessments',
+    vi: 'lần đánh giá',
+    ar: 'تقييمات',
+  } satisfies LabelMap,
+  insufficient: {
+    ko: '평가 데이터 5건 이상 누적 시 표시됩니다.',
+    en: 'Displayed once 5 or more assessments are accumulated.',
+    vi: 'Hiển thị khi tích lũy đủ 5 lần đánh giá trở lên.',
+    ar: 'سيتم العرض عند تجميع 5 تقييمات أو أكثر.',
+  } satisfies LabelMap,
+} as const
+
+// OPIc/TOPIK 식 등급 — 점수 비율에 따라 분류.
+// 80% 이상 = 상급(Advanced), 65-79% = 중상급(Intermediate High),
+// 50-64% = 중급(Intermediate), 35-49% = 초급(Novice High), 그 외 Novice.
+export const SCORE_LEVEL_LABELS = {
+  advanced: {
+    ko: '상급 (Advanced)',
+    en: 'Advanced',
+    vi: 'Cao cấp',
+    ar: 'متقدم',
+  } satisfies LabelMap,
+  intermediateHigh: {
+    ko: '중상급 (Intermediate High)',
+    en: 'Intermediate High',
+    vi: 'Trung cao',
+    ar: 'متوسط مرتفع',
+  } satisfies LabelMap,
+  intermediate: {
+    ko: '중급 (Intermediate)',
+    en: 'Intermediate',
+    vi: 'Trung cấp',
+    ar: 'متوسط',
+  } satisfies LabelMap,
+  noviceHigh: {
+    ko: '초상급 (Novice High)',
+    en: 'Novice High',
+    vi: 'Sơ cao',
+    ar: 'مبتدئ مرتفع',
+  } satisfies LabelMap,
+  novice: {
+    ko: '초급 (Novice)',
+    en: 'Novice',
+    vi: 'Sơ cấp',
+    ar: 'مبتدئ',
+  } satisfies LabelMap,
+} as const
+
+/** 점수 비율(0~1)에서 등급 키 산출. */
+export function scoreLevelKey(ratio: number): keyof typeof SCORE_LEVEL_LABELS {
+  if (ratio >= 0.8) return 'advanced'
+  if (ratio >= 0.65) return 'intermediateHigh'
+  if (ratio >= 0.5) return 'intermediate'
+  if (ratio >= 0.35) return 'noviceHigh'
+  return 'novice'
+}
+
 // 페이지 헤더
 export const PAGE_LABELS = {
   progressTitle: {
@@ -263,6 +342,8 @@ export type DashboardLabelKey =
   | { kind: 'modeCard'; key: keyof typeof MODE_CARD_LABELS }
   | { kind: 'dataDownload'; key: keyof typeof DATA_DOWNLOAD_LABELS }
   | { kind: 'scoreUnit'; key: keyof typeof SCORE_UNIT_LABELS }
+  | { kind: 'overallScore'; key: keyof typeof OVERALL_SCORE_LABELS }
+  | { kind: 'scoreLevel'; key: keyof typeof SCORE_LEVEL_LABELS }
   | { kind: 'page'; key: keyof typeof PAGE_LABELS }
   | { kind: 'time'; key: keyof typeof TIME_UNITS }
 
@@ -280,6 +361,10 @@ export function getLabel(spec: DashboardLabelKey, lang: DisplayLanguage): string
       return DATA_DOWNLOAD_LABELS[spec.key][lang]
     case 'scoreUnit':
       return SCORE_UNIT_LABELS[spec.key][lang]
+    case 'overallScore':
+      return OVERALL_SCORE_LABELS[spec.key][lang]
+    case 'scoreLevel':
+      return SCORE_LEVEL_LABELS[spec.key][lang]
     case 'page':
       return PAGE_LABELS[spec.key][lang]
     case 'time':
