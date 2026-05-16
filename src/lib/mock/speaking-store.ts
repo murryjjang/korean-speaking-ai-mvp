@@ -51,7 +51,16 @@ export type SpeakingEvalRecord = {
 
 // Module-level store — Phase 3 MVP only. Resets on server restart.
 // Phase 9+에서 Supabase submissions 테이블로 교체 예정.
-const evalStore = new Map<string, SpeakingEvalRecord>()
+//
+// v1.1 단계 19.8: globalThis 보관 — Next.js 16/Turbopack dev에서 route handler와
+// page route가 모듈을 별도 instance로 평가할 수 있어 Map이 분리되는 사례가 발견됨.
+// 동일 Node 프로세스 내에서 in-memory 공유를 보장하기 위해 globalThis에 부착.
+declare global {
+  var __speakingEvalStore: Map<string, SpeakingEvalRecord> | undefined
+}
+const evalStore: Map<string, SpeakingEvalRecord> =
+  globalThis.__speakingEvalStore ?? new Map<string, SpeakingEvalRecord>()
+globalThis.__speakingEvalStore = evalStore
 
 export function saveSpeakingEval(record: SpeakingEvalRecord): void {
   evalStore.set(record.submissionId, record)

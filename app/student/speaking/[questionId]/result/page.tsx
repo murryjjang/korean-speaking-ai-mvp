@@ -1396,7 +1396,7 @@ export default async function SpeakingResultPage({
           </CardBody>
         </Card>
 
-        {/* q1~q4 다국어 피드백 — 페이지 상단 보조 언어 토글(ar/en/vi)이 단일 소스 */}
+        {/* q1~q4 다국어 피드백 — mother_tongue 단일 결정 (단계 19.8: motherTongueHint 명시 전달). */}
         {(() => {
           if (isDialogueMission) {
             const ml = dialogueMultilingualFeedback(displayScore, achievedMissionGoals, totalMissionGoals)
@@ -1406,6 +1406,7 @@ export default async function SpeakingResultPage({
                 vi={ml.vi}
                 en={ml.en}
                 ar={ml.ar}
+                motherTongueHint={participantMotherTongue}
                 description="한국어 평가 내용을 보조 언어로 안내합니다."
               />
             )
@@ -1418,6 +1419,7 @@ export default async function SpeakingResultPage({
                 vi={ml.vi}
                 en={ml.en}
                 ar={ml.ar}
+                motherTongueHint={participantMotherTongue}
                 description="한국어 평가 내용을 보조 언어로 안내합니다."
               />
             )
@@ -1430,6 +1432,7 @@ export default async function SpeakingResultPage({
                 vi={ml.vi}
                 en={ml.en}
                 ar={ml.ar}
+                motherTongueHint={participantMotherTongue}
                 description="한국어 평가 내용을 보조 언어로 안내합니다."
               />
             )
@@ -1442,6 +1445,7 @@ export default async function SpeakingResultPage({
                 vi={ml.vi}
                 en={ml.en}
                 ar={ml.ar}
+                motherTongueHint={participantMotherTongue}
                 description="한국어 평가 내용을 보조 언어로 안내합니다."
               />
             )
