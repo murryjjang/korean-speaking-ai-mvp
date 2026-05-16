@@ -37,24 +37,19 @@ test.describe('[단계19.5-L4] KDLI placeholder SVG 노출', () => {
   })
 })
 
-test.describe('[단계19.5-P.2] PDF 캡처 컨테이너 ar locale LTR 유지', () => {
-  test('/dev/pdf-smoke ar locale에서 캡처 컨테이너는 dir="ltr"', async ({ page }) => {
+test.describe('[단계19.6-RTL] 보조 언어 ar 선택 시에도 html.dir = ltr 유지', () => {
+  test('/dev/pdf-smoke ar locale에서 html.dir은 항상 ltr (페이지 RTL 적용 중단)', async ({ page }) => {
     await setDisplayLanguage(page, 'ar')
     await page.goto('/dev/pdf-smoke')
-    // html.dir은 RTL로 동기화
+    // 단계 19.6: 보조 언어가 ar이어도 페이지(html.dir)는 LTR 고정.
+    // 아랍어 텍스트 자체는 컨테이너 내부 dir="rtl"로 단어 단위 정상.
     await page.waitForFunction(
-      () => document.documentElement.dir === 'rtl',
+      () => document.documentElement.dir === 'ltr',
       undefined,
       { timeout: 5_000 },
     )
-    // 그러나 PDF 캡처 컨테이너는 명시적 LTR
+    // PDF 캡처 컨테이너도 LTR 유지 (data-keep-ltr 마커).
     const target = page.getByTestId('pdf-smoke-target')
     await expect(target).toBeVisible()
-    const dir = await target.getAttribute('dir')
-    // 부모는 dir 없을 수 있지만 data-keep-ltr 조부모(섹션)는 LTR
-    const keepLtr = await target.getAttribute('data-keep-ltr')
-    // 부모 wrapper에 data-keep-ltr이 들어가 있거나, target 자신에 들어가 있을 수 있다.
-    // 본 smoke는 그 둘 중 하나가 있는지 확인.
-    expect([dir === 'ltr', keepLtr !== null].some(Boolean) || true).toBe(true)
   })
 })

@@ -63,16 +63,18 @@ test.describe('[단계19-G] PDF 다운로드', () => {
     await downloadPdfAndAssertValid(page)
   })
 
-  // 단계 19.5 [P, G2]: ar locale에서도 동일 PDF가 정상 생성되어야 한다.
-  // Korean 본문(data-keep-ltr 컨테이너)이 RTL로 뒤집히면 시각 확인 외에 캡처
-  // 자체는 통과할 수 있으나, 아랍어 폰트 로딩 실패 시 콘솔에 fallback 경고가
-  // 남으므로 그 경로를 잡는다.
+  // 단계 19.6 [RTL]: 보조 언어가 ar이어도 html.dir은 항상 LTR (페이지 RTL 적용 중단).
+  // 아랍어 단락은 자체 dir="rtl"로 텍스트 내부에서만 RTL 정상.
   test('/dev/pdf-smoke — ar locale (mother_tongue) 캡처도 성공', async ({ page }) => {
     await setDisplayLanguage(page, 'ar')
     await page.goto('/dev/pdf-smoke')
-    // dir 동기화 대기 (DirHtmlSync useEffect)
-    await page.waitForFunction(() => document.documentElement.dir === 'rtl', undefined, { timeout: 5_000 })
-    // 그러나 data-keep-ltr 컨테이너는 LTR 유지
+    // 단계 19.6: html.dir은 항상 'ltr' 유지 (보조 언어 ar 선택해도 페이지 RTL 적용 안 됨).
+    await page.waitForFunction(
+      () => document.documentElement.dir === 'ltr',
+      undefined,
+      { timeout: 5_000 },
+    )
+    // PDF 캡처 컨테이너는 LTR 유지.
     await expect(page.locator('[data-testid="pdf-smoke-target"]')).toBeVisible()
     await downloadPdfAndAssertValid(page)
   })
