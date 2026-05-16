@@ -136,8 +136,13 @@ export default async function ConsentPage() {
           사용자가 변경할 수 없으며, 가입 시 결정된 mother_tongue 값으로 표시. */}
       <header>
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{t.title}</h1>
-          <p className="text-sm text-text-secondary mt-1">{t.subtitle}</p>
+          <h1
+            className="text-2xl font-bold text-text-primary"
+            data-testid="consent-header-title"
+          >
+            {t.title}
+          </h1>
+          <p className="text-sm text-text-secondary mt-1" data-testid="consent-header-subtitle">{t.subtitle}</p>
         </div>
       </header>
 
