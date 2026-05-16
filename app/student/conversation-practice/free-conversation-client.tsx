@@ -1303,7 +1303,9 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
           label="대화 요약 PDF"
         />
       </div>
-      <div ref={pdfSectionRef} className="space-y-6">
+      {/* v1.1 단계 19.5 [P.2]: 한국어 대화 본문은 ar 토글에서도 LTR 유지.
+          내부 다국어 라벨은 자체 dir 속성으로 RTL 회복. */}
+      <div ref={pdfSectionRef} className="space-y-6" data-keep-ltr dir="ltr">
 
       {summaryLoading && !summary && (
         <Card>

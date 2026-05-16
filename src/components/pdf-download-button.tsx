@@ -46,6 +46,11 @@ export function PdfDownloadButton(props: PdfDownloadButtonProps) {
       if (beforeCapture) await beforeCapture()
       // 폰트 로딩 안정화 — 한국어·아랍어 폰트 비동기 로딩이 끝난 후 캡처해야
       // 첫 페이지에서 텍스트가 비어 보이지 않는다.
+      //
+      // v1.1 단계 19.5 [P]: next/font로 self-host된 Noto Sans Arabic은 페이지에
+      // 사용되는 시점에 lazy 로드된다. 캡처 대상 안에 lang="ar" 요소가 있으면
+      // 그 요소가 실제 페이지에 마운트되어 있어야 폰트 로드가 트리거되므로,
+      // beforeCapture 후 한 번 더 fonts.ready를 기다린다.
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready
       }

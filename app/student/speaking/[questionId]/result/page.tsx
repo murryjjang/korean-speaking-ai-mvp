@@ -947,7 +947,13 @@ export default async function SpeakingResultPage({
         />
       </div>
 
-      <div id="speaking-result-pdf-target" className="max-w-2xl mx-auto space-y-6">
+      {/* v1.1 단계 19.5 [P.2]: 한국어 평가 본문은 ar 토글에서도 LTR 유지. */}
+      <div
+        id="speaking-result-pdf-target"
+        className="max-w-2xl mx-auto space-y-6"
+        data-keep-ltr
+        dir="ltr"
+      >
         {/* 총점 */}
         <Card>
           <CardHeader

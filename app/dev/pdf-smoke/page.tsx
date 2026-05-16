@@ -5,6 +5,10 @@
 // 경로를 실제 브라우저에서 검증하기 위한 dev/smoke 전용 페이지. Playwright는
 // 다운로드 이벤트를 가로채 PDF 매직 바이트와 페이지 수를 확인한다.
 //
+// 단계 19.5 [P]: 아랍어 학습자가 PDF에서 본문을 읽을 수 있는지 검증하기 위해
+// Arabic 단락을 추가. lang="ar"/dir="rtl" 블록 안에서 Noto Sans Arabic이
+// 적용되어 글자 분리·반전 없이 캡처되어야 한다.
+//
 // 운영 노출 차단: NODE_ENV === 'production'이면 404.
 
 import { notFound } from 'next/navigation'
@@ -37,6 +41,18 @@ export default function PdfSmokePage() {
           <p className="text-text-secondary">
             Tailwind v4 oklch 팔레트 사용. 색상이 잘 캡처되는지 검증한다.
           </p>
+          {/* v1.1 단계 19.5 [P]: 아랍어 shaping 검증 — Noto Sans Arabic이 임베드되어
+              연결 글자(ligature)가 단어 단위로 정상 표시되어야 한다. */}
+          <div
+            data-testid="pdf-smoke-arabic"
+            lang="ar"
+            dir="rtl"
+            className="bg-primary-50 border border-primary-100 rounded p-3 text-text-primary"
+            style={{ fontFamily: "'Noto Sans Arabic', 'Pretendard Variable', sans-serif" }}
+          >
+            <p className="text-sm">مرحباً بك في تطبيق تعلم اللغة الكورية. هذا اختبار لعرض النص العربي في ملف PDF.</p>
+            <p className="text-sm mt-1">السلام عليكم ورحمة الله وبركاته — اليوم سنتعلم بعض العبارات الكورية.</p>
+          </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-primary-100 text-primary-700 p-3 rounded">primary</div>
             <div className="bg-success-100 text-success-700 p-3 rounded">success</div>

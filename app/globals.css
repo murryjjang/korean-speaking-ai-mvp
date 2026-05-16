@@ -94,6 +94,25 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
 }
 
+/* v1.1 단계 19.5 [P]: 아랍어 텍스트는 Pretendard에 글리프가 없어 system 폴백으로
+   렌더되며 html2canvas-pro 캡처 시 shaping이 깨진다. lang="ar"/dir="rtl" 요소에
+   Noto Sans Arabic을 명시적으로 우선 적용 (next/font CSS 변수 self-host). */
+:lang(ar),
+[lang="ar"],
+[dir="rtl"] {
+  font-family: var(--font-noto-sans-arabic), 'Noto Sans Arabic',
+    'Pretendard Variable', 'Pretendard',
+    -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+
+/* 한국어 학습 본문(PDF 캡처 대상 포함)은 html.dir="rtl" 하에서도 LTR 유지.
+   data-keep-ltr 마커로 명시 옵트인. 자식 노드 중 lang="ar"인 블록은 자체
+   dir 속성으로 다시 RTL 회복 가능. */
+[data-keep-ltr] {
+  direction: ltr;
+  text-align: start;
+}
+
 /* === UI polish: 화면 하단 고정 녹음바 === */
 @layer utilities {
   .recorder-fixed {

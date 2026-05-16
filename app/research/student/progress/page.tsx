@@ -169,7 +169,14 @@ export default async function StudentProgressPage() {
         </div>
       </header>
 
-      <div id="research-progress-pdf-target" className="space-y-8">
+      {/* v1.1 단계 19.5 [P.2]: 한국어 본문 위주 컨테이너는 ar 토글 시에도 LTR 유지.
+          내부의 다국어 라벨은 자체 dir 속성으로 RTL 회복 가능. */}
+      <div
+        id="research-progress-pdf-target"
+        className="space-y-8"
+        data-keep-ltr
+        dir="ltr"
+      >
 
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="student-stats">
         <Stat
