@@ -563,6 +563,7 @@ export type DashboardLabelKey =
   | { kind: 'sidebar'; key: keyof typeof SIDEBAR_LABELS }
   | { kind: 'page'; key: keyof typeof PAGE_LABELS }
   | { kind: 'time'; key: keyof typeof TIME_UNITS }
+  | { kind: 'practice'; key: keyof typeof PRACTICE_LABELS }
 
 export function getLabel(spec: DashboardLabelKey, lang: DisplayLanguage): string {
   switch (spec.kind) {
@@ -588,6 +589,8 @@ export function getLabel(spec: DashboardLabelKey, lang: DisplayLanguage): string
       return PAGE_LABELS[spec.key][lang]
     case 'time':
       return TIME_UNITS[spec.key][lang]
+    case 'practice':
+      return PRACTICE_LABELS[spec.key][lang]
   }
 }
 
@@ -604,3 +607,253 @@ export function fmtDuration(
   const secUnit = getLabel({ kind: 'time', key: 'seconds' }, lang)
   return s === 0 ? `${m}${minUnit}` : `${m}${minUnit} ${s}${secUnit}`
 }
+
+// v1.1 단계 19.9 [페이즈4]: 학습 모드 페이지 본문 라벨 (Q2=a 본문 라벨 보조 표기).
+// 19.8까지는 사이드바·모드 카드·페이지 제목만 보조 표기됐고, 페이지 본문 내부
+// 라벨(난이도 배지·primary 액션·필드명·상태)은 한국어 단독이었다. 19.9에서
+// 본 영역까지 확장 — 모든 라벨에 mother_tongue 보조 작은 글씨 추가.
+export const PRACTICE_LABELS = {
+  diff_beginner: {
+    ko: "초급",
+    en: "Beginner",
+    vi: "Cơ bản",
+    ar: "مبتدئ",
+    th: "ระดับเริ่มต้น",
+    ms: "Asas",
+    km: "កម្រិតដំបូង",
+  } satisfies LabelMap,
+  diff_intermediate: {
+    ko: "중급",
+    en: "Intermediate",
+    vi: "Trung cấp",
+    ar: "متوسط",
+    th: "ระดับกลาง",
+    ms: "Pertengahan",
+    km: "មធ្យម",
+  } satisfies LabelMap,
+  diff_advanced: {
+    ko: "고급",
+    en: "Advanced",
+    vi: "Nâng cao",
+    ar: "متقدم",
+    th: "ระดับสูง",
+    ms: "Tinggi",
+    km: "កម្រិតខ្ពស់",
+  } satisfies LabelMap,
+  purpose_official: {
+    ko: "정식 평가",
+    en: "Formal Assessment",
+    vi: "Đánh giá chính thức",
+    ar: "تقييم رسمي",
+    th: "การประเมินอย่างเป็นทางการ",
+    ms: "Penilaian Rasmi",
+    km: "ការប៉ាន់ប្រមាណយ៉ាងផ្លូវការនៅក្នុងការសិក្សា",
+  } satisfies LabelMap,
+  purpose_diagnostic: {
+    ko: "진단평가",
+    en: "Diagnostic Assessment",
+    vi: "Đánh giá chẩn đoán",
+    ar: "تقييم تشخيصي",
+    th: "การประเมินผลการวินิจฉัย",
+    ms: "Penilaian Diagnostik",
+    km: "ការវាយតម្លៃជំនាញ",
+  } satisfies LabelMap,
+  purpose_practice: {
+    ko: "연습평가",
+    en: "Practice Assessment",
+    vi: "Đánh giá thực hành",
+    ar: "تقييم الممارسة",
+    th: "การประเมินผลการฝึกฝน",
+    ms: "Penilaian Latihan",
+    km: "ការប៉ាន់ប្រមាណអនុវត្ត",
+  } satisfies LabelMap,
+  action_startInOrder: {
+    ko: "1번부터 순서대로 응시하기",
+    en: "Take the exam in order starting from 1.",
+    vi: "Tham gia từ câu 1 theo thứ tự.",
+    ar: "ابدأ من الرقم 1 بالترتيب",
+    th: "ทำการสอบตามลำดับตั้งแต่ข้อที่ 1",
+    ms: "Ambil ujian secara berurutan dari nombor 1.",
+    km: "ចាប់ផ្តើមពីលេខ ១ តាមលំដាប់",
+  } satisfies LabelMap,
+  action_start: {
+    ko: "시작하기",
+    en: "Get Started",
+    vi: "Bắt đầu",
+    ar: "ابدأ",
+    th: "เริ่มต้น",
+    ms: "Mulakan",
+    km: "ចាប់ផ្តើម",
+  } satisfies LabelMap,
+  action_recordPresentation: {
+    ko: "발표 녹음 시작",
+    en: "Start recording presentation",
+    vi: "Bắt đầu ghi âm bài thuyết trình",
+    ar: "بدء تسجيل العرض",
+    th: "เริ่มบันทึกการนำเสนอ",
+    ms: "Mulakan rakaman pembentangan",
+    km: "ចាប់ផ្តើមកំណត់សំឡេងការបង្ហាញ",
+  } satisfies LabelMap,
+  action_endConversation: {
+    ko: "대화 종료",
+    en: "End conversation",
+    vi: "Kết thúc cuộc trò chuyện",
+    ar: "إنهاء المحادثة",
+    th: "สิ้นสุดการสนทนา",
+    ms: "Akhiri perbualan",
+    km: "បញ្ចប់ការសន្ទនា",
+  } satisfies LabelMap,
+  action_tryNow: {
+    ko: "체험하기",
+    en: "Experience",
+    vi: "Trải nghiệm",
+    ar: "تجربة",
+    th: "ลองใช้งาน",
+    ms: "Cuba Sekarang",
+    km: "សាកល្បង",
+  } satisfies LabelMap,
+  field_topic: {
+    ko: "주제",
+    en: "Topic",
+    vi: "Chủ đề",
+    ar: "موضوع",
+    th: "หัวข้อ",
+    ms: "Tajuk",
+    km: "ប្រធានបទ",
+  } satisfies LabelMap,
+  field_elapsed: {
+    ko: "경과",
+    en: "Elapsed",
+    vi: "Tiến trình",
+    ar: "المدة",
+    th: "ระยะเวลา",
+    ms: "Perjalanan",
+    km: "កំណត់",
+  } satisfies LabelMap,
+  field_presentationTopic: {
+    ko: "발표 주제",
+    en: "Presentation Topic",
+    vi: "Chủ đề thuyết trình",
+    ar: "موضوع العرض",
+    th: "หัวข้อการนำเสนอ",
+    ms: "Tajuk Pembentangan",
+    km: "ប្រធានបទនៃការបង្ហាញ",
+  } satisfies LabelMap,
+  field_presentationLevel: {
+    ko: "발표 수준",
+    en: "Presentation Level",
+    vi: "Cấp độ thuyết trình",
+    ar: "مستوى العرض",
+    th: "ระดับการนำเสนอ",
+    ms: "Tahap Pembentangan",
+    km: "កម្រិតការបង្ហាញ",
+  } satisfies LabelMap,
+  field_targetTime: {
+    ko: "목표 발표 시간",
+    en: "Goal Presentation Time",
+    vi: "Thời gian công bố mục tiêu",
+    ar: "وقت عرض الهدف",
+    th: "เวลานำเสนอเป้าหมาย",
+    ms: "Masa Pembentangan Matlamat",
+    km: "ពេលវេលាផ្សាយគោលបំណង",
+  } satisfies LabelMap,
+  field_presentationScript: {
+    ko: "발표 원고",
+    en: "Presentation script",
+    vi: "Bài phát biểu",
+    ar: "نص العرض",
+    th: "เอกสารการนำเสนอ",
+    ms: "Draf Pembentangan",
+    km: "អត្ថបទសម្តែង",
+  } satisfies LabelMap,
+  setting_learningSetup: {
+    ko: "학습 설정",
+    en: "Learning Settings",
+    vi: "Cài đặt học tập",
+    ar: "إعدادات التعلم",
+    th: "การตั้งค่าการเรียนรู้",
+    ms: "Tetapan Pembelajaran",
+    km: "ការកំណត់ការសិក្សា",
+  } satisfies LabelMap,
+  setting_presentationSetup: {
+    ko: "발표 설정",
+    en: "Presentation Settings",
+    vi: "Cài đặt bài thuyết trình",
+    ar: "إعداد العرض",
+    th: "การตั้งค่าการนำเสนอ",
+    ms: "Tetapan Pembentangan",
+    km: "ការកំណត់ការបង្ហាញ",
+  } satisfies LabelMap,
+  state_inProgress: {
+    ko: "진행 중",
+    en: "In Progress",
+    vi: "Đang tiến hành",
+    ar: "جاري التنفيذ",
+    th: "กำลังดำเนินการ",
+    ms: "Sedang berlangsung",
+    km: "កំពុងដំណើរការ",
+  } satisfies LabelMap,
+  state_completed: {
+    ko: "완료",
+    en: "Completed",
+    vi: "Hoàn thành",
+    ar: "تم الانتهاء",
+    th: "เสร็จสิ้น",
+    ms: "Selesai",
+    km: "បានបញ្ចប់",
+  } satisfies LabelMap,
+  state_ready: {
+    ko: "체험 가능",
+    en: "Available for trial",
+    vi: "Có thể trải nghiệm",
+    ar: "تجربة متاحة",
+    th: "ทดลองใช้งานได้",
+    ms: "Boleh dicuba",
+    km: "អាចសាកល្បងបាន",
+  } satisfies LabelMap,
+  state_preparing: {
+    ko: "준비 중",
+    en: "Preparing",
+    vi: "Đang chuẩn bị",
+    ar: "قيد التحضير",
+    th: "กำลังเตรียมการ",
+    ms: "Sedang bersiap",
+    km: "កំពុងរៀបចំ",
+  } satisfies LabelMap,
+  meta_pronunciationAzure: {
+    ko: "발음 평가 (Azure)",
+    en: "Pronunciation Assessment (Azure)",
+    vi: "Đánh giá phát âm (Azure)",
+    ar: "تقييم النطق (Azure)",
+    th: "การประเมินการออกเสียง (Azure)",
+    ms: "Penilaian Sebutan (Azure)",
+    km: "ការប៉ាន់ប្រមាណសំឡេង (Azure)",
+  } satisfies LabelMap,
+  meta_npcAutoPlay: {
+    ko: "NPC 음성 자동 재생",
+    en: "NPC Voice Auto Play",
+    vi: "Tự động phát giọng NPC",
+    ar: "تشغيل صوت NPC تلقائيًا",
+    th: "การเล่นเสียง NPC อัตโนมัติ",
+    ms: "Pemain NPC suara automatik",
+    km: "ការបញ្ចេញសំឡេង NPC ធ្វើឡើងដោយស្វ័យប្រវត្តិ",
+  } satisfies LabelMap,
+  meta_prepTime: {
+    ko: "준비",
+    en: "Ready",
+    vi: "Chuẩn bị",
+    ar: "استعداد",
+    th: "เตรียมพร้อม",
+    ms: "Sedia",
+    km: "រៀបចំ",
+  } satisfies LabelMap,
+  meta_answerTime: {
+    ko: "답변",
+    en: "Answer",
+    vi: "Câu trả lời",
+    ar: "إجابة",
+    th: "คำตอบ",
+    ms: "Jawapan",
+    km: "ចម្លើយ",
+  } satisfies LabelMap,
+} as const

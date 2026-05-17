@@ -3,12 +3,17 @@ import questionSetsJson from '@/src/content/question-sets.json'
 import questionsJson from '@/src/content/questions.json'
 import questionTypesJson from '@/src/content/question-types.json'
 import { PageHeader, Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
+import { Localized } from '@/src/components/ui/localized'
+import { getCurrentParticipant } from '@/src/lib/research/session'
+import type { DashboardLabelKey } from '@/src/lib/i18n/dashboard-labels'
 import { StartSetButton } from './start-set-button'
 
-const difficultyLabel: Record<string, string> = {
-  beginner: '초급',
-  intermediate: '중급',
-  advanced: '고급',
+// v1.1 단계 19.9 [페이즈4]: 난이도·목적 라벨도 한국어 본문 + mother_tongue 보조.
+// Localized 컴포넌트가 mother_tongue 단독 결정으로 보조 텍스트를 렌더.
+const difficultyKey: Record<string, DashboardLabelKey> = {
+  beginner: { kind: 'practice', key: 'diff_beginner' },
+  intermediate: { kind: 'practice', key: 'diff_intermediate' },
+  advanced: { kind: 'practice', key: 'diff_advanced' },
 }
 
 const difficultyVariant: Record<string, 'success' | 'info' | 'warning'> = {
@@ -17,10 +22,14 @@ const difficultyVariant: Record<string, 'success' | 'info' | 'warning'> = {
   advanced: 'warning',
 }
 
-const purposeLabel: Record<string, string> = {
-  official: '정식 평가',
-  diagnostic: '진단평가',
-  practice: '연습평가',
+const purposeKey: Record<string, DashboardLabelKey | undefined> = {
+  official: { kind: 'practice', key: 'purpose_official' },
+  diagnostic: { kind: 'practice', key: 'purpose_diagnostic' },
+  practice: { kind: 'practice', key: 'purpose_practice' },
+  // post·dev는 학습자 노출 가능성 거의 없어 한국어 단독 유지.
+}
+
+const purposeFallback: Record<string, string> = {
   post: '사후평가',
   dev: '개발용',
 }
@@ -33,7 +42,9 @@ const purposeVariant: Record<string, 'success' | 'info' | 'default' | 'warning'>
   dev: 'default',
 }
 
-export default function SpeakingSelectionPage() {
+export default async function SpeakingSelectionPage() {
+  const participant = await getCurrentParticipant().catch(() => null)
+  const motherTongueHint = participant?.motherTongue ?? null
   const activeSets = questionSetsJson.filter((qs) => qs.isActive)
   const questionMap = new Map(questionsJson.map((q) => [q.id, q]))
   const typeMap = new Map(questionTypesJson.map((t) => [t.id, t]))
@@ -58,7 +69,11 @@ export default function SpeakingSelectionPage() {
               description={set.description}
               action={
                 <Badge variant={purposeVariant[set.purpose]}>
-                  {purposeLabel[set.purpose] ?? set.purpose}
+                  {purposeKey[set.purpose] ? (
+                    <Localized spec={purposeKey[set.purpose]!} motherTongueHint={motherTongueHint} inline prominent />
+                  ) : (
+                    purposeFallback[set.purpose] ?? set.purpose
+                  )}
                 </Badge>
               }
             />
@@ -69,7 +84,11 @@ export default function SpeakingSelectionPage() {
                   firstQuestionId={firstActiveQuestion.questionId}
                   className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[40px] rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700"
                 >
-                  1번부터 순서대로 응시하기 →
+                  <Localized
+                    spec={{ kind: 'practice', key: 'action_startInOrder' }}
+                    motherTongueHint={motherTongueHint}
+                    inline
+                  /> →
                 </StartSetButton>
               </div>
             )}
@@ -97,7 +116,16 @@ export default function SpeakingSelectionPage() {
                                 difficultyVariant[q.difficulty] ?? 'default'
                               }
                             >
-                              {difficultyLabel[q.difficulty] ?? q.difficulty}
+                              {difficultyKey[q.difficulty] ? (
+                                <Localized
+                                  spec={difficultyKey[q.difficulty]}
+                                  motherTongueHint={motherTongueHint}
+                                  inline
+                                  prominent
+                                />
+                              ) : (
+                                q.difficulty
+                              )}
                             </Badge>
                           </div>
                           {/* 메타: 데스크톱 전용 */}
@@ -111,7 +139,11 @@ export default function SpeakingSelectionPage() {
                           href={`/student/speaking/${q.id}?setId=${set.id}`}
                           className="hidden md:inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 py-2 rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 shrink-0"
                         >
-                          시작하기
+                          <Localized
+                            spec={{ kind: 'practice', key: 'action_start' }}
+                            motherTongueHint={motherTongueHint}
+                            inline
+                          />
                         </Link>
                       </div>
 
@@ -125,7 +157,11 @@ export default function SpeakingSelectionPage() {
                           href={`/student/speaking/${q.id}?setId=${set.id}`}
                           className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 shrink-0"
                         >
-                          시작하기
+                          <Localized
+                            spec={{ kind: 'practice', key: 'action_start' }}
+                            motherTongueHint={motherTongueHint}
+                            inline
+                          />
                         </Link>
                       </div>
                     </li>
