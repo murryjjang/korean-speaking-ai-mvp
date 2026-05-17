@@ -95,8 +95,10 @@ describe('[단계19.8-UI보조] Localized 컴포넌트가 mother_tongue 보조 �
     expect(localizedSrc).toMatch(/data-bilingual-supplement/)
   })
 
-  it('RTL(ar)에 대해 unicodeBidi/plaintext 처리', () => {
-    expect(localizedSrc).toMatch(/unicodeBidi:\s*'plaintext'/)
+  it('RTL(ar)에 대해 unicodeBidi 격리 처리', () => {
+    // v1.1 단계 19.11 [#3]: plaintext → isolate 격상 (외부 LTR 괄호 회귀 차단).
+    // dir 속성이 명시되므로 plaintext의 자동 dir 결정 효과는 불필요, isolate가 적절.
+    expect(localizedSrc).toMatch(/unicodeBidi:\s*'isolate'/)
   })
 
   it('lang="ko" 본문 + 보조 영역 lang 속성 명시', () => {
