@@ -39,6 +39,27 @@ const CASES: Case[] = [
   { participantCode: 'P046', pin: '1046', motherTongue: 'km', sidebarMyProgress: 'ស្ថានភាពការសិក្សារបស់ខ្ញុំ', freeConvTopicHeader: 'ប្រធានបទដែលណែនាំ' },
 ]
 
+test.describe('[단계19.11-#3] 진척 페이지 RTL/LTR 괄호 bidi 격리 — 페이지 로드 검증', () => {
+  // 회귀 코드 패턴은 unit test (stage1911-bidi-isolation)로 보장. 여기서는
+  // P043(ar)가 진척 페이지 정상 로드 + 한국어/아랍어 보조 표기 노출만 확인.
+  test('P043 (ar) — 진척 페이지 정상 로드 + 보조 표기 노출', async ({ page }) => {
+    await resetParticipantConsent('P043')
+    await loginAsResearchParticipant(page, 'P043', '1043')
+    const agreeBtn = page.getByTestId('btn-consent-agree')
+    if (await agreeBtn.isVisible().catch(() => false)) {
+      await agreeBtn.click()
+      await page.waitForURL(/\/research\/student\/progress/, { timeout: 10_000 })
+    }
+    await expect(page.getByTestId('research-student-progress')).toBeVisible()
+    // 아랍어 보조 마크가 페이지에 존재
+    await expect(page.locator('[data-bilingual-supplement="ar"]').first()).toBeVisible()
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/03-progress-rtl-bidi-P043-ar.png`,
+      fullPage: true,
+    })
+  })
+})
+
 test.describe('[단계19.11-#1] /research/login 6개 외국어 동시 표시 제거 검증', () => {
   test('로그인 화면에 6개 외국어 보조 라벨 span 없음 + 영어 한 줄 도움말 노출', async ({ page }) => {
     await page.goto('/research/login')

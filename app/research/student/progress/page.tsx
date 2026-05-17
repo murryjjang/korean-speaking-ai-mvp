@@ -315,9 +315,13 @@ export default async function StudentProgressPage() {
                           <span className="text-text-secondary">{persona.nameKo}</span>
                         </>
                       )}
+                      {/* v1.1 단계 19.11 [#3]: RTL 보조 텍스트(예: 아랍어 "مكتمل")가
+                          외부 한국어 괄호와 같은 인라인 컨텍스트에 섞여 bidi 알고리즘이
+                          ")"를 별도 줄로 밀어내던 회귀. dir="ltr" + unicode-bidi:isolate로
+                          괄호 컨테이너를 LTR 컨텍스트로 격리해 줄바뀜 차단. */}
                       {s.sessionEndedAt
-                        ? <span className="text-emerald-600 ml-auto">(<Localized spec={{ kind: 'page', key: 'completed' }} motherTongueHint={participant.motherTongue} />)</span>
-                        : <span className="text-yellow-600 ml-auto">(<Localized spec={{ kind: 'page', key: 'inProgress' }} motherTongueHint={participant.motherTongue} />)</span>}
+                        ? <span className="text-emerald-600 ml-auto" dir="ltr" style={{ unicodeBidi: 'isolate' }}>(<Localized spec={{ kind: 'page', key: 'completed' }} motherTongueHint={participant.motherTongue} />)</span>
+                        : <span className="text-yellow-600 ml-auto" dir="ltr" style={{ unicodeBidi: 'isolate' }}>(<Localized spec={{ kind: 'page', key: 'inProgress' }} motherTongueHint={participant.motherTongue} />)</span>}
                     </div>
                     <div className="mt-1 flex items-baseline gap-3">
                       {topic ? (

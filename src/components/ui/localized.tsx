@@ -55,7 +55,9 @@ export function Localized({
         className={className}
         dir={rtl ? 'rtl' : undefined}
         lang={lang ?? undefined}
-        style={rtl ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+        // v1.1 단계 19.11 [#3]: 보조 영역을 항상 isolate해 외부 LTR 괄호 등과
+        // bidi 충돌 차단. RTL은 plaintext 흐름 + 격리, LTR은 단순 격리.
+        style={rtl ? { unicodeBidi: 'isolate', textAlign: 'start' } : { unicodeBidi: 'isolate' }}
         data-bilingual-supplement={lang}
       >
         {supplement}
@@ -79,7 +81,9 @@ export function Localized({
           className={supClass}
           dir={rtl ? 'rtl' : undefined}
           lang={lang ?? undefined}
-          style={rtl ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+          // v1.1 단계 19.11 [#3]: 보조 영역을 항상 isolate — inline 모드 시 외부 괄호 추가
+          // 시나리오(예: "(완료 مكتمل)")에서 ")"가 RTL 컨텍스트로 잘못 밀려나는 회귀 차단.
+          style={rtl ? { unicodeBidi: 'isolate', textAlign: 'start' } : { unicodeBidi: 'isolate' }}
         >
           {inline ? `(${supplement})` : supplement}
         </span>
