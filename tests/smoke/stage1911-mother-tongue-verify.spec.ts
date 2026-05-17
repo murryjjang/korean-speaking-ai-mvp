@@ -39,6 +39,25 @@ const CASES: Case[] = [
   { participantCode: 'P046', pin: '1046', motherTongue: 'km', sidebarMyProgress: 'ស្ថានភាពការសិក្សារបស់ខ្ញុំ', freeConvTopicHeader: 'ប្រធានបទដែលណែនាំ' },
 ]
 
+test.describe('[단계19.11-#1] /research/login 6개 외국어 동시 표시 제거 검증', () => {
+  test('로그인 화면에 6개 외국어 보조 라벨 span 없음 + 영어 한 줄 도움말 노출', async ({ page }) => {
+    await page.goto('/research/login')
+    await expect(page.getByTestId('research-login-page')).toBeVisible()
+    // 단계 19.10 페이즈 1.2에서 추가됐던 6개 외국어 hint 영역이 제거됐는지 확인
+    await expect(page.getByTestId('code-label-hints')).toHaveCount(0)
+    await expect(page.getByTestId('pin-label-hints')).toHaveCount(0)
+    // 단계 19.11 페이즈 2 신규 — 영어 도움말 한 줄 노출
+    const hint = page.getByTestId('login-hint-en')
+    await expect(hint).toBeVisible()
+    await expect(hint).toHaveAttribute('lang', 'en')
+    await expect(hint).toContainText('participant code')
+    await page.screenshot({
+      path: `${SCREENSHOT_DIR}/00-login-redesigned.png`,
+      fullPage: true,
+    })
+  })
+})
+
 test.describe('[단계19.11] 7개 mother_tongue × 3 화면 보조 표기 시각 검증', () => {
   for (const c of CASES) {
     test(`${c.participantCode} (mt=${c.motherTongue}) — 진척 페이지 사이드바 보조`, async ({ page }) => {

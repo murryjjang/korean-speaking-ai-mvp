@@ -1,10 +1,10 @@
 // v1.1 단계 10-2 / 16-10-6 / 18 [I]: 참여자 사전 발급 코드 로그인.
 // 단계 18 [I]: KDLI 로고·중앙 정렬·카드 디자인을 /login과 통일.
-// v1.1 단계 19.10 [#8]: 19.7 결정에 따라 언어 토글 제거. 학습자는 로그인하기
-// 전까지는 mother_tongue이 정해지지 않아 토글로 미리 보는 UI 언어는 의미가 없다.
-// 동의서 이후 화면은 mother_tongue 단독으로 보조 표기를 결정한다. 로그인 카드는
-// 한국어 본문 + 6개 외국어 보조 라벨을 한 화면에 함께 노출해 어느 모국어 학습자도
-// 코드·PIN 입력 의미를 이해할 수 있게 한다.
+// v1.1 단계 19.10 [#8]: 19.7 결정에 따라 언어 토글 제거.
+// v1.1 단계 19.11 [#1]: 19.10 페이즈 1.2에서 6개 외국어 보조 라벨을 한 줄로 동시
+// 노출했더니 화면이 난잡했다. 한국어 본문 + 영어 한 줄 도움말만 남기고 6개 보조
+// 라벨은 제거한다. 학습자는 코드·PIN의 의미를 영어 도움말 또는 인쇄물로 안내받고,
+// 동의서 이후 화면부터 mother_tongue 보조 표기가 시작된다.
 
 import { redirect } from 'next/navigation'
 
@@ -136,9 +136,6 @@ const I18N: Record<Lang, {
   },
 }
 
-// v1.1 단계 19.10 [#8]: 보조 라벨 — 코드 입력·PIN 입력의 의미를 6개 외국어로 함께 표시.
-const FOREIGN_LANGS: Lang[] = ['en', 'vi', 'ar', 'th', 'ms', 'km']
-const RTL_LANGS: ReadonlyArray<Lang> = ['ar']
 
 export default async function ResearchLoginPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
@@ -163,18 +160,6 @@ export default async function ResearchLoginPage({ searchParams }: { searchParams
     redirect(ok.consentRequired ? '/research/consent' : redirectTo)
   }
 
-  // v1.1 단계 19.10 [#8]: 코드/PIN 라벨을 6개 외국어 작은 글씨로 함께 보여 다언어 학습자 모두 이해 가능.
-  const codeLabelHints = FOREIGN_LANGS.map((c) => ({
-    code: c,
-    text: I18N[c].codeLabel,
-    rtl: RTL_LANGS.includes(c),
-  }))
-  const pinLabelHints = FOREIGN_LANGS.map((c) => ({
-    code: c,
-    text: I18N[c].pinLabel,
-    rtl: RTL_LANGS.includes(c),
-  }))
-
   return (
     <div
       className="min-h-screen flex items-center justify-center bg-surface px-4 py-10"
@@ -196,6 +181,14 @@ export default async function ResearchLoginPage({ searchParams }: { searchParams
             {t.title}
           </h1>
           <p className="text-sm text-text-secondary text-center">{t.subtitle}</p>
+          {/* v1.1 단계 19.11 [#1]: 6개 외국어 보조 라벨 동시 표시 제거 — 영어 한 줄 도움말로 단순화. */}
+          <p
+            className="text-xs text-text-muted text-center"
+            lang="en"
+            data-testid="login-hint-en"
+          >
+            Enter your participant code (e.g. P001) to begin.
+          </p>
         </div>
 
         <form
@@ -226,21 +219,6 @@ export default async function ResearchLoginPage({ searchParams }: { searchParams
             >
               {t.codeLabel}
             </label>
-            <div
-              className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-text-muted leading-snug"
-              data-testid="code-label-hints"
-            >
-              {codeLabelHints.map((h) => (
-                <span
-                  key={h.code}
-                  lang={h.code}
-                  dir={h.rtl ? 'rtl' : undefined}
-                  style={h.rtl ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
-                >
-                  {h.text}
-                </span>
-              ))}
-            </div>
             <input
               id="research-login-code"
               name="code"
@@ -262,21 +240,6 @@ export default async function ResearchLoginPage({ searchParams }: { searchParams
             >
               {t.pinLabel}
             </label>
-            <div
-              className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-text-muted leading-snug"
-              data-testid="pin-label-hints"
-            >
-              {pinLabelHints.map((h) => (
-                <span
-                  key={h.code}
-                  lang={h.code}
-                  dir={h.rtl ? 'rtl' : undefined}
-                  style={h.rtl ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
-                >
-                  {h.text}
-                </span>
-              ))}
-            </div>
             <input
               id="research-login-pin"
               name="pin"
