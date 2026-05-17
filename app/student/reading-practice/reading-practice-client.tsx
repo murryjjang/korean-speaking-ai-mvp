@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
+import { Localized } from '@/src/components/ui/localized'
 import { computeEtriWordDiff } from '@/src/lib/etri-word-diff'
 import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
@@ -842,13 +843,19 @@ export function ReadingPracticeClient({ motherTongue }: { motherTongue?: string 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-12">
 
-      {/* 헤더 */}
+      {/* 헤더 — v1.1 단계 19.9 [페이즈5]: 4개 메뉴 page 제목 typography 통일 (text-xl) + mother_tongue 보조. */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-3xl font-bold text-text-primary">읽기연습</h1>
+          <h1 className="text-xl font-bold text-text-primary leading-tight" lang="ko">읽기연습</h1>
+          <div className="mt-0.5">
+            <Localized
+              spec={{ kind: 'sidebar', key: 'studentReading' }}
+              motherTongueHint={motherTongue}
+              supplementOnly
+              className="text-xs text-text-muted"
+            />
           </div>
-          <p className="text-sm text-text-secondary">
+          <p className="mt-1 text-sm text-text-secondary">
             AI 음성을 듣고 따라 읽은 뒤, 음성 인식 결과와 제시문을 비교해 읽기 정확도를 확인합니다.
           </p>
         </div>

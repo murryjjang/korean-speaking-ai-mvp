@@ -6,6 +6,7 @@ import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 import { type FeedbackLanguage } from '@/src/lib/feedback-language'
 import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
 import { BilingualText, BilingualListItem } from '@/src/components/ui/bilingual-text'
+import { Localized } from '@/src/components/ui/localized'
 import { ToolResultCards } from '@/src/components/tool-result-cards'
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { getPersona } from '@/src/lib/personas'
@@ -819,8 +820,17 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
       return (
         <div className="max-w-2xl mx-auto space-y-6 px-4 py-6" data-testid="free-conversation-start">
           <div>
-            <h1 className="text-xl font-bold text-text-primary">생성형 대화 연습</h1>
-            <p className="text-sm text-text-secondary mt-1">
+            {/* v1.1 단계 19.9 [페이즈5]: page 제목 mother_tongue 보조 표기 통일. */}
+            <h1 className="text-xl font-bold text-text-primary leading-tight" lang="ko">생성형 대화 연습</h1>
+            <div className="mt-0.5">
+              <Localized
+                spec={{ kind: 'page', key: 'freeConversationPractice' }}
+                motherTongueHint={motherTongue}
+                supplementOnly
+                className="text-xs text-text-muted"
+              />
+            </div>
+            <p className="mt-1 text-sm text-text-secondary">
               먼저 대화 주제를 고르세요. 추천 주제 중에서 선택하거나 직접 입력할 수 있습니다. (1/2)
             </p>
           </div>

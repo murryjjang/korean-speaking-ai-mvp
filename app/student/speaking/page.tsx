@@ -54,6 +54,14 @@ export default async function SpeakingSelectionPage() {
       <PageHeader
         title="말하기 평가"
         description="아래 평가 세트에서 문항을 선택하거나 세트 전체를 순서대로 응시하세요."
+        titleSupplement={
+          <Localized
+            spec={{ kind: 'sidebar', key: 'studentSpeaking' }}
+            motherTongueHint={motherTongueHint}
+            supplementOnly
+            className="text-xs text-text-muted"
+          />
+        }
       />
 
       <div className="flex flex-col gap-6">

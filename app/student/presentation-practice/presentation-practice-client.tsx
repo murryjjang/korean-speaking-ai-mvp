@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo, type CSSProperties } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
+import { Localized } from '@/src/components/ui/localized'
 import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
@@ -972,12 +973,18 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
 
       <div className="space-y-6">
 
-      {/* 헤더 */}
+      {/* 헤더 — v1.1 단계 19.9 [페이즈5]: 4개 메뉴 page 제목 통일 (text-xl) + mother_tongue 보조. */}
       <div>
-        <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-3xl font-bold text-text-primary">발표연습</h1>
+        <h1 className="text-xl font-bold text-text-primary leading-tight" lang="ko">발표연습</h1>
+        <div className="mt-0.5">
+          <Localized
+            spec={{ kind: 'sidebar', key: 'studentPresentation' }}
+            motherTongueHint={motherTongue}
+            supplementOnly
+            className="text-xs text-text-muted"
+          />
         </div>
-        <p className="text-sm text-text-secondary">
+        <p className="mt-1 text-sm text-text-secondary">
           발표 원고를 입력하면 AI가 자연스러운 한국어로 다듬고, 수정 이유를 한국어와 학습자
           모국어로 설명합니다. 이후 교정문을 들으며 섀도잉 연습을 하고, 직접 발표한 내용을
           음성 인식으로 확인할 수 있습니다.
