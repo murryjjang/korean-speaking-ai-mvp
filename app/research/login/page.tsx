@@ -131,17 +131,15 @@ export default async function ResearchLoginPage({ searchParams }: { searchParams
       dir={rtl ? 'rtl' : undefined}
     >
       <main className="w-full max-w-sm">
-        {/* 단계 18 [I]: /login과 동일한 KDLI 로고·중앙 정렬·타이틀 폰트.
-            단계 19.5 [L.4]: 원본 벡터 입수 전 임시 placeholder SVG로 교체.
-            next/image의 SVG 보안 제약을 우회하기 위해 일반 <img> 사용. */}
+        {/* v1.1 단계 19.9 [로고]: 공식 KDLI 원형 로고 (사용자 제공). */}
         <div className="flex flex-col items-center gap-4 mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logos/kdli-placeholder.svg"
-            alt="KDLI - Korea Defense Language Institute (placeholder)"
-            width={160}
-            height={160}
-            className="h-40 w-40"
+            src="/kdli-logo-circle.png"
+            alt="KDLI - Korea Defense Language Institute"
+            width={224}
+            height={224}
+            className="h-56 w-56 object-contain"
             data-testid="kdli-logo"
           />
           <h1 className="text-2xl font-semibold text-text-primary tracking-tight text-center">

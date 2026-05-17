@@ -13,17 +13,15 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center gap-4 mb-8">
-          {/* v1.1 단계 19.5 [L.4]: 원본 벡터 입수 전 임시 placeholder SVG.
-              PNG 에지 안티앨리어싱 아티팩트 차단을 위해 벡터로 교체.
-              next/image의 SVG 보안 제약을 우회하기 위해 일반 <img> 사용. */}
+          {/* v1.1 단계 19.9 [로고]: 공식 KDLI 원형 로고 (사용자 제공). */}
           <div className="flex justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logos/kdli-placeholder.svg"
-              alt="KDLI - Korea Defense Language Institute (placeholder)"
-              width={160}
-              height={160}
-              className="h-40 w-40"
+              src="/kdli-logo-circle.png"
+              alt="KDLI - Korea Defense Language Institute"
+              width={224}
+              height={224}
+              className="h-56 w-56 object-contain"
               data-testid="kdli-logo"
             />
           </div>

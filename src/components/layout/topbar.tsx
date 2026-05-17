@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { Badge } from "@/src/components/ui/badge";
+import { KdliBrand } from "./kdli-brand";
 import type { UserRole } from "./app-shell";
 
 interface TopbarProps {
@@ -24,24 +24,8 @@ export function Topbar({ role, userName }: TopbarProps) {
 
   return (
     <header className="h-14 shrink-0 flex items-center justify-between px-6 bg-surface-raised border-b border-border">
-      <div className="flex items-center gap-3">
-        <div className="inline-flex items-center justify-center bg-white rounded-lg px-2 py-1">
-          <Image
-            src="/logos/kdli-logo-256.png"
-            alt="KDLI"
-            width={160}
-            height={120}
-            priority
-            className="h-7 w-auto"
-          />
-        </div>
-        <span className="text-border-strong text-sm" aria-hidden="true">
-          |
-        </span>
-        <span className="text-xs text-text-secondary font-medium">
-          말하기 훈련·평가 플랫폼
-        </span>
-      </div>
+      {/* v1.1 단계 19.9 [로고]: 공용 KdliBrand로 통일 — 학습자/관리자/리서치 헤더 동일 워드마크. */}
+      <KdliBrand subtitle="말하기 훈련·평가 플랫폼" />
 
       <div className="flex items-center gap-3">
         {userName && (
