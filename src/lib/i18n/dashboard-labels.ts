@@ -273,13 +273,67 @@ export function scoreLevelKey(ratio: number): keyof typeof SCORE_LEVEL_LABELS {
   return 'novice'
 }
 
+// v1.1 단계 19.8 [UI보조]: 학습자 사이드바 메뉴 5개 — Korean + mother_tongue 보조.
+// Sidebar는 navItems의 href와 매칭해 라벨을 결정. 키는 의미 단위로 안정 (i18n 표준).
+export const SIDEBAR_LABELS = {
+  studentProgress: {
+    ko: '내 학습 현황',
+    en: 'My Progress',
+    vi: 'Tiến độ học tập',
+    ar: 'تقدم التعلم',
+  } satisfies LabelMap,
+  studentSpeaking: {
+    ko: '말하기 평가',
+    en: 'Speaking Assessment',
+    vi: 'Đánh giá nói',
+    ar: 'تقييم التحدث',
+  } satisfies LabelMap,
+  studentReading: {
+    ko: '읽기연습',
+    en: 'Reading Practice',
+    vi: 'Luyện đọc',
+    ar: 'تدريب القراءة',
+  } satisfies LabelMap,
+  studentPresentation: {
+    ko: '발표연습',
+    en: 'Presentation Practice',
+    vi: 'Luyện thuyết trình',
+    ar: 'تدريب العرض',
+  } satisfies LabelMap,
+  studentConversation: {
+    ko: '생성형 대화',
+    en: 'Free Conversation',
+    vi: 'Trò chuyện tự do',
+    ar: 'محادثة حرة',
+  } satisfies LabelMap,
+} as const
+
 // 페이지 헤더
 export const PAGE_LABELS = {
   progressTitle: {
     ko: '학습 진척 상황',
     en: 'Learning Progress',
     vi: 'Tiến độ học tập',
-    ar: 'تقدم التعلم',
+    ar: 'حالة التقدم في التعلم',
+  } satisfies LabelMap,
+  // v1.1 단계 19.8 [UI보조]: 다음 페이지 제목들도 mother_tongue 보조 표기.
+  evaluationResult: {
+    ko: '평가 결과',
+    en: 'Assessment Result',
+    vi: 'Kết quả đánh giá',
+    ar: 'نتيجة التقييم',
+  } satisfies LabelMap,
+  freeConversationPractice: {
+    ko: '생성형 대화 연습',
+    en: 'Free Conversation Practice',
+    vi: 'Luyện trò chuyện tự do',
+    ar: 'تدريب المحادثة الحرة',
+  } satisfies LabelMap,
+  chooseConversationPartner: {
+    ko: '대화 상대 선택',
+    en: 'Choose Conversation Partner',
+    vi: 'Chọn người trò chuyện',
+    ar: 'اختر شريك المحادثة',
   } satisfies LabelMap,
   participantCode: {
     ko: '참여자 코드',
@@ -344,6 +398,7 @@ export type DashboardLabelKey =
   | { kind: 'scoreUnit'; key: keyof typeof SCORE_UNIT_LABELS }
   | { kind: 'overallScore'; key: keyof typeof OVERALL_SCORE_LABELS }
   | { kind: 'scoreLevel'; key: keyof typeof SCORE_LEVEL_LABELS }
+  | { kind: 'sidebar'; key: keyof typeof SIDEBAR_LABELS }
   | { kind: 'page'; key: keyof typeof PAGE_LABELS }
   | { kind: 'time'; key: keyof typeof TIME_UNITS }
 
@@ -365,6 +420,8 @@ export function getLabel(spec: DashboardLabelKey, lang: DisplayLanguage): string
       return OVERALL_SCORE_LABELS[spec.key][lang]
     case 'scoreLevel':
       return SCORE_LEVEL_LABELS[spec.key][lang]
+    case 'sidebar':
+      return SIDEBAR_LABELS[spec.key][lang]
     case 'page':
       return PAGE_LABELS[spec.key][lang]
     case 'time':

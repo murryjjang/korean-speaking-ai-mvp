@@ -22,7 +22,7 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: ['**/mobile-speaking.spec.ts', '**/auth-routes.spec.ts', '**/reading-practice.spec.ts', '**/presentation-practice.spec.ts', '**/analytics-dashboard.spec.ts', '**/pdf-download.spec.ts', '**/console-errors.spec.ts', '**/stage195-visual-verify.spec.ts', '**/stage197-real-user-path.spec.ts', '**/stage197-pdf-real-path.spec.ts', '**/stage198-logo-verify.spec.ts', '**/stage198-realuser.spec.ts'],
+      testMatch: ['**/mobile-speaking.spec.ts', '**/auth-routes.spec.ts', '**/reading-practice.spec.ts', '**/presentation-practice.spec.ts', '**/analytics-dashboard.spec.ts', '**/pdf-download.spec.ts', '**/console-errors.spec.ts', '**/stage195-visual-verify.spec.ts', '**/stage197-real-user-path.spec.ts', '**/stage197-pdf-real-path.spec.ts', '**/stage198-logo-verify.spec.ts', '**/stage198-realuser.spec.ts', '**/stage198-ui-supplement.spec.ts'],
     },
   ],
 

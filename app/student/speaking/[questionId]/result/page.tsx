@@ -6,6 +6,7 @@ import questionSetsJson from '@/src/content/question-sets.json'
 import questionTypesJson from '@/src/content/question-types.json'
 import rubricsJson from '@/src/content/rubrics.json'
 import { PageHeader, Card, CardHeader, CardBody, Badge, ScoreBar, MultilingualFeedback } from '@/src/components/ui'
+import { Localized } from '@/src/components/ui/localized'
 import type { AzureWordResult } from '@/src/types/providers'
 import { MultilingualFeedbackBlock } from '@/src/components/multilingual-feedback-block'
 import { getCurrentParticipant } from '@/src/lib/research/session'
@@ -936,6 +937,14 @@ export default async function SpeakingResultPage({
       <PageHeader
         title="평가 결과"
         description={`${set?.name ?? '말하기 평가'} · ${qType?.name ?? ''} · ${submittedAt}`}
+        titleSupplement={
+          <Localized
+            spec={{ kind: 'page', key: 'evaluationResult' }}
+            motherTongueHint={participantMotherTongue}
+            supplementOnly
+            className="text-xs text-text-muted block"
+          />
+        }
       />
 
       {/* v1.1 26-3: 평가 결과 화면 전체를 PDF로 다운로드 */}
