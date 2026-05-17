@@ -8,10 +8,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// v1.1 단계 19.5 [P]: 아랍어 학습자용 폰트 임베드.
-// Pretendard에는 아랍어 글리프가 없어 시스템 폴백으로 떨어지면 html2canvas-pro
-// 캡처 시 글자 분리·반전(shaping 깨짐)이 발생. next/font로 self-host해 모든
-// 환경에서 동일한 ligature/joining이 보장되도록 한다.
+// v1.1 단계 19.5 [P] / 19.9 유지: 아랍어 학습자용 폰트 임베드 (next/font self-host).
+// 19.5에서 html2canvas-pro 캡처 시 shaping 깨짐을 막을 목적으로 도입.
+// 19.9에서 PDF는 Puppeteer 서버사이드 렌더로 전환됐으나, 화면 표시(웹·동의서)에서도
+// Pretendard에 없는 아랍어 글리프를 self-host로 제공하기 위해 그대로 유지.
 const notoSansArabic = Noto_Sans_Arabic({
   variable: "--font-noto-sans-arabic",
   subsets: ["arabic"],
