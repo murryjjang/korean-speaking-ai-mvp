@@ -1,6 +1,7 @@
 // v1.1 단계 19.7 검증용 시드 스크립트.
-// 4명의 참여자(P040 ko, P041 en, P042 vi, P043 ar)를 Supabase에 멱등 발급한다.
-// 이미 존재하면 skip — 코드 충돌 방지.
+// 7명의 참여자(P040 ko, P041 en, P042 vi, P043 ar, P044 th, P045 ms, P046 km)
+// 를 Supabase에 멱등 발급한다. 이미 존재하면 consent·name만 reset.
+// 단계 19.11에서 P044/045/046 추가 — 7개 mother_tongue 시각 검증용.
 //
 // 사용:
 //   npx tsx scripts/seed-stage197-participants.ts
@@ -50,6 +51,10 @@ const SEEDS: Seed[] = [
   { participantCode: 'P041', motherTongue: 'en', name: 'stage197-seed-041', pin: '1041' },
   { participantCode: 'P042', motherTongue: 'vi', name: 'stage197-seed-042', pin: '1042' },
   { participantCode: 'P043', motherTongue: 'ar', name: 'stage197-seed-043', pin: '1043' },
+  // v1.1 단계 19.11: 7개 mother_tongue 시각 검증용 확장.
+  { participantCode: 'P044', motherTongue: 'th', name: 'stage1911-seed-044', pin: '1044' },
+  { participantCode: 'P045', motherTongue: 'ms', name: 'stage1911-seed-045', pin: '1045' },
+  { participantCode: 'P046', motherTongue: 'km', name: 'stage1911-seed-046', pin: '1046' },
 ]
 
 // consent_status=false로 리셋하기 위해 admin client 직접 사용.
