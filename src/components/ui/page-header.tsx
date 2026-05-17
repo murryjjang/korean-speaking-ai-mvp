@@ -2,7 +2,8 @@ import { type ReactNode } from "react";
 
 interface PageHeaderProps {
   title: string;
-  description?: string;
+  // v1.1 단계 19.10 [페이즈3]: description을 ReactNode로 확장 — BilingualText 직접 끼우기 위함.
+  description?: ReactNode;
   action?: ReactNode;
   className?: string;
   /** v1.1 단계 19.8 [UI보조]: 제목 mother_tongue 보조 표기 — 작은 글씨로 본문 아래.
@@ -29,7 +30,7 @@ export function PageHeader({
           </div>
         )}
         {description && (
-          <p className="mt-1 text-sm text-text-secondary">{description}</p>
+          <div className="mt-1 text-sm text-text-secondary">{description}</div>
         )}
       </div>
       {action && <div className="shrink-0">{action}</div>}

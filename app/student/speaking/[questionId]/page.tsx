@@ -4,8 +4,14 @@ import questionsJson from '@/src/content/questions.json'
 import questionSetsJson from '@/src/content/question-sets.json'
 import questionTypesJson from '@/src/content/question-types.json'
 import { PageHeader } from '@/src/components/ui'
+import { Localized } from '@/src/components/ui/localized'
+import { BilingualText } from '@/src/components/ui/bilingual-text'
 import { getStudentVisibleAsset } from '@/src/content/assessment-assets'
 import { getCurrentParticipant } from '@/src/lib/research/session'
+import {
+  QUESTION_SET_NAMES,
+  QUESTION_TYPE_NAMES,
+} from '@/src/lib/i18n/content-labels'
 import { SpeakingClient } from './speaking-client'
 
 // Canonical ID aliases — old short IDs redirect to canonical long IDs.
@@ -60,6 +66,19 @@ export default async function SpeakingQuestionPage({
   const participant = await getCurrentParticipant().catch(() => null)
   const motherTongue = participant?.motherTongue ?? null
 
+  // v1.1 단계 19.10 [페이즈3]: 페이지 헤더·문항 목록 링크 mother_tongue 보조.
+  const descMultilingual = qType
+    ? {
+        ko: `${QUESTION_SET_NAMES[resolvedSet.id]?.ko ?? resolvedSet.name} · ${QUESTION_TYPE_NAMES[qType.id]?.ko ?? qType.name}`,
+        en: `${QUESTION_SET_NAMES[resolvedSet.id]?.en ?? resolvedSet.name} · ${QUESTION_TYPE_NAMES[qType.id]?.en ?? qType.name}`,
+        vi: `${QUESTION_SET_NAMES[resolvedSet.id]?.vi ?? resolvedSet.name} · ${QUESTION_TYPE_NAMES[qType.id]?.vi ?? qType.name}`,
+        ar: `${QUESTION_SET_NAMES[resolvedSet.id]?.ar ?? resolvedSet.name} · ${QUESTION_TYPE_NAMES[qType.id]?.ar ?? qType.name}`,
+        th: `${QUESTION_SET_NAMES[resolvedSet.id]?.th ?? resolvedSet.name} · ${QUESTION_TYPE_NAMES[qType.id]?.th ?? qType.name}`,
+        ms: `${QUESTION_SET_NAMES[resolvedSet.id]?.ms ?? resolvedSet.name} · ${QUESTION_TYPE_NAMES[qType.id]?.ms ?? qType.name}`,
+        km: `${QUESTION_SET_NAMES[resolvedSet.id]?.km ?? resolvedSet.name} · ${QUESTION_TYPE_NAMES[qType.id]?.km ?? qType.name}`,
+      }
+    : undefined
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
@@ -67,13 +86,35 @@ export default async function SpeakingQuestionPage({
           href="/student/speaking"
           className="text-xs text-text-muted hover:text-text-secondary transition-colors"
         >
-          ← 문항 목록
+          <span lang="ko">← 문항 목록</span>
+          <Localized
+            spec={{ kind: 'practice', key: 'speaking_questionList' }}
+            motherTongueHint={motherTongue}
+            supplementOnly
+            className="ml-1 text-[11px] text-text-muted"
+          />
         </Link>
       </div>
 
       <PageHeader
         title="말하기 평가"
-        description={`${resolvedSet.name} · ${qType?.name ?? question.typeId}`}
+        titleSupplement={
+          <Localized
+            spec={{ kind: 'practice', key: 'speaking_pageTitle' }}
+            motherTongueHint={motherTongue}
+            supplementOnly
+            className="text-xs text-text-muted"
+          />
+        }
+        description={
+          <BilingualText
+            ko={`${resolvedSet.name} · ${qType?.name ?? question.typeId}`}
+            multilingual={descMultilingual}
+            motherTongueHint={motherTongue}
+            className="text-sm text-text-secondary"
+            supplementClassName="text-[11px]"
+          />
+        }
       />
 
       <SpeakingClient

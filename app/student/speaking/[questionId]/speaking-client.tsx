@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Button, Card, CardBody, Badge, LangHint } from '@/src/components/ui'
 import type { LangHintItem } from '@/src/components/ui'
+import { Localized } from '@/src/components/ui/localized'
+import { BilingualText } from '@/src/components/ui/bilingual-text'
+import {
+  QUESTION_TITLES,
+  QUESTION_TYPE_NAMES,
+  QUESTION_SET_NAMES,
+} from '@/src/lib/i18n/content-labels'
 import { submitSpeaking } from '../actions'
 import type { ClientPronunciationResult } from '../actions'
 import { logSingleTurnSession, modeFromQuestionTypeId } from '@/src/lib/research/client-logger'
@@ -441,19 +448,55 @@ export function SpeakingClient({
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Question card */}
+      {/* Question card — v1.1 단계 19.10 [페이즈3]: 문항 제목·메타·난이도 mother_tongue 보조. */}
       <Card>
         <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-text-primary leading-5">
-              {question.title}
+              <BilingualText
+                ko={question.title}
+                multilingual={QUESTION_TITLES[question.id]}
+                motherTongueHint={motherTongue}
+                inline
+                supplementClassName="text-[11px]"
+              />
             </h2>
-            <p className="mt-0.5 text-xs text-text-muted">
-              {setName} · {question.typeLabel}
-            </p>
+            <div className="mt-0.5 text-xs text-text-muted">
+              <BilingualText
+                ko={`${setName} · ${question.typeLabel}`}
+                multilingual={
+                  QUESTION_SET_NAMES[questionSetId] && QUESTION_TYPE_NAMES[question.typeId]
+                    ? {
+                        ko: `${QUESTION_SET_NAMES[questionSetId].ko} · ${QUESTION_TYPE_NAMES[question.typeId].ko}`,
+                        en: `${QUESTION_SET_NAMES[questionSetId].en} · ${QUESTION_TYPE_NAMES[question.typeId].en}`,
+                        vi: `${QUESTION_SET_NAMES[questionSetId].vi} · ${QUESTION_TYPE_NAMES[question.typeId].vi}`,
+                        ar: `${QUESTION_SET_NAMES[questionSetId].ar} · ${QUESTION_TYPE_NAMES[question.typeId].ar}`,
+                        th: `${QUESTION_SET_NAMES[questionSetId].th} · ${QUESTION_TYPE_NAMES[question.typeId].th}`,
+                        ms: `${QUESTION_SET_NAMES[questionSetId].ms} · ${QUESTION_TYPE_NAMES[question.typeId].ms}`,
+                        km: `${QUESTION_SET_NAMES[questionSetId].km} · ${QUESTION_TYPE_NAMES[question.typeId].km}`,
+                      }
+                    : undefined
+                }
+                motherTongueHint={motherTongue}
+                supplementClassName="text-[11px]"
+              />
+            </div>
           </div>
           <Badge variant={dVariant as 'success' | 'info' | 'warning'}>
-            {difficultyLabel[question.difficulty] ?? question.difficulty}
+            <Localized
+              spec={{
+                kind: 'practice',
+                key:
+                  question.difficulty === 'beginner'
+                    ? 'diff_beginner'
+                    : question.difficulty === 'intermediate'
+                      ? 'diff_intermediate'
+                      : 'diff_advanced',
+              }}
+              motherTongueHint={motherTongue}
+              inline
+              prominent
+            />
           </Badge>
         </div>
         <CardBody>
@@ -568,8 +611,22 @@ export function SpeakingClient({
 
           {!isDialogueMission && (
             <div className="mt-4 flex items-center gap-4 text-xs text-text-muted">
-              <span>준비 시간: {question.prepTimeSec}초</span>
-              <span>답변 시간: {formatTime(question.responseTimeSec)}</span>
+              <span>
+                <Localized
+                  spec={{ kind: 'practice', key: 'speaking_prepTimeLabel' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
+                : {question.prepTimeSec}초
+              </span>
+              <span>
+                <Localized
+                  spec={{ kind: 'practice', key: 'speaking_answerTimeLabel' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
+                : {formatTime(question.responseTimeSec)}
+              </span>
             </div>
           )}
           {QUESTION_HINTS[question.id] && (
@@ -586,14 +643,22 @@ export function SpeakingClient({
                     size="sm"
                     onClick={() => tts.play(question.prompt, question.id, 'question')}
                   >
-                    문제 듣기
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_listenQuestion' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => tts.play(RECORDING_GUIDE_TEXT, question.id, 'recording-guide')}
                   >
-                    녹음 안내 듣기
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_listenGuide' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
                   </Button>
                 </div>
               ) : tts.state === 'loading' ? (
@@ -602,9 +667,19 @@ export function SpeakingClient({
                 </Button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-text-muted">재생 중</span>
+                  <span className="text-xs text-text-muted">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_playing' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
+                  </span>
                   <Button variant="secondary" size="sm" onClick={tts.stop}>
-                    정지
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_stop' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
                   </Button>
                 </div>
               )}
@@ -623,12 +698,22 @@ export function SpeakingClient({
             <div className="text-center py-8">
               {prepStarted ? (
                 <>
-                  <p className="text-xs text-text-muted mb-3">준비 시간</p>
+                  <p className="text-xs text-text-muted mb-3">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_prepTimeLabel' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
+                  </p>
                   <p className="text-5xl font-mono font-bold text-text-primary tabular-nums mb-6">
                     {formatTime(prepRemaining)}
                   </p>
                   <Button variant="secondary" onClick={() => setPhase('recording')}>
-                    준비 완료 — 바로 시작
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_prepDone' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
                   </Button>
                 </>
               ) : (
@@ -648,7 +733,11 @@ export function SpeakingClient({
                     size="lg"
                     onClick={() => setPrepStarted(true)}
                   >
-                    준비 시작
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_prepStart' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
                   </Button>
                   <div className="mt-4 text-left">
                     <LangHint items={RECORDING_HINTS} label="녹음 방법 도움말" motherTongue={motherTongue} />
@@ -696,16 +785,31 @@ export function SpeakingClient({
                 <>
                   <div className="flex items-center justify-center gap-2 mb-3">
                     <span className="inline-block w-3 h-3 rounded-full bg-danger-500 animate-pulse" />
-                    <span className="text-sm font-medium text-danger-500">녹음 중</span>
+                    <span className="text-sm font-medium text-danger-500">
+                      <Localized
+                        spec={{ kind: 'practice', key: 'speaking_recording' }}
+                        motherTongueHint={motherTongue}
+                        inline
+                      />
+                    </span>
                   </div>
                   <p className="text-5xl font-mono font-bold text-text-primary tabular-nums mb-1">
                     {formatTime(recordingElapsed)}
                   </p>
                   <p className="text-xs text-text-muted mb-6">
-                    최대 {formatTime(question.responseTimeSec)}
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_maxTime' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />{' '}
+                    {formatTime(question.responseTimeSec)}
                   </p>
                   <Button variant="secondary" onClick={handleStopRecording} className="min-w-[160px]">
-                    녹음 완료
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_recordStop' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
                   </Button>
                 </>
               )}
@@ -717,7 +821,12 @@ export function SpeakingClient({
                     {formatTime(recordingElapsed)}
                   </p>
                   <p className="text-xs text-text-muted mb-6">
-                    최대 {formatTime(question.responseTimeSec)}
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_maxTime' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />{' '}
+                    {formatTime(question.responseTimeSec)}
                   </p>
                 </>
               )}
@@ -784,7 +893,13 @@ export function SpeakingClient({
               {/* Audio playback */}
               {recorder.blobUrl && (
                 <div className="mb-6">
-                  <p className="text-xs text-text-muted mb-2">내 녹음 확인</p>
+                  <p className="text-xs text-text-muted mb-2">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_myRecording' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
+                  </p>
                   <audio
                     controls
                     src={recorder.blobUrl}
@@ -792,7 +907,12 @@ export function SpeakingClient({
                     style={{ minHeight: '44px' }}
                   />
                   <p className="text-xs text-text-muted mt-1">
-                    녹음 길이: {formatTime(recorder.durationSec)}
+                    <Localized
+                      spec={{ kind: 'practice', key: 'speaking_recordingLength' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
+                    : {formatTime(recorder.durationSec)}
                   </p>
                 </div>
               )}
@@ -807,7 +927,11 @@ export function SpeakingClient({
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Button variant="secondary" onClick={handleRetake} className="w-full sm:w-auto">
-                  다시 녹음
+                  <Localized
+                    spec={{ kind: 'practice', key: 'speaking_recordRetake' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </Button>
                 <Button
                   variant="primary"
@@ -815,7 +939,11 @@ export function SpeakingClient({
                   disabled={isInvalidAudio}
                   className="w-full sm:w-auto"
                 >
-                  제출하기
+                  <Localized
+                    spec={{ kind: 'practice', key: 'speaking_submit' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </Button>
               </div>
             </div>
@@ -829,7 +957,11 @@ export function SpeakingClient({
           <CardBody>
             <div className="text-center py-8">
               <Button loading variant="primary" disabled>
-                평가 중...
+                <Localized
+                  spec={{ kind: 'practice', key: 'speaking_evalInProgress' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
               </Button>
               <p className="mt-4 text-xs text-text-muted">
                 AI가 말하기를 평가하고 있습니다. 잠시 기다려주세요.

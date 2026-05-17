@@ -909,7 +909,11 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
                 data-testid="btn-start-recording"
                 className="px-5 py-2.5 rounded-md bg-rose-600 text-white font-semibold text-sm hover:bg-rose-700 transition-colors"
               >
-                발표 녹음 시작
+                <Localized
+                  spec={{ kind: 'practice', key: 'action_recordPresentation' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
               </button>
             )}
             {recordingState === 'recording' && (
@@ -991,16 +995,16 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
         </p>
       </div>
 
-      {/* 연습 흐름 */}
+      {/* 연습 흐름 — v1.1 단계 19.10 [페이즈3]: 라벨 mother_tongue 보조. */}
       <div className="flex items-center gap-0 overflow-x-auto pb-1" data-testid="practice-flow">
-        {[
-          { step: '1', label: '설정', sub: '주제·언어·수준' },
-          { step: '2', label: '원고 교정', sub: 'AI가 다듬어 줘요' },
-          { step: '3', label: '설명', sub: '한국어+모국어' },
-          { step: '4', label: '섀도잉', sub: 'AI 음성 듣기' },
-          { step: '5', label: '타이머 발표', sub: '시간 맞춰 읽기' },
-          { step: '6', label: '발표 녹음', sub: 'STT 비교 피드백' },
-        ].map((s, i) => (
+        {([
+          { step: '1', label: '설정', sub: '주제·언어·수준', key: 'presentation_step1_setup' },
+          { step: '2', label: '원고 교정', sub: 'AI가 다듬어 줘요', key: 'presentation_step2_revise' },
+          { step: '3', label: '설명', sub: '한국어+모국어', key: 'presentation_step3_explain' },
+          { step: '4', label: '섀도잉', sub: 'AI 음성 듣기', key: 'presentation_step4_shadowing' },
+          { step: '5', label: '타이머 발표', sub: '시간 맞춰 읽기', key: 'presentation_step5_timed' },
+          { step: '6', label: '발표 녹음', sub: 'STT 비교 피드백', key: 'presentation_step6_record' },
+        ] as const).map((s, i) => (
           <div key={s.step} className="flex items-center shrink-0">
             <div
               className="flex flex-col items-center px-3 py-2 text-center"
@@ -1009,9 +1013,15 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
               <span className="w-7 h-7 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center mb-1">
                 {s.step}
               </span>
-              <span className="text-xs font-semibold text-text-primary whitespace-nowrap">
+              <span className="text-xs font-semibold text-text-primary whitespace-nowrap" lang="ko">
                 {s.label}
               </span>
+              <Localized
+                spec={{ kind: 'practice', key: s.key }}
+                motherTongueHint={motherTongue}
+                supplementOnly
+                className="text-[9px] text-text-muted whitespace-nowrap"
+              />
               <span className="text-[10px] text-text-muted whitespace-nowrap">{s.sub}</span>
             </div>
             {i < 5 && <span className="text-slate-300 text-sm mx-0.5">›</span>}
@@ -1021,11 +1031,23 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
 
       {/* 발표 설정 */}
       <Card>
-        <CardHeader title="발표 설정" />
+        <CardHeader
+          title={
+            <Localized
+              spec={{ kind: 'practice', key: 'setting_presentationSetup' }}
+              motherTongueHint={motherTongue}
+              inline
+            />
+          }
+        />
         <CardBody className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-              발표 주제
+              <Localized
+                spec={{ kind: 'practice', key: 'field_presentationTopic' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
             </label>
             <input
               type="text"
@@ -1039,7 +1061,11 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
 
           <div>
             <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-              발표 수준
+              <Localized
+                spec={{ kind: 'practice', key: 'field_presentationLevel' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
             </label>
             <div className="flex gap-2" data-testid="level-options">
               {LEVEL_OPTIONS.map(lv => (
@@ -1060,7 +1086,11 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
 
           <div>
             <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-              목표 발표 시간
+              <Localized
+                spec={{ kind: 'practice', key: 'field_targetTime' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
             </label>
             <div className="flex flex-wrap gap-2" data-testid="time-options">
               {TIME_OPTIONS.map(t => (
@@ -1087,7 +1117,11 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
                     : 'bg-surface text-text-secondary border-border hover:border-primary-400'
                 }`}
               >
-                직접 입력
+                <Localized
+                  spec={{ kind: 'practice', key: 'time_customInput' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
               </button>
             </div>
             {useCustom && (
@@ -1111,7 +1145,16 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
 
       {/* 원고 입력 */}
       <Card>
-        <CardHeader title="발표 원고" description="발표할 내용을 한국어로 입력하세요" />
+        <CardHeader
+          title={
+            <Localized
+              spec={{ kind: 'practice', key: 'field_presentationScript' }}
+              motherTongueHint={motherTongue}
+              inline
+            />
+          }
+          description="발표할 내용을 한국어로 입력하세요"
+        />
         <CardBody className="space-y-3">
           <textarea
             value={script}

@@ -16,8 +16,10 @@ export function Card({ children, className = "", ...props }: CardProps) {
 }
 
 interface CardHeaderProps {
-  title: string;
-  description?: string;
+  // v1.1 단계 19.10 [페이즈3]: title·description을 ReactNode로 확장.
+  // BilingualText·Localized 같은 다국어 컴포넌트를 헤더에 직접 끼울 수 있게 함.
+  title: ReactNode;
+  description?: ReactNode;
   action?: ReactNode;
   className?: string;
 }
@@ -37,7 +39,7 @@ export function CardHeader({
           {title}
         </h3>
         {description && (
-          <p className="mt-0.5 text-xs text-text-muted">{description}</p>
+          <div className="mt-0.5 text-xs text-text-muted">{description}</div>
         )}
       </div>
       {action && <div className="ml-4 shrink-0">{action}</div>}

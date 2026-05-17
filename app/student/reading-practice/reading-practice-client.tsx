@@ -861,20 +861,26 @@ export function ReadingPracticeClient({ motherTongue }: { motherTongue?: string 
         </div>
       </div>
 
-      {/* 4단계 학습 흐름 */}
+      {/* 4단계 학습 흐름 — v1.1 단계 19.10 [페이즈3]: 라벨 mother_tongue 보조. */}
       <div className="flex items-center gap-0 overflow-x-auto pb-1" data-testid="reading-flow-steps">
-        {[
-          { step: '1', label: '듣기', sub: 'AI 음성 청취' },
-          { step: '2', label: '따라 읽기', sub: '지문 낭독' },
-          { step: '3', label: '제시문-발화 비교', sub: '인식 결과 확인' },
-          { step: '4', label: '한국어+모국어 피드백', sub: '결과 분석' },
-        ].map((s, i) => (
+        {([
+          { step: '1', label: '듣기', sub: 'AI 음성 청취', key: 'reading_step1_listen' },
+          { step: '2', label: '따라 읽기', sub: '지문 낭독', key: 'reading_step2_repeat' },
+          { step: '3', label: '제시문-발화 비교', sub: '인식 결과 확인', key: 'reading_step3_compare' },
+          { step: '4', label: '한국어+모국어 피드백', sub: '결과 분석', key: 'reading_step4_feedback' },
+        ] as const).map((s, i) => (
           <div key={s.step} className="flex items-center shrink-0">
             <div className="flex flex-col items-center px-3 py-2 text-center" data-testid={`reading-step-${s.step}`}>
               <span className="w-7 h-7 rounded-full bg-primary-600 text-white text-xs font-bold flex items-center justify-center mb-1">
                 {s.step}
               </span>
-              <span className="text-xs font-semibold text-text-primary whitespace-nowrap">{s.label}</span>
+              <span className="text-xs font-semibold text-text-primary whitespace-nowrap" lang="ko">{s.label}</span>
+              <Localized
+                spec={{ kind: 'practice', key: s.key }}
+                motherTongueHint={motherTongue}
+                supplementOnly
+                className="text-[9px] text-text-muted whitespace-nowrap"
+              />
               <span className="text-[10px] text-text-muted whitespace-nowrap">{s.sub}</span>
             </div>
             {i < 3 && <span className="text-slate-300 text-sm mx-0.5">›</span>}
@@ -889,8 +895,21 @@ export function ReadingPracticeClient({ motherTongue }: { motherTongue?: string 
             <Card className="border-2 border-primary-400 ring-2 ring-primary-100">
               <CardBody>
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-sm font-semibold text-text-primary">쉬운 생활문 읽기</span>
-                  <Badge variant="success" size="sm">체험 가능</Badge>
+                  <div className="text-sm font-semibold text-text-primary">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'reading_content_easy' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
+                  </div>
+                  <Badge variant="success" size="sm">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'state_ready' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                      prominent
+                    />
+                  </Badge>
                 </div>
                 <p className="text-xs text-text-muted mb-3">
                   일상 생활에서 자주 쓰이는 짧은 문장을 읽고 발음을 연습합니다.
@@ -900,50 +919,105 @@ export function ReadingPracticeClient({ motherTongue }: { motherTongue?: string 
                   className="w-full py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors"
                   data-testid="start-easy-reading"
                 >
-                  체험하기
+                  <Localized
+                    spec={{ kind: 'practice', key: 'action_tryNow' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </button>
               </CardBody>
             </Card>
             <Card className="opacity-60">
               <CardBody>
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-sm font-semibold text-text-primary">뉴스형 지문 읽기</span>
-                  <Badge variant="default" size="sm">준비 중</Badge>
+                  <div className="text-sm font-semibold text-text-primary">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'reading_content_news' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
+                  </div>
+                  <Badge variant="default" size="sm">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'state_preparing' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                      prominent
+                    />
+                  </Badge>
                 </div>
                 <p className="text-xs text-text-muted mb-3" data-testid="copyright-notice">
                   신문기사 원문은 저작권 문제가 있을 수 있어 그대로 사용하지 않습니다.
                   향후 자체 제작 뉴스형 지문 또는 공공누리 자료를 활용할 예정입니다.
                 </p>
                 <div className="w-full py-2 rounded-md bg-slate-200 text-slate-400 text-sm font-medium text-center cursor-not-allowed">
-                  준비 중
+                  <Localized
+                    spec={{ kind: 'practice', key: 'state_preparing' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </div>
               </CardBody>
             </Card>
             <Card className="opacity-60">
               <CardBody>
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-sm font-semibold text-text-primary">공공기관 안내문 읽기</span>
-                  <Badge variant="default" size="sm">준비 중</Badge>
+                  <div className="text-sm font-semibold text-text-primary">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'reading_content_publicNotice' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
+                  </div>
+                  <Badge variant="default" size="sm">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'state_preparing' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                      prominent
+                    />
+                  </Badge>
                 </div>
                 <p className="text-xs text-text-muted mb-3">
                   관공서, 병원, 학교 등에서 사용하는 안내 문장을 읽습니다.
                 </p>
                 <div className="w-full py-2 rounded-md bg-slate-200 text-slate-400 text-sm font-medium text-center cursor-not-allowed">
-                  준비 중
+                  <Localized
+                    spec={{ kind: 'practice', key: 'state_preparing' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </div>
               </CardBody>
             </Card>
             <Card className="opacity-60">
               <CardBody>
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="text-sm font-semibold text-text-primary">군 생활 안내문 읽기</span>
-                  <Badge variant="default" size="sm">준비 중</Badge>
+                  <div className="text-sm font-semibold text-text-primary">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'reading_content_military' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
+                  </div>
+                  <Badge variant="default" size="sm">
+                    <Localized
+                      spec={{ kind: 'practice', key: 'state_preparing' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                      prominent
+                    />
+                  </Badge>
                 </div>
                 <p className="text-xs text-text-muted mb-3">
                   군 생활과 관련된 실용적인 문장을 읽고 발음을 연습합니다.
                 </p>
                 <div className="w-full py-2 rounded-md bg-slate-200 text-slate-400 text-sm font-medium text-center cursor-not-allowed">
-                  준비 중
+                  <Localized
+                    spec={{ kind: 'practice', key: 'state_preparing' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </div>
               </CardBody>
             </Card>
@@ -951,32 +1025,55 @@ export function ReadingPracticeClient({ motherTongue }: { motherTongue?: string 
 
           {/* 설정 카드 */}
           <Card>
-            <CardHeader title="학습 설정" />
+            <CardHeader
+              title={
+                <Localized
+                  spec={{ kind: 'practice', key: 'setting_learningSetup' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
+              }
+            />
             <CardBody className="space-y-5">
               <div>
                 <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                  지문 난이도
+                  <Localized
+                    spec={{ kind: 'practice', key: 'setting_difficulty' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </label>
                 <div className="flex gap-2">
-                  {(['easy', 'normal', 'hard'] as const).map((d, idx) => (
-                    <button
-                      key={d}
-                      onClick={() => setDifficulty(d)}
-                      className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                        difficulty === d
-                          ? 'bg-primary-600 text-white border-primary-600'
-                          : 'bg-surface text-text-secondary border-border hover:border-primary-400'
-                      }`}
-                    >
-                      {['쉬움', '보통', '어려움'][idx]}
-                    </button>
-                  ))}
+                  {(['easy', 'normal', 'hard'] as const).map((d, idx) => {
+                    const diffKey = (['difficulty_easy', 'difficulty_normal', 'difficulty_hard'] as const)[idx]
+                    return (
+                      <button
+                        key={d}
+                        onClick={() => setDifficulty(d)}
+                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                          difficulty === d
+                            ? 'bg-primary-600 text-white border-primary-600'
+                            : 'bg-surface text-text-secondary border-border hover:border-primary-400'
+                        }`}
+                      >
+                        <Localized
+                          spec={{ kind: 'practice', key: diffKey }}
+                          motherTongueHint={motherTongue}
+                          inline
+                        />
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-                  AI 음성 속도
+                  <Localized
+                    spec={{ kind: 'practice', key: 'setting_voiceSpeed' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </label>
                 <div className="flex gap-2 flex-wrap" data-testid="speed-buttons">
                   {SPEED_OPTIONS.map(s => (

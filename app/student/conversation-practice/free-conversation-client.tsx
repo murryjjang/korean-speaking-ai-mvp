@@ -7,6 +7,7 @@ import { type FeedbackLanguage } from '@/src/lib/feedback-language'
 import { PersonaAvatar } from '@/src/components/ui/persona-avatar'
 import { BilingualText, BilingualListItem } from '@/src/components/ui/bilingual-text'
 import { Localized } from '@/src/components/ui/localized'
+import { RECOMMENDED_TOPIC_LABELS } from '@/src/lib/i18n/content-labels'
 import { ToolResultCards } from '@/src/components/tool-result-cards'
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { getPersona } from '@/src/lib/personas'
@@ -830,17 +831,34 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                 className="text-xs text-text-muted"
               />
             </div>
+            {/* v1.1 단계 19.10 [페이즈3/#4]: 단계 진행도 분수형(1/2) → "단계 1 / 총 2단계" + mother_tongue 보조. */}
             <p className="mt-1 text-sm text-text-secondary">
-              먼저 대화 주제를 고르세요. 추천 주제 중에서 선택하거나 직접 입력할 수 있습니다. (1/2)
+              먼저 대화 주제를 고르세요. 추천 주제 중에서 선택하거나 직접 입력할 수 있습니다.{' '}
+              <span className="text-xs text-text-muted">
+                (<Localized
+                  spec={{ kind: 'practice', key: 'progress_step1of2' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />)
+              </span>
             </p>
           </div>
 
           <Card>
-            <CardHeader title="추천 주제" />
+            <CardHeader
+              title={
+                <Localized
+                  spec={{ kind: 'practice', key: 'topic_recommended' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
+              }
+            />
             <CardBody className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="topic-cards">
                 {RECOMMENDED_TOPICS.map((t) => {
                   const selected = selectedCardLabel === t.label
+                  const topicMultilingual = RECOMMENDED_TOPIC_LABELS[t.id]
                   return (
                     <button
                       key={t.id}
@@ -858,10 +876,26 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                       aria-pressed={selected}
                     >
                       <div className="flex items-start justify-between mb-1">
-                        <p className="text-sm font-semibold text-text-primary">{t.label}</p>
+                        <div className="text-sm font-semibold text-text-primary">
+                          <BilingualText
+                            ko={t.label}
+                            multilingual={topicMultilingual}
+                            motherTongueHint={motherTongue}
+                            supplementClassName="text-[11px]"
+                          />
+                        </div>
                         {selected && <span className="text-primary-600 text-sm" aria-hidden>✓</span>}
                       </div>
-                      <p className="text-xs text-text-muted">{selected ? '선택됨' : '이 주제 선택'}</p>
+                      <div className="text-xs text-text-muted">
+                        <Localized
+                          spec={{
+                            kind: 'practice',
+                            key: selected ? 'topic_selected' : 'topic_selectThis',
+                          }}
+                          motherTongueHint={motherTongue}
+                          inline
+                        />
+                      </div>
                     </button>
                   )
                 })}
@@ -873,14 +907,26 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                   className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="btn-next-to-persona"
                 >
-                  다음 →
+                  <Localized
+                    spec={{ kind: 'practice', key: 'action_next' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  /> →
                 </button>
               </div>
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader title="직접 주제 입력" />
+            <CardHeader
+              title={
+                <Localized
+                  spec={{ kind: 'practice', key: 'topic_custom' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
+              }
+            />
             <CardBody className="space-y-3">
               <textarea
                 value={customTopic}
@@ -900,7 +946,11 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                   className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="btn-start-custom"
                 >
-                  다음 →
+                  <Localized
+                    spec={{ kind: 'practice', key: 'action_next' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  /> →
                 </button>
               </div>
             </CardBody>
@@ -913,17 +963,45 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
     return (
       <div className="max-w-2xl mx-auto space-y-6 px-4 py-6" data-testid="free-conversation-persona-select">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">대화 상대 선택</h1>
+          <h1 className="text-xl font-bold text-text-primary" lang="ko">대화 상대 선택</h1>
+          <div className="mt-0.5">
+            <Localized
+              spec={{ kind: 'page', key: 'chooseConversationPartner' }}
+              motherTongueHint={motherTongue}
+              supplementOnly
+              className="text-xs text-text-muted"
+            />
+          </div>
           <p className="text-sm text-text-secondary mt-1">
-            누구와 이야기할지 골라보세요. (2/2)
+            누구와 이야기할지 골라보세요.{' '}
+            <span className="text-xs text-text-muted">
+              (<Localized
+                spec={{ kind: 'practice', key: 'progress_step2of2' }}
+                motherTongueHint={motherTongue}
+                inline
+              />)
+            </span>
           </p>
           <p className="text-xs text-text-muted mt-1" data-testid="pending-topic">
-            주제: <span className="font-medium text-text-secondary">{pendingTopic}</span>
+            <Localized
+              spec={{ kind: 'practice', key: 'field_topic' }}
+              motherTongueHint={motherTongue}
+              inline
+            />
+            : <span className="font-medium text-text-secondary">{pendingTopic}</span>
           </p>
         </div>
 
         <Card>
-          <CardHeader title="대화 상대" />
+          <CardHeader
+            title={
+              <Localized
+                spec={{ kind: 'practice', key: 'field_partner' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
+            }
+          />
           <CardBody className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="persona-cards">
               {AVAILABLE_PERSONAS.map((p) => {
@@ -960,7 +1038,11 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                 className="px-4 py-2 rounded-md border border-border bg-surface text-text-secondary text-sm font-medium hover:bg-slate-50 transition-colors"
                 data-testid="btn-back-to-topic"
               >
-                ← 이전
+                ← <Localized
+                  spec={{ kind: 'practice', key: 'action_back' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
               </button>
               <button
                 onClick={() => startConversation(pendingTopic, pendingPersonaId)}
@@ -991,7 +1073,13 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
         >
           <PersonaAvatar personaId={personaId} size={40} alt={personaMeta(personaId).label} />
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-text-muted">주제</p>
+            <p className="text-xs text-text-muted">
+              <Localized
+                spec={{ kind: 'practice', key: 'field_topic' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
+            </p>
             <p className="text-sm font-semibold text-text-primary truncate" data-testid="conversation-topic">
               {topic}
             </p>
@@ -1000,7 +1088,13 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-text-muted">경과</p>
+            <p className="text-xs text-text-muted">
+              <Localized
+                spec={{ kind: 'practice', key: 'field_elapsed' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
+            </p>
             <p className="text-sm font-mono tabular-nums text-text-primary" data-testid="conversation-elapsed">
               {formatTime(elapsed)} / {formatTime(TOTAL_SECONDS)}
             </p>
@@ -1013,7 +1107,11 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
             className="px-3 py-1.5 rounded-md bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors"
             data-testid="btn-end-conversation"
           >
-            대화 종료
+            <Localized
+              spec={{ kind: 'practice', key: 'action_endConversation' }}
+              motherTongueHint={motherTongue}
+              inline
+            />
           </button>
         </div>
 
@@ -1029,7 +1127,13 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
               className="rounded border-border"
               data-testid="tts-autoplay-toggle"
             />
-            <span>NPC 음성 자동 재생</span>
+            <span>
+              <Localized
+                spec={{ kind: 'practice', key: 'meta_npcAutoPlay' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
+            </span>
           </label>
           {/* 23-h A-3: 발음 평가 토글 (기본 OFF, 비용 절약) */}
           <label className="inline-flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer select-none">
@@ -1040,7 +1144,13 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
               className="rounded border-border"
               data-testid="pron-eval-toggle"
             />
-            <span>발음 평가 (Azure)</span>
+            <span>
+              <Localized
+                spec={{ kind: 'practice', key: 'meta_pronunciationAzure' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
+            </span>
           </label>
           {speakingTurnIdx !== null && (
             <button

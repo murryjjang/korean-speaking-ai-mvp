@@ -4,8 +4,15 @@ import questionsJson from '@/src/content/questions.json'
 import questionTypesJson from '@/src/content/question-types.json'
 import { PageHeader, Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { Localized } from '@/src/components/ui/localized'
+import { BilingualText } from '@/src/components/ui/bilingual-text'
 import { getCurrentParticipant } from '@/src/lib/research/session'
 import type { DashboardLabelKey } from '@/src/lib/i18n/dashboard-labels'
+import {
+  QUESTION_SET_NAMES,
+  QUESTION_SET_DESCRIPTIONS,
+  QUESTION_TITLES,
+  QUESTION_TYPE_NAMES,
+} from '@/src/lib/i18n/content-labels'
 import { StartSetButton } from './start-set-button'
 
 // v1.1 단계 19.9 [페이즈4]: 난이도·목적 라벨도 한국어 본문 + mother_tongue 보조.
@@ -72,9 +79,28 @@ export default async function SpeakingSelectionPage() {
           )
           return (
           <Card key={set.id}>
+            {/* v1.1 단계 19.10 [페이즈3]: 세트 이름·설명 mother_tongue 보조 표기.
+                CardHeader title은 단일 ReactNode를 받으므로 BilingualText로 래핑. */}
             <CardHeader
-              title={set.name}
-              description={set.description}
+              title={
+                <BilingualText
+                  ko={set.name}
+                  multilingual={QUESTION_SET_NAMES[set.id]}
+                  motherTongueHint={motherTongueHint}
+                  inline
+                  className="font-semibold text-text-primary"
+                  supplementClassName="text-[11px]"
+                />
+              }
+              description={
+                <BilingualText
+                  ko={set.description}
+                  multilingual={QUESTION_SET_DESCRIPTIONS[set.id]}
+                  motherTongueHint={motherTongueHint}
+                  className="text-sm text-text-secondary"
+                  supplementClassName="text-[11px]"
+                />
+              }
               action={
                 <Badge variant={purposeVariant[set.purpose]}>
                   {purposeKey[set.purpose] ? (
@@ -116,9 +142,14 @@ export default async function SpeakingSelectionPage() {
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap mb-0.5 md:mb-1">
-                            <span className="text-sm font-medium text-text-primary leading-snug">
-                              {q.title}
-                            </span>
+                            <BilingualText
+                              ko={q.title}
+                              multilingual={QUESTION_TITLES[q.id]}
+                              motherTongueHint={motherTongueHint}
+                              inline
+                              className="text-sm font-medium text-text-primary leading-snug"
+                              supplementClassName="text-[11px]"
+                            />
                             <Badge
                               variant={
                                 difficultyVariant[q.difficulty] ?? 'default'
@@ -136,11 +167,28 @@ export default async function SpeakingSelectionPage() {
                               )}
                             </Badge>
                           </div>
-                          {/* 메타: 데스크톱 전용 */}
-                          <p className="hidden md:block text-xs text-text-muted truncate">
-                            {qType?.name ?? q.typeId} · 준비{' '}
-                            {q.prepTimeSec}초 · 답변 {q.responseTimeSec}초
-                          </p>
+                          {/* 메타: 데스크톱 전용 — v1.1 단계 19.10 [페이즈3]: 문항 유형명·시간 라벨 보조 표기.
+                              한 줄 안에 다언어 텍스트가 뒤섞이지 않도록 본문(한국어) 다음 줄로 보조 분리. */}
+                          <div className="hidden md:block text-xs text-text-muted">
+                            <BilingualText
+                              ko={`${qType?.name ?? q.typeId} · 준비 ${q.prepTimeSec}초 · 답변 ${q.responseTimeSec}초`}
+                              multilingual={
+                                qType
+                                  ? {
+                                      ko: `${QUESTION_TYPE_NAMES[qType.id]?.ko ?? qType.name} · 준비 ${q.prepTimeSec}초 · 답변 ${q.responseTimeSec}초`,
+                                      en: `${QUESTION_TYPE_NAMES[qType.id]?.en ?? qType.name} · Prep ${q.prepTimeSec}s · Answer ${q.responseTimeSec}s`,
+                                      vi: `${QUESTION_TYPE_NAMES[qType.id]?.vi ?? qType.name} · Chuẩn bị ${q.prepTimeSec}s · Trả lời ${q.responseTimeSec}s`,
+                                      ar: `${QUESTION_TYPE_NAMES[qType.id]?.ar ?? qType.name} · تحضير ${q.prepTimeSec}ث · إجابة ${q.responseTimeSec}ث`,
+                                      th: `${QUESTION_TYPE_NAMES[qType.id]?.th ?? qType.name} · เตรียม ${q.prepTimeSec}วิ · ตอบ ${q.responseTimeSec}วิ`,
+                                      ms: `${QUESTION_TYPE_NAMES[qType.id]?.ms ?? qType.name} · Sedia ${q.prepTimeSec}s · Jawapan ${q.responseTimeSec}s`,
+                                      km: `${QUESTION_TYPE_NAMES[qType.id]?.km ?? qType.name} · រៀបចំ ${q.prepTimeSec}វិ · ឆ្លើយ ${q.responseTimeSec}វិ`,
+                                    }
+                                  : undefined
+                              }
+                              motherTongueHint={motherTongueHint}
+                              supplementClassName="text-[11px]"
+                            />
+                          </div>
                         </div>
                         {/* 시작하기: 데스크톱 전용 */}
                         <Link
@@ -157,10 +205,26 @@ export default async function SpeakingSelectionPage() {
 
                       {/* 모바일 하단행: 메타 + 시작하기 */}
                       <div className="md:hidden flex items-center justify-between gap-3 pl-8 mt-2">
-                        <p className="text-xs text-text-muted truncate flex-1">
-                          {qType?.name ?? q.typeId} · 준비{' '}
-                          {q.prepTimeSec}초 · 답변 {q.responseTimeSec}초
-                        </p>
+                        <div className="text-xs text-text-muted flex-1 min-w-0">
+                          <BilingualText
+                            ko={`${qType?.name ?? q.typeId} · 준비 ${q.prepTimeSec}초 · 답변 ${q.responseTimeSec}초`}
+                            multilingual={
+                              qType
+                                ? {
+                                    ko: `${QUESTION_TYPE_NAMES[qType.id]?.ko ?? qType.name} · 준비 ${q.prepTimeSec}초 · 답변 ${q.responseTimeSec}초`,
+                                    en: `${QUESTION_TYPE_NAMES[qType.id]?.en ?? qType.name} · Prep ${q.prepTimeSec}s · Answer ${q.responseTimeSec}s`,
+                                    vi: `${QUESTION_TYPE_NAMES[qType.id]?.vi ?? qType.name} · Chuẩn bị ${q.prepTimeSec}s · Trả lời ${q.responseTimeSec}s`,
+                                    ar: `${QUESTION_TYPE_NAMES[qType.id]?.ar ?? qType.name} · تحضير ${q.prepTimeSec}ث · إجابة ${q.responseTimeSec}ث`,
+                                    th: `${QUESTION_TYPE_NAMES[qType.id]?.th ?? qType.name} · เตรียม ${q.prepTimeSec}วิ · ตอบ ${q.responseTimeSec}วิ`,
+                                    ms: `${QUESTION_TYPE_NAMES[qType.id]?.ms ?? qType.name} · Sedia ${q.prepTimeSec}s · Jawapan ${q.responseTimeSec}s`,
+                                    km: `${QUESTION_TYPE_NAMES[qType.id]?.km ?? qType.name} · រៀបចំ ${q.prepTimeSec}វិ · ឆ្លើយ ${q.responseTimeSec}វិ`,
+                                  }
+                                : undefined
+                            }
+                            motherTongueHint={motherTongueHint}
+                            supplementClassName="text-[11px]"
+                          />
+                        </div>
                         <Link
                           href={`/student/speaking/${q.id}?setId=${set.id}`}
                           className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-primary-700 text-white hover:bg-primary-800 border border-primary-700 shrink-0"
