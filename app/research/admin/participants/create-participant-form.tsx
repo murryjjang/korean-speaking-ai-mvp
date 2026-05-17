@@ -73,6 +73,10 @@ export function CreateParticipantForm() {
           <option value="en">English (en)</option>
           <option value="vi">Tiếng Việt (vi)</option>
           <option value="ar">العربية (ar)</option>
+          {/* v1.1 단계 19.9: 7개 언어 확장 — 태국·말레이·크메르 추가. */}
+          <option value="th">ภาษาไทย (th, Thai)</option>
+          <option value="ms">Bahasa Melayu (ms, Malay)</option>
+          <option value="km">ភាសាខ្មែរ (km, Khmer/Cambodian)</option>
           <option value="other">기타 (other)</option>
         </select>
       </label>

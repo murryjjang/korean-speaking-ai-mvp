@@ -102,15 +102,19 @@ function renderConsentBody(body: string): React.ReactNode {
 }
 
 // 화면 상단 안내 문구 — 학습자 mother_tongue 단독.
+// v1.1 단계 19.9: th/ms/km 추가 (LLM 임시본 번역).
 const I18N_TEXT: Record<ConsentLocale, { title: string; subtitle: string; pcLabel: string; agree: string; decline: string }> = {
   ko: { title: '시험운영 참여 동의', subtitle: '계속하기 전에 본문을 자세히 읽어주세요.', pcLabel: '참여자 코드', agree: '동의하고 시작', decline: '동의하지 않음' },
   en: { title: 'Consent to Participate', subtitle: 'Please read carefully before continuing.', pcLabel: 'Participant code', agree: 'I agree and start', decline: 'I do not agree' },
   vi: { title: 'Đồng ý tham gia thử nghiệm', subtitle: 'Vui lòng đọc kỹ trước khi tiếp tục.', pcLabel: 'Mã người tham gia', agree: 'Tôi đồng ý và bắt đầu', decline: 'Tôi không đồng ý' },
   ar: { title: 'الموافقة على المشاركة', subtitle: 'يرجى القراءة بعناية قبل المتابعة.', pcLabel: 'رمز المشارك', agree: 'أوافق وأبدأ', decline: 'لا أوافق' },
+  th: { title: 'ความยินยอมเข้าร่วมการทดสอบ', subtitle: 'กรุณาอ่านเนื้อหาอย่างละเอียดก่อนดำเนินการต่อ', pcLabel: 'รหัสผู้เข้าร่วม', agree: 'เห็นด้วยและเริ่มต้น', decline: 'ไม่เห็นด้วย' },
+  ms: { title: 'Persetujuan untuk menyertai ujian', subtitle: 'Sila baca teks dengan teliti sebelum meneruskan.', pcLabel: 'Kod peserta', agree: 'Setuju dan mula', decline: 'Tidak setuju' },
+  km: { title: 'ការយល់ព្រមចូលរួមក្នុងការប្រឡង', subtitle: 'សូមអានអត្ថបទនេះឲ្យយ៉ាងម៉ត់ចត់មុននឹងបន្ត។', pcLabel: 'កូដអ្នកចូលរួម', agree: 'យល់ព្រមនិងចាប់ផ្តើម', decline: 'មិនយល់ព្រម' },
 }
 
 function isConsentLocale(v: unknown): v is ConsentLocale {
-  return v === 'ko' || v === 'en' || v === 'vi' || v === 'ar'
+  return v === 'ko' || v === 'en' || v === 'vi' || v === 'ar' || v === 'th' || v === 'ms' || v === 'km'
 }
 
 export default async function ConsentPage() {

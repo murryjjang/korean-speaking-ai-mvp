@@ -67,33 +67,39 @@ ${lines}`
  *  - v1.1 15-2: learner_grammar_note 필드를 다시 사용한다. UI에서 별도 표시되며
  *    명백한 시제·어휘·문법 오류 발견 시 한 줄 정리, 오류 없으면 빈 문자열.
  */
-// v1.1 16-10-2: motherTongue에 따라 다국어 객체 응답 가이드를 동적으로 결정.
+// v1.1 16-10-2 / 19.9: motherTongue에 따라 다국어 객체 응답 가이드를 동적으로 결정.
+// 19.9에서 th/ms/km 추가 — 외국어 6개(en/vi/ar/th/ms/km) 모두 다국어 객체 요청.
 function multilingualGrammarNoteBlock(motherTongue?: string | null): {
   guideText: string
   schemaSnippet: string
 } {
   const mt = motherTongue?.trim().toLowerCase()
-  // 학습자 모국어가 외국어(en/vi/ar)일 때만 다국어 객체로 응답.
-  const isForeign = mt === 'en' || mt === 'vi' || mt === 'ar'
-  if (!isForeign) {
+  const foreignMap: Record<string, string> = {
+    en: 'English',
+    vi: 'Vietnamese',
+    ar: 'Arabic',
+    th: 'Thai',
+    ms: 'Malay',
+    km: 'Khmer (Cambodian)',
+  }
+  const langName = mt ? foreignMap[mt] : undefined
+  if (!langName) {
     return {
       guideText:
         '- learner_grammar_note 필드는 한국어 한 줄 문자열로 채우세요. 오류가 없으면 빈 문자열.',
       schemaSnippet: '"learner_grammar_note": "문법 교정 안내 또는 빈 문자열"',
     }
   }
-  const langName = mt === 'en' ? 'English' : mt === 'vi' ? 'Vietnamese' : 'Arabic'
   return {
     guideText: `- 학습자의 모국어가 ${langName}(${mt}) 입니다.\n` +
-      `- learner_grammar_note 필드는 다국어 객체로 응답하세요: { ko, en, vi, ar }.\n` +
+      `- learner_grammar_note 필드는 다국어 객체로 응답하세요: { ko, en, vi, ar, th, ms, km }.\n` +
       `  · ko: 한국어 한 줄 정리 (예: "'가요' → '갔어요' (과거 시제)")\n` +
-      `  · en: 영어 한 줄 정리 (예: "'가요' (present) → '갔어요' (past tense)")\n` +
-      `  · vi: 베트남어 한 줄 정리 (예: "'가요' (hiện tại) → '갔어요' (quá khứ)")\n` +
-      `  · ar: 아랍어 한 줄 정리\n` +
+      `  · en: 영어 한 줄 정리 / vi: 베트남어 / ar: 아랍어\n` +
+      `  · th: Thai / ms: Malay / km: Khmer (학습자 모국어가 해당될 때 최소한 그 키는 반드시 채울 것)\n` +
       `- 오류가 없으면 모든 언어 키를 빈 문자열로 둡니다.\n` +
       `- npc_utterance는 항상 한국어 그대로(학습 목적). 다국어는 learner_grammar_note에만.`,
     schemaSnippet:
-      '"learner_grammar_note": { "ko": "한국어 정리", "en": "english summary", "vi": "tóm tắt", "ar": "ملخص" }',
+      '"learner_grammar_note": { "ko": "한국어 정리", "en": "english summary", "vi": "tóm tắt", "ar": "ملخص", "th": "สรุป", "ms": "ringkasan", "km": "សង្ខេប" }',
   }
 }
 

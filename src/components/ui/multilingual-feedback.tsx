@@ -44,7 +44,11 @@ export function MultilingualFeedback({
   // ko 선택 → 보조 언어 미표시. 새 모델: DOM 자체 없음.
   if (displayLang === 'ko') return null
 
-  const lang: FeedbackLanguage = displayLang
+  // v1.1 단계 19.9: th/ms/km는 본 컴포넌트가 정적 번역(en/vi/ar)만 보유 →
+  // 영어로 폴백 (임시본 정책). 동의서·UI 보조는 별도 데이터로 th/ms/km 직접 지원.
+  const lang: FeedbackLanguage = (displayLang === 'en' || displayLang === 'vi' || displayLang === 'ar')
+    ? displayLang
+    : 'en'
   const data: Record<FeedbackLanguage, MultilingualFeedbackData> = { vi, en, ar }
   const current = data[lang]
   const dir = isRTL(lang) ? 'rtl' : 'ltr'

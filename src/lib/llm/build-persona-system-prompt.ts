@@ -238,15 +238,24 @@ reason 포맷: "[원문] → [정답]". 예: "3잔 → 세 잔", "1조각 → �
 
 function outputFormatBlock(motherTongue?: string | null): string {
   const mt = motherTongue?.trim().toLowerCase()
-  const isForeign = mt === 'en' || mt === 'vi' || mt === 'ar'
-  const langName = mt === 'en' ? 'English' : mt === 'vi' ? 'Vietnamese' : mt === 'ar' ? 'Arabic' : ''
+  // v1.1 16-10-2 / 19.9: 학습자 모국어가 외국어이면 reason을 다국어 객체로 응답.
+  // 19.9에서 th/ms/km 추가 — 외국어 6개 모두 동일 처리.
+  const foreignMap: Record<string, string> = {
+    en: 'English',
+    vi: 'Vietnamese',
+    ar: 'Arabic',
+    th: 'Thai',
+    ms: 'Malay',
+    km: 'Khmer',
+  }
+  const langName = mt ? foreignMap[mt] : ''
+  const isForeign = Boolean(langName)
 
-  // v1.1 16-10-2: 학습자 모국어가 외국어이면 reason을 다국어 객체로 응답하도록 가이드.
   const reasonSchema = isForeign
-    ? `"reason": { "ko": "한국어 한 줄", "en": "english summary", "vi": "tóm tắt", "ar": "ملخص" }`
+    ? `"reason": { "ko": "한국어 한 줄", "en": "english summary", "vi": "tóm tắt", "ar": "ملخص", "th": "สรุป", "ms": "ringkasan", "km": "សង្ខេប" }`
     : `"reason": "교정 이유 또는 칭찬 (한 문장)"`
   const reasonGuide = isForeign
-    ? `\n- 학습자 모국어 ${langName}(${mt}). reason은 다국어 객체로 응답하되 ko 키는 항상 채우고, 오류 없으면 모든 언어 빈 문자열.`
+    ? `\n- 학습자 모국어 ${langName}(${mt}). reason은 다국어 객체로 응답하되 ko 키는 항상 채우고, 학습자 모국어 키(${mt}) 도 채울 것. 그 외 언어는 빈 문자열 가능.`
     : ''
 
   return `

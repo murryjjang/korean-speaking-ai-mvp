@@ -97,7 +97,8 @@ Vui lòng liên hệ trực tiếp với người vận hành.
 
 Tôi đã hiểu các nội dung trên và đồng ý tham gia thử nghiệm này.
 
-(Bản tiếng Hàn và tiếng Anh là bản chính thức. Bản dịch này nhằm hỗ trợ hiểu nội dung.)`
+[임시본 안내 / Provisional Translation Notice]
+Bản dịch này là bản tạm thời và sẽ được áp dụng bản dịch chính thức sau khi hệ thống được cải thiện. Nếu nội dung đồng ý không rõ ràng, vui lòng tham khảo tài liệu đồng ý bằng tiếng Hàn hoặc tiếng Anh, hoặc liên hệ với quản trị viên.`
 
 export const CONSENT_TEXT_AR = `موافقة المشاركة في تجربة الذكاء الاصطناعي لتعلم محادثة اللغة الكورية
 
@@ -130,13 +131,121 @@ export const CONSENT_TEXT_AR = `موافقة المشاركة في تجربة ا
 
 أقرّ بأنني قد فهمت ما سبق وأوافق على المشاركة في هذه التجربة.
 
-(النسخة الكورية والإنجليزية هما النسختان الرسميتان. هذه الترجمة لتسهيل الفهم.)`
+[임시본 안내 / Provisional Translation Notice]
+هذه الترجمة مؤقتة وسيتم تطبيق الترجمة الرسمية بعد تحسين النظام. إذا كانت محتويات الموافقة غير واضحة، يرجى الرجوع إلى وثيقة الموافقة باللغة الكورية أو الإنجليزية أو الاتصال بالمدير.`
 
-export type ConsentLocale = 'ko' | 'en' | 'vi' | 'ar'
+
+
+export const CONSENT_TEXT_TH = `แบบฟอร์มยินยอมเข้าร่วมการดำเนินการทดสอบการเรียนรู้การพูดภาษาเกาหลี
+
+การดำเนินการทดสอบนี้จัดทำขึ้นเพื่อยืนยันประสิทธิภาพของระบบการเรียนรู้การพูดภาษาเกาหลี (KDLI Korean MVP) โดยจะนำไปใช้ในการวิจัยทางวิชาการและรายงาน KDLI
+
+[ข้อมูลที่เก็บรวบรวม]
+- บันทึกกิจกรรมการเรียนรู้: โหมดการเรียนรู้·เวลาเริ่ม·เวลาสิ้นสุดเซสชัน
+- ข้อมูลการพูด: เสียงพูด·ข้อความที่รู้จำเสียง·ข้อความตอบกลับ NPC
+- คะแนนการประเมิน: คะแนนและข้อเสนอแนะแยกตามหมวดหมู่ เช่น การออกเสียง·ความคล่องแคล่ว·ไวยากรณ์·คำศัพท์
+- บันทึกการเรียกใช้เครื่องมือ: ประวัติการใช้เครื่องมือของระบบ เช่น การค้นหา·สภาพอากาศ·ที่อยู่
+- ข้อมูลทางเทคนิค: ที่อยู่ IP ณ เวลายินยอม (เก็บเป็นข้อมูลที่ไม่ระบุชื่อเฉพาะ 24 บิตแรก) และผู้ใช้เอเจนต์
+
+[ขอบเขตการใช้ข้อมูล]
+- การวิจัยทางวิชาการ (เอกสาร·การนำเสนอในการประชุม)
+- รายงาน KDLI
+- การปรับปรุงระบบ
+
+[ระยะเวลาการเก็บรักษา]
+เก็บรักษาเป็นเวลา 2 ปีหลังจากสิ้นสุดการวิจัย เมื่อสิ้นสุดระยะเวลาการเก็บรักษาข้อมูลที่สามารถระบุตัวตนได้ทั้งหมดจะถูกลบออก
+
+[การประมวลผลแบบไม่ระบุชื่อ]
+ข้อมูลทั้งหมดที่ถูกอ้างอิงในรายงาน·เอกสารจะถูกประมวลผลในรูปแบบที่ไม่สามารถระบุตัวตนของผู้เข้าร่วมได้ โดยจะระบุเพียงรหัสผู้เข้าร่วม (เช่น P001) เท่านั้น ชื่อ·สัญชาติ·ข้อมูลติดต่อ ฯลฯ จะไม่ถูกเปิดเผย
+
+[สิทธิของผู้เข้าร่วม]
+- สามารถถอนตัวจากการเข้าร่วมได้ทุกเมื่อ (ติดต่อผู้ดำเนินการ)
+- สามารถขอดูหรือลบข้อมูลของตนได้
+
+[ข้อมูลติดต่อของนักวิจัย]
+กรุณาติดต่อผู้ดำเนินการโดยตรง
+
+ข้าพเจ้าเข้าใจเนื้อหาข้างต้นอย่างเพียงพอ และยินยอมเข้าร่วมการดำเนินการทดสอบนี้.
+
+[임시본 안내 / Provisional Translation Notice]
+การแปลนี้เป็นฉบับชั่วคราวและจะมีการนำไปใช้เป็นการแปลอย่างเป็นทางการหลังจากการปรับปรุงระบบ หากเนื้อหาการยินยอมไม่ชัดเจน โปรดดูเอกสารการยินยอมภาษาเกาหลีหรือภาษาอังกฤษ หรือสอบถามผู้ดูแลระบบ`
+
+export const CONSENT_TEXT_MS = `Persetujuan untuk Penyertaan dalam Ujian Operasi Pembelajaran Berbicara dalam Bahasa Korea
+
+Ujian operasi ini dijalankan untuk mengesahkan keberkesanan sistem pembelajaran berbicara dalam bahasa Korea (KDLI Korean MVP). Ia akan digunakan untuk penyelidikan akademik dan laporan KDLI.
+
+[Data yang Dikumpul]
+- Rekod aktiviti pembelajaran: Mod pembelajaran·Masa mula·Masa tamat sesi
+- Data ucapan: Suara berbicara·Teks pengenalan suara·Teks respons NPC
+- Skor penilaian: Skor dan maklum balas mengikut item seperti sebutan·Kelancaran·Tatabahasa·Kosa kata
+- Rekod panggilan alat: Sejarah penggunaan alat sistem seperti carian·Cuaca·Alamat
+- Maklumat teknikal: Alamat IP pada masa persetujuan (hanya 24 bit pertama disimpan secara tanpa nama) dan agen pengguna
+
+[Skop Penggunaan Data]
+- Penyelidikan akademik (kertas kerja·Pembentangan persidangan)
+- Laporan KDLI
+- Penambahbaikan sistem
+
+[Tempoh Penyimpanan]
+Disimpan selama 2 tahun selepas tamat penyelidikan. Semua maklumat yang boleh dikenalpasti akan dipadamkan selepas tempoh penyimpanan tamat.
+
+[Proses Tanpa Nama]
+Semua data yang dipetik dalam laporan·kertas kerja akan diproses dalam bentuk yang tidak membolehkan pengenalan peserta. Hanya ditandakan dengan kod peserta (contoh: P001), dan nama·kewarganegaraan·maklumat hubungan tidak akan didedahkan.
+
+[Hak Peserta]
+- Boleh menarik diri pada bila-bila masa (hubungi pengendali).
+- Permintaan untuk melihat·memadam data sendiri adalah dibenarkan.
+
+[Hubungi Penyelidik]
+Sila hubungi pengendali secara langsung.
+
+Saya telah memahami sepenuhnya kandungan di atas dan bersetuju untuk menyertai ujian operasi.
+
+[임시본 안내 / Provisional Translation Notice]
+Terjemahan ini adalah versi sementara dan akan diterapkan terjemahan rasmi setelah peningkatan sistem. Jika isi persetujuan tidak jelas, sila rujuk kepada surat persetujuan dalam bahasa Korea atau Inggeris, atau hubungi pentadbir.`
+
+export const CONSENT_TEXT_KM = `ការព្រមព្រៀងចូលរួមក្នុងការប្រឡងសិក្សាភាសាកូរ
+
+ការប្រឡងនេះត្រូវបានអនុវត្តដើម្បីបញ្ជាក់ពីប្រសិទ្ធភាពនៃប្រព័ន្ធសិក្សាភាសាកូរ(KDLI Korean MVP)។ វានឹងត្រូវបានប្រើសម្រាប់ការស្រាវជ្រាវវិទ្យាសាស្ត្រ និងរបាយការណ៍ KDLI។
+
+[ទិន្នន័យដែលត្រូវបានប្រមូល]
+- ការកត់ត្រាសកម្មភាពសិក្សា: របៀបសិក្សា·ពេលវេលាដើម·ពេលវេលាបញ្ចប់
+- ទិន្នន័យសំឡេង: សំឡេងនិយាយ·អត្ថបទស្គាល់សំឡេង·អត្ថបទឆ្លើយតប NPC
+- ពិន្ទុវាយតម្លៃ: ពិន្ទុសំឡេង·ភាពរលូន·វេយ្យាករណ៍·ពាក្យសព្ទ និងមតិយោបល់តាមប្រភេទ
+- ការកត់ត្រាការហៅឧបករណ៍: ការស្វែងរក·អាកាសធាតុ·អាសយដ្ឋាន និងប្រវត្តិការប្រើប្រាស់ឧបករណ៍ប្រព័ន្ធ
+- ព័ត៌មានបច្ចេកវិទ្យា: អាសយដ្ឋាន IP នៅពេលដែលបានយល់ព្រម(រក្សាទុកតែ 24 ប៊ីតដំបូង) និងអ្នកប្រើប្រាស់
+
+[វិសាលភាពនៃការប្រើប្រាស់ទិន្នន័យ]
+- ការស្រាវជ្រាវវិទ្យាសាស្ត្រ(អត្ថបទ·ការបង្ហាញសន្និសីទ)
+- របាយការណ៍ KDLI
+- ការកែលម្អប្រព័ន្ធ
+
+[រយៈពេលរក្សាទុក]
+រក្សាទុករយៈពេល 2 ឆ្នាំបន្ទាប់ពីការស្រាវជ្រាវបញ្ចប់។ នៅពេលដែលរយៈពេលរក្សាទុកបញ្ចប់ ទិន្នន័យដែលអាចកំណត់អត្តសញ្ញាណបានទាំងអស់នឹងត្រូវលុបចោល។
+
+[ការបំភ្លឺអត្តសញ្ញាណ]
+ទិន្នន័យទាំងអស់ដែលត្រូវបានយោងក្នុងរបាយការណ៍·អត្ថបទនឹងត្រូវបានកែប្រែជារូបរាងដែលមិនអាចកំណត់អត្តសញ្ញាណអ្នកចូលរួមបាន។ វានឹងត្រូវបានសរសេរដោយកូដអ្នកចូលរួម(ឧ. P001) ប៉ុណ្ណោះ ហើយឈ្មោះ·សញ្ជាតិ·លេខទំនាក់ទំនងនឹងមិនត្រូវបានបង្ហាញ។
+
+[សិទ្ធិរបស់អ្នកចូលរួម]
+- អ្នកអាចដកចេញពីការចូលរួមបានគ្រប់ពេល(ទំនាក់ទំនងទៅអ្នកប្រតិបត្តិការ)។
+- អ្នកអាចស្នើសុំមើល·លុបទិន្នន័យរបស់ខ្លួន។
+
+[ទំនាក់ទំនងអ្នកស្រាវជ្រាវ]
+សូមទំនាក់ទំនងទៅអ្នកប្រតិបត្តិការ។
+
+ខ្ញុំបានយល់ដឹងអំពីមាតិកានេះយ៉ាងគ្រប់គ្រាន់ ហើយខ្ញុំយល់ព្រមចូលរួមក្នុងការប្រឡង។
+
+[임시본 안내 / Provisional Translation Notice]
+ការបកប្រែនេះគឺជាការបកប្រែបណ្តោះអាសន្ន ហើយនឹងត្រូវបានអនុវត្តន៍ការបកប្រែជាផ្លូវការបន្ទាប់ពីការកែលម្អប្រព័ន្ធ។ ប្រសិនបើមាតិកានៃការយល់ព្រមមិនច្បាស់ សូមយោងទៅកាន់ឯកសារយល់ព្រមជាភាសាកូរ៉េឬភាសាអង់គ្លេស ឬសូមទំនាក់ទំនងអ្នកគ្រប់គ្រង។`
+
+export type ConsentLocale = 'ko' | 'en' | 'vi' | 'ar' | 'th' | 'ms' | 'km'
 
 export const CONSENT_TEXTS: Record<ConsentLocale, string> = {
   ko: CONSENT_TEXT_KO,
   en: CONSENT_TEXT_EN,
   vi: CONSENT_TEXT_VI,
   ar: CONSENT_TEXT_AR,
+  th: CONSENT_TEXT_TH,
+  ms: CONSENT_TEXT_MS,
+  km: CONSENT_TEXT_KM,
 }
