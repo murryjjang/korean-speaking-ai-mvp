@@ -109,6 +109,13 @@ export const BilingualText = memo(BilingualTextImpl)
 
 // v1.1 단계 19.6 [BiText]: 리스트 항목용 보조 — strengths/next_steps 같은 리스트.
 // 한국어 항목을 본문으로, 보조 언어 항목을 같은 li 안에 작은 글씨로 한 줄 더 표시.
+//
+// v1.1 단계 19.10 [#3]: PDF에서 한국어와 보조 언어가 같은 줄에 붙어 출력되는
+// 회귀 차단. 부모 ul이 `list-disc list-inside`라 li 내부 콘텐츠가 inline-flow
+// 처럼 다뤄질 수 있어 보조 span의 `block` 클래스만으로는 puppeteer 렌더에서
+// 줄바꿈이 보장되지 않았다. 본문/보조를 명시적 div 컨테이너로 감싸고 인라인
+// style `display:block`을 안전망으로 추가, 보조 영역 margin도 `mt-1`로 증가
+// 시켜 시각적 분리를 강화한다.
 function BilingualListItemImpl({
   ko,
   multilingual,
@@ -135,16 +142,20 @@ function BilingualListItemImpl({
       className={className}
       data-bilingual-supplement={showSupplement ? lang : undefined}
     >
-      <span lang="ko">{ko}</span>
+      <div lang="ko" style={{ display: 'block' }}>{ko}</div>
       {showSupplement && (
-        <span
-          className="block text-[11px] text-text-muted opacity-80 mt-0.5 leading-snug"
+        <div
+          className="text-[11px] text-text-muted opacity-80 mt-1 leading-snug"
           dir={rtl ? 'rtl' : undefined}
           lang={lang}
-          style={rtl ? { unicodeBidi: 'plaintext', textAlign: 'start' } : undefined}
+          style={
+            rtl
+              ? { display: 'block', unicodeBidi: 'plaintext', textAlign: 'start' }
+              : { display: 'block' }
+          }
         >
           {supplement}
-        </span>
+        </div>
       )}
     </li>
   )
