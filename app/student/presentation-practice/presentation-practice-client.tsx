@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type CSSProperties } from 'react'
 import { Card, CardHeader, CardBody, Badge } from '@/src/components/ui'
 import { Localized } from '@/src/components/ui/localized'
+import { getLabel } from '@/src/lib/i18n/dashboard-labels'
+import { inferDisplayLanguageFromMotherTongue } from '@/src/lib/i18n/display-language'
 import { useKaraokeTracking } from '@/src/hooks/useKaraokeTracking'
 import { useLanguageHelper } from '@/src/hooks/use-language-helper'
 import { isRTL, L1_LABEL_KO, type FeedbackLanguage } from '@/src/lib/feedback-language'
@@ -42,6 +44,22 @@ const TIME_OPTIONS = [
 ]
 
 const LEVEL_OPTIONS = ['초급', '중급', '고급'] as const
+
+// v1.1 단계 19.12: HTML <option>은 텍스트 노드만 허용해 Localized 컴포넌트를 못 쓴다.
+// 한국어 본문 + 학습자 모국어 보조 텍스트를 단일 문자열로 합쳐 옵션 라벨에 사용.
+const TONE_KO_SUFFIX: Record<'formal' | 'general' | 'casual', string> = {
+  formal: '격식체 (-습니다, -입니다)',
+  general: '일반체 (-요, -아·어요)',
+  casual: '친근체 (반말)',
+}
+function getToneLabel(tone: 'formal' | 'general' | 'casual', motherTongue?: string | null): string {
+  const lang = inferDisplayLanguageFromMotherTongue(motherTongue) ?? 'ko'
+  const ko = TONE_KO_SUFFIX[tone]
+  if (lang === 'ko') return ko
+  const keyMap = { formal: 'presentation_toneFormal', general: 'presentation_toneGeneral', casual: 'presentation_toneCasual' } as const
+  const supplement = getLabel({ kind: 'practice', key: keyMap[tone] }, lang)
+  return `${ko} — ${supplement}`
+}
 
 // ── 기본 예문 ("지난 주말에 한 일") ─────────────────────────────────────────
 const DEFAULT_TOPIC = '지난 주말에 한 일'
@@ -920,14 +938,22 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
               <>
                 <span className="flex items-center gap-2 text-xs font-medium text-rose-600">
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                  녹음 중
+                  <Localized
+                    spec={{ kind: 'practice', key: 'presentation_recording' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </span>
                 <button
                   onClick={stopRecording}
                   data-testid="btn-stop-recording"
                   className="px-5 py-2.5 rounded-md bg-slate-700 text-white font-semibold text-sm hover:bg-slate-800 transition-colors"
                 >
-                  발표 종료
+                  <Localized
+                    spec={{ kind: 'practice', key: 'presentation_stopRecording' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
                 </button>
               </>
             )}
@@ -940,7 +966,11 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
                 data-testid="btn-retry-recording"
                 className="px-4 py-2 rounded-md bg-surface border border-border text-text-secondary text-sm font-medium hover:bg-slate-50 transition-colors"
               >
-                다시 녹음
+                <Localized
+                  spec={{ kind: 'practice', key: 'presentation_retryRecording' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
               </button>
             )}
           </div>
@@ -952,7 +982,13 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
             className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-100 border border-red-300"
             data-testid="alert-time-over"
           >
-            <span className="text-red-700 font-semibold text-xs">목표 시간 도달</span>
+            <span className="text-red-700 font-semibold text-xs">
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_alertTargetReached' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
+            </span>
           </div>
         )}
         {recordingState === 'recording' && !targetReached && alert10 && (
@@ -961,7 +997,13 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
             data-testid="alert-10sec"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-red-700 font-semibold text-xs">10초 전</span>
+            <span className="text-red-700 font-semibold text-xs">
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_alert10sec' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
+            </span>
           </div>
         )}
         {recordingState === 'recording' && !targetReached && !alert10 && alert30 && (
@@ -970,7 +1012,13 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
             data-testid="alert-30sec"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            <span className="text-amber-700 font-semibold text-xs">30초 전</span>
+            <span className="text-amber-700 font-semibold text-xs">
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_alert30sec' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
+            </span>
           </div>
         )}
       </div>
@@ -1165,7 +1213,13 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
           />
           <div className="flex flex-wrap items-end gap-3" data-testid="correction-tone-row">
             <label className="flex flex-col gap-1 text-xs text-text-secondary">
-              <span className="font-medium">교정 톤</span>
+              <span className="font-medium">
+                <Localized
+                  spec={{ kind: 'practice', key: 'presentation_correctionTone' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
+              </span>
               <select
                 value={correctionTone}
                 onChange={e => setCorrectionTone(e.target.value as CorrectionTone)}
@@ -1173,14 +1227,20 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
                 data-testid="correction-tone-select"
                 disabled={correctionLoading}
               >
-                <option value="formal">격식체 (-습니다, -입니다)</option>
-                <option value="general">일반체 (-요, -아·어요)</option>
-                <option value="casual">친근체 (반말)</option>
+                {/* v1.1 단계 19.12: option 텍스트는 HTML <option> 안에서 Localized 컴포넌트
+                    렌더 불가(텍스트 노드만 허용). 사용자 모국어로 옵션 라벨을 미리 계산해 표시. */}
+                <option value="formal">{getToneLabel('formal', motherTongue)}</option>
+                <option value="general">{getToneLabel('general', motherTongue)}</option>
+                <option value="casual">{getToneLabel('casual', motherTongue)}</option>
               </select>
             </label>
             {correctionTone === 'casual' && (
               <p className="text-xs text-amber-700 max-w-xs" data-testid="correction-tone-hint">
-                친근체는 친구·가족 사이 톤입니다. 공식 발표엔 격식체를 권장합니다.
+                <Localized
+                  spec={{ kind: 'practice', key: 'presentation_toneCasualHint' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
               </p>
             )}
           </div>
@@ -1193,7 +1253,11 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
               className="px-3 py-1.5 rounded-md bg-surface border border-border text-text-secondary text-xs font-medium hover:bg-slate-50 transition-colors"
               data-testid="btn-load-sample"
             >
-              샘플 원고 불러오기
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_loadSample' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
             </button>
             <button
               onClick={async () => {
@@ -1252,10 +1316,22 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
               {correctionLoading ? (
                 <>
                   <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>교정 중...</span>
+                  <span>
+                    <Localized
+                      spec={{ kind: 'practice', key: 'presentation_correcting' }}
+                      motherTongueHint={motherTongue}
+                      inline
+                    />
+                  </span>
                 </>
               ) : (
-                <span>AI 원고 교정하기</span>
+                <span>
+                  <Localized
+                    spec={{ kind: 'practice', key: 'presentation_aiCorrect' }}
+                    motherTongueHint={motherTongue}
+                    inline
+                  />
+                </span>
               )}
             </button>
           </div>
@@ -1271,7 +1347,17 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
       {showCorrection && correctionResult && (
         <Card data-testid="correction-card">
           <CardHeader
-            title="AI 원고 교정 결과"
+            title={
+              <>
+                AI 원고 교정 결과
+                <Localized
+                  spec={{ kind: 'practice', key: 'presentation_correctionResult' }}
+                  motherTongueHint={motherTongue}
+                  supplementOnly
+                  className="ml-1.5 text-xs font-normal text-text-muted"
+                />
+              </>
+            }
             action={
               <Badge variant="info" size="sm">
                 {correctionResult.source === 'llm' ? 'AI 교정' : '샘플 교정'}
@@ -1429,9 +1515,39 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
       {/* 교정문 섀도잉 */}
       <Card data-testid="shadowing-card">
         <CardHeader
-          title="교정문 섀도잉"
-          description="교정된 발표문을 들으며 억양과 속도를 따라 연습해 보세요."
-          action={ttsStatus === 'playing' ? <Badge variant="success" size="sm">재생 중</Badge> : null}
+          title={
+            <>
+              교정문 섀도잉
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_shadowingTitle' }}
+                motherTongueHint={motherTongue}
+                supplementOnly
+                className="ml-1.5 text-xs font-normal text-text-muted"
+              />
+            </>
+          }
+          description={
+            <>
+              교정된 발표문을 들으며 억양과 속도를 따라 연습해 보세요.
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_shadowingDesc' }}
+                motherTongueHint={motherTongue}
+                supplementOnly
+                className="block mt-0.5 text-[11px] text-text-muted opacity-80 leading-snug"
+              />
+            </>
+          }
+          action={
+            ttsStatus === 'playing' ? (
+              <Badge variant="success" size="sm">
+                <Localized
+                  spec={{ kind: 'practice', key: 'presentation_playing' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
+              </Badge>
+            ) : null
+          }
         />
         <CardBody className="space-y-3">
           <PresentationScriptDisplay
@@ -1505,7 +1621,11 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
               data-testid="btn-play-corrected"
               className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors"
             >
-              교정문 듣기
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_listenCorrected' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
             </button>
             <button
               onClick={() => playTTS(DEFAULT_CORRECTED, 0.75)}
@@ -1513,7 +1633,11 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
               data-testid="btn-play-slow"
               className="px-3 py-2 rounded-md bg-surface border border-border text-text-secondary text-sm font-medium hover:bg-slate-200 disabled:opacity-50 transition-colors"
             >
-              천천히 듣기
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_listenSlow' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
             </button>
             <button
               onClick={() => playTTS(DEFAULT_CORRECTED, 1.0)}
@@ -1521,21 +1645,33 @@ export function PresentationPracticeClient({ motherTongue }: { motherTongue?: st
               data-testid="btn-play-normal"
               className="px-3 py-2 rounded-md bg-surface border border-border text-text-secondary text-sm font-medium hover:bg-slate-200 disabled:opacity-50 transition-colors"
             >
-              보통 속도로 듣기
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_listenNormal' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
             </button>
             {(ttsStatus === 'loading' || ttsStatus === 'playing') && (
               <button
                 onClick={stopAudio}
                 className="px-4 py-2 rounded-md bg-white border border-border text-text-secondary text-sm font-medium hover:bg-slate-50 transition-colors"
               >
-                정지
+                <Localized
+                  spec={{ kind: 'practice', key: 'presentation_stop' }}
+                  motherTongueHint={motherTongue}
+                  inline
+                />
               </button>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-              재생 속도
+              <Localized
+                spec={{ kind: 'practice', key: 'presentation_playSpeed' }}
+                motherTongueHint={motherTongue}
+                inline
+              />
             </label>
             <div className="flex gap-1.5 flex-wrap" data-testid="speed-buttons">
               {SPEED_OPTIONS.map(s => (
