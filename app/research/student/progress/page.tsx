@@ -315,13 +315,16 @@ export default async function StudentProgressPage() {
                           <span className="text-text-secondary">{persona.nameKo}</span>
                         </>
                       )}
-                      {/* v1.1 단계 19.11 [#3]: RTL 보조 텍스트(예: 아랍어 "مكتمل")가
-                          외부 한국어 괄호와 같은 인라인 컨텍스트에 섞여 bidi 알고리즘이
-                          ")"를 별도 줄로 밀어내던 회귀. dir="ltr" + unicode-bidi:isolate로
-                          괄호 컨테이너를 LTR 컨텍스트로 격리해 줄바뀜 차단. */}
+                      {/* v1.1 단계 19.11 [#3]: 외부 dir="ltr" + unicode-bidi:isolate로
+                          한국어 괄호 컨텍스트 격리.
+                          v1.1 단계 19.12 [#3]: 단계 19.11의 dir/isolate는 bidi 재정렬만
+                          차단했고 Localized 기본 분기의 block 자식 (보조 영역 display:block)
+                          때문에 ")"가 새 줄로 밀려나는 회귀가 잔존. inline + bareSupplement로
+                          보조 영역을 ml-1.5 인라인으로 강제, 외부 괄호로 감싸 "(완료 مكتمل)"
+                          한 줄 표시 보장. */}
                       {s.sessionEndedAt
-                        ? <span className="text-emerald-600 ml-auto" dir="ltr" style={{ unicodeBidi: 'isolate' }}>(<Localized spec={{ kind: 'page', key: 'completed' }} motherTongueHint={participant.motherTongue} />)</span>
-                        : <span className="text-yellow-600 ml-auto" dir="ltr" style={{ unicodeBidi: 'isolate' }}>(<Localized spec={{ kind: 'page', key: 'inProgress' }} motherTongueHint={participant.motherTongue} />)</span>}
+                        ? <span className="text-emerald-600 ml-auto" dir="ltr" style={{ unicodeBidi: 'isolate' }}>(<Localized inline bareSupplement spec={{ kind: 'page', key: 'completed' }} motherTongueHint={participant.motherTongue} />)</span>
+                        : <span className="text-yellow-600 ml-auto" dir="ltr" style={{ unicodeBidi: 'isolate' }}>(<Localized inline bareSupplement spec={{ kind: 'page', key: 'inProgress' }} motherTongueHint={participant.motherTongue} />)</span>}
                     </div>
                     <div className="mt-1 flex items-baseline gap-3">
                       {topic ? (

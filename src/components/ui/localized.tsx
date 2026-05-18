@@ -33,6 +33,9 @@ export function Localized({
   /** true면 한국어 본문 미렌더, 보조 텍스트만 출력. titleSupplement 등 외부 본문이 이미
    *  있을 때 보조 영역만 추가하고 싶을 때 사용. ko/null이면 빈 결과. */
   supplementOnly = false,
+  /** v1.1 단계 19.12 [#3]: inline 모드에서 보조 텍스트 자동 괄호 비부여.
+   *  호출부가 외부 괄호로 감쌀 때(예: 진척 페이지 "(완료 mother_tongue)"). */
+  bareSupplement = false,
 }: {
   spec: DashboardLabelKey
   /** 학습자 모국어 단독 결정. ko/null이면 보조 영역 미생성. */
@@ -41,6 +44,7 @@ export function Localized({
   inline?: boolean
   prominent?: boolean
   supplementOnly?: boolean
+  bareSupplement?: boolean
 }) {
   const lang = inferDisplayLanguageFromMotherTongue(motherTongueHint)
   const ko = getLabel(spec, 'ko')
@@ -85,7 +89,7 @@ export function Localized({
           // 시나리오(예: "(완료 مكتمل)")에서 ")"가 RTL 컨텍스트로 잘못 밀려나는 회귀 차단.
           style={rtl ? { unicodeBidi: 'isolate', textAlign: 'start' } : { unicodeBidi: 'isolate' }}
         >
-          {inline ? `(${supplement})` : supplement}
+          {inline && !bareSupplement ? `(${supplement})` : supplement}
         </span>
       )}
     </span>

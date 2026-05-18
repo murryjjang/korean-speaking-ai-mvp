@@ -43,12 +43,13 @@ describe('[단계19.11-#3] Localized 보조 영역 unicode-bidi: isolate 적용'
 
 describe('[단계19.11-#3] 진척 페이지 "(완료/진행 중)" 괄호 LTR 격리', () => {
   it('completed/inProgress Localized를 감싸는 span에 dir="ltr" + unicodeBidi: isolate', () => {
-    // 라인 패턴: <span ... dir="ltr" style={{ unicodeBidi: 'isolate' }}>(<Localized ... /></span>
+    // 라인 패턴: <span ... dir="ltr" style={{ unicodeBidi: 'isolate' }}>(<Localized ... [props] spec={{ ... key: 'completed' ...}} ... /></span>
+    // 단계 19.12: Localized에 inline bareSupplement props 추가됐으므로 spec 앞 임의 prop 허용.
     expect(progressPageSrc).toMatch(
-      /dir="ltr"[^>]*unicodeBidi:\s*'isolate'[^>]*>\(<Localized\s+spec=\{\{\s*kind:\s*'page',\s*key:\s*'completed'/,
+      /dir="ltr"[^>]*unicodeBidi:\s*'isolate'[^>]*>\(<Localized\s[^>]*spec=\{\{\s*kind:\s*'page',\s*key:\s*'completed'/,
     )
     expect(progressPageSrc).toMatch(
-      /dir="ltr"[^>]*unicodeBidi:\s*'isolate'[^>]*>\(<Localized\s+spec=\{\{\s*kind:\s*'page',\s*key:\s*'inProgress'/,
+      /dir="ltr"[^>]*unicodeBidi:\s*'isolate'[^>]*>\(<Localized\s[^>]*spec=\{\{\s*kind:\s*'page',\s*key:\s*'inProgress'/,
     )
   })
 
@@ -58,5 +59,29 @@ describe('[단계19.11-#3] 진척 페이지 "(완료/진행 중)" 괄호 LTR 격
     const unfencedPattern = /className="text-(emerald|yellow)-600\s+ml-auto">\(<Localized/g
     const matches = progressPageSrc.match(unfencedPattern)
     expect(matches).toBeNull()
+  })
+})
+
+// v1.1 단계 19.12 [#3]: 단계 19.11의 dir/isolate가 bidi 재정렬은 차단했으나,
+// Localized inline 미지정 시 보조 영역이 `block mt-0.5`로 렌더되어 인라인 컨텍스트의
+// block 자식이 ")"를 새 줄로 밀어내는 회귀가 잔존. 진척 페이지 호출부에 inline +
+// bareSupplement 부여로 보조 영역 ml-1.5 인라인 강제 + 외부 괄호 유지 보장.
+describe('[단계19.12-#3] Localized bareSupplement 추가 — inline+자동괄호 비부여', () => {
+  it('Localized에 bareSupplement prop 정의', () => {
+    expect(localizedSrc).toMatch(/bareSupplement\s*[:=?]/)
+  })
+
+  it('inline=true && bareSupplement=true 시 자동 괄호 미부여', () => {
+    // 분기: `${inline && !bareSupplement ? '(' + supplement + ')' : supplement}`
+    expect(localizedSrc).toMatch(/inline\s*&&\s*!bareSupplement/)
+  })
+
+  it('진척 페이지 completed/inProgress 호출부가 inline bareSupplement 사용', () => {
+    expect(progressPageSrc).toMatch(
+      /<Localized\s+inline\s+bareSupplement\s+spec=\{\{\s*kind:\s*'page',\s*key:\s*'completed'/,
+    )
+    expect(progressPageSrc).toMatch(
+      /<Localized\s+inline\s+bareSupplement\s+spec=\{\{\s*kind:\s*'page',\s*key:\s*'inProgress'/,
+    )
   })
 })
