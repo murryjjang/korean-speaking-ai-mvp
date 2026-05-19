@@ -187,6 +187,186 @@ function diffWordsInline(original: string, corrected: string): DiffSeg[] {
   return segs
 }
 
+// v1.1 단계 19.18: 종합 화면 발음 점수 집계 컴포넌트.
+// turns[].pronScore 클라이언트 state만 집계 — 별도 fetch·DB 조회 없음.
+// 구간: <50 / 50–69 / 70–84 / ≥85. 데이터 없으면 안내문.
+function PronunciationScoreSummary({
+  turns,
+  motherTongue,
+}: {
+  turns: ChatTurn[]
+  motherTongue: string | null
+}) {
+  const scores = turns
+    .filter((t): t is ChatTurn & { pronScore: number } =>
+      t.role === 'student' && typeof t.pronScore === 'number',
+    )
+    .map((t) => t.pronScore)
+
+  if (scores.length === 0) {
+    return (
+      <Card data-testid="conversation-pron-summary-empty">
+        <CardHeader
+          title={
+            <Localized
+              spec={{ kind: 'practice', key: 'free_conv_summaryPronTitle' }}
+              motherTongueHint={motherTongue}
+              inline
+            />
+          }
+        />
+        <CardBody>
+          <p className="text-sm text-text-muted" lang="ko">
+            이번 대화에서는 발음 평가가 활성화되지 않았거나 평가된 발화가 없습니다.
+          </p>
+          <Localized
+            spec={{ kind: 'practice', key: 'free_conv_summaryPronEmpty' }}
+            motherTongueHint={motherTongue}
+            supplementOnly
+            className="mt-1 text-xs text-text-muted"
+          />
+        </CardBody>
+      </Card>
+    )
+  }
+
+  const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+  const buckets = {
+    low: scores.filter((s) => s < 50).length,
+    mid: scores.filter((s) => s >= 50 && s < 70).length,
+    high: scores.filter((s) => s >= 70 && s < 85).length,
+    top: scores.filter((s) => s >= 85).length,
+  }
+
+  return (
+    <Card data-testid="conversation-pron-summary">
+      <CardHeader
+        title={
+          <Localized
+            spec={{ kind: 'practice', key: 'free_conv_summaryPronTitle' }}
+            motherTongueHint={motherTongue}
+            inline
+          />
+        }
+      />
+      <CardBody className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div
+            className="rounded-md border border-border bg-surface-raised p-3"
+            data-testid="pron-summary-avg"
+          >
+            <p className="text-xs text-text-muted" lang="ko">평균</p>
+            <Localized
+              spec={{ kind: 'practice', key: 'free_conv_summaryPronAvg' }}
+              motherTongueHint={motherTongue}
+              supplementOnly
+              className="text-[10px] text-text-muted"
+            />
+            <p className="mt-1 text-2xl font-bold text-primary-700" data-testid="pron-summary-avg-value">
+              {avg}
+              <span className="text-sm font-normal text-text-muted">/100</span>
+            </p>
+          </div>
+          <div
+            className="rounded-md border border-border bg-surface-raised p-3"
+            data-testid="pron-summary-count"
+          >
+            <p className="text-xs text-text-muted" lang="ko">평가된 발화</p>
+            <Localized
+              spec={{ kind: 'practice', key: 'free_conv_summaryPronCount' }}
+              motherTongueHint={motherTongue}
+              supplementOnly
+              className="text-[10px] text-text-muted"
+            />
+            <p className="mt-1 text-2xl font-bold text-text-primary" data-testid="pron-summary-count-value">
+              {scores.length}
+              <span className="text-sm font-normal text-text-muted" lang="ko">개</span>
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold text-text-secondary mb-2" lang="ko">구간별 분포</p>
+          <Localized
+            spec={{ kind: 'practice', key: 'free_conv_summaryPronDistribution' }}
+            motherTongueHint={motherTongue}
+            supplementOnly
+            className="text-[10px] text-text-muted -mt-1 mb-2 block"
+          />
+          <ul className="text-sm space-y-1.5" data-testid="pron-summary-buckets">
+            <li className="flex items-center justify-between">
+              <span className="text-text-secondary" lang="ko">
+                50점 미만
+                <Localized
+                  spec={{ kind: 'practice', key: 'free_conv_summaryPronBucketLow' }}
+                  motherTongueHint={motherTongue}
+                  supplementOnly
+                  className="ml-2 text-[10px] text-text-muted"
+                />
+              </span>
+              <span className="font-mono text-text-primary" data-testid="pron-bucket-low">
+                {buckets.low}
+              </span>
+            </li>
+            <li className="flex items-center justify-between">
+              <span className="text-text-secondary" lang="ko">
+                50–69
+                <Localized
+                  spec={{ kind: 'practice', key: 'free_conv_summaryPronBucketMid' }}
+                  motherTongueHint={motherTongue}
+                  supplementOnly
+                  className="ml-2 text-[10px] text-text-muted"
+                />
+              </span>
+              <span className="font-mono text-text-primary" data-testid="pron-bucket-mid">
+                {buckets.mid}
+              </span>
+            </li>
+            <li className="flex items-center justify-between">
+              <span className="text-text-secondary" lang="ko">
+                70–84
+                <Localized
+                  spec={{ kind: 'practice', key: 'free_conv_summaryPronBucketHigh' }}
+                  motherTongueHint={motherTongue}
+                  supplementOnly
+                  className="ml-2 text-[10px] text-text-muted"
+                />
+              </span>
+              <span className="font-mono text-text-primary" data-testid="pron-bucket-high">
+                {buckets.high}
+              </span>
+            </li>
+            <li className="flex items-center justify-between">
+              <span className="text-text-secondary" lang="ko">
+                85점 이상
+                <Localized
+                  spec={{ kind: 'practice', key: 'free_conv_summaryPronBucketTop' }}
+                  motherTongueHint={motherTongue}
+                  supplementOnly
+                  className="ml-2 text-[10px] text-text-muted"
+                />
+              </span>
+              <span className="font-mono text-text-primary" data-testid="pron-bucket-top">
+                {buckets.top}
+              </span>
+            </li>
+          </ul>
+        </div>
+
+        <p className="text-xs text-text-muted leading-relaxed border-t border-border pt-3" lang="ko">
+          ⚠ 표현 연습용 점수입니다. 정식 발음 평가는 읽기·발표 연습에서 확인하세요.
+        </p>
+        <Localized
+          spec={{ kind: 'practice', key: 'free_conv_summaryPronNotice' }}
+          motherTongueHint={motherTongue}
+          supplementOnly
+          className="text-[11px] text-text-muted leading-relaxed -mt-2 block"
+        />
+      </CardBody>
+    </Card>
+  )
+}
+
 export function FreeConversationClient({ motherTongue = null }: { motherTongue?: string | null }) {
   // v1.1 단계 19.7 [아키텍처]: motherTongue 단독 결정. LLM 요약 fetch는 en/vi/ar이 필요하므로
   // ko/매칭 실패면 디폴트 'en'으로 fetch만 진행 (보조 카드는 BilingualText가 ko면 자동 숨김).
@@ -918,6 +1098,25 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                 />)
               </span>
             </p>
+
+            {/* v1.1 단계 19.18: 자유 대화 정체성 안내 — "표현·흐름 연습용"임을 명시.
+                정확 발음 평가는 읽기·발표 연습에서 이루어진다는 사실을 학습자에게
+                대화 시작 전 한 번 안내해 발음 점수에 매달리지 않도록 한다. */}
+            <div
+              className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5"
+              data-testid="free-conv-purpose-notice"
+              role="note"
+            >
+              <p className="text-xs leading-relaxed text-amber-900" lang="ko">
+                💡 이 활동은 표현과 대화 흐름을 연습하는 단계입니다. 정확한 발음 평가는 &ldquo;읽기연습&rdquo;과 &ldquo;발표연습&rdquo;에서 진행됩니다.
+              </p>
+              <Localized
+                spec={{ kind: 'practice', key: 'free_conv_purposeNotice' }}
+                motherTongueHint={motherTongue}
+                supplementOnly
+                className="mt-1 text-[11px] leading-relaxed text-amber-800"
+              />
+            </div>
           </div>
 
           <Card>
@@ -1531,6 +1730,13 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
               {summaryReloadError}
             </div>
           )}
+
+          {/* v1.1 단계 19.18: 종합 화면 발음 점수 요약. 메시지별 pronScore는 chat
+              본문에서 이미 표시되며, 여기서는 평균·구간별 분포·평가 발화 수를 묶어
+              학습자가 본인 진척도를 한눈에 추적할 수 있게 한다. 자유 대화는 표현
+              연습용이라 "참고용" 주의문을 함께 노출한다. */}
+          <PronunciationScoreSummary turns={turns} motherTongue={motherTongue} />
+
           <Card data-testid="conversation-summary">
             <CardHeader
               title="대화 요약"
