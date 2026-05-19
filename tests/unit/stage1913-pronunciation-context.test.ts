@@ -85,16 +85,18 @@ describe('buildSpeechFlowContext', () => {
     expect(buildSpeechFlowContext(r)).toBeUndefined()
   })
 
-  it(`${PAUSE_LONG_MS}ms 이상은 longPauses, ${PAUSE_SHORT_MS}~${PAUSE_LONG_MS}ms는 shortPauses`, () => {
+  it(`${PAUSE_LONG_MS}ms 이상은 longPauses, ${PAUSE_SHORT_MS}~${PAUSE_LONG_MS - 1}ms는 shortPauses`, () => {
+    // v1.1 단계 19.17: 임계 하향 (800/1500 → 500/1000). 픽스처 gap을 새 임계에
+    // 맞춰 — long: 2100ms (≥1000), short: 700ms (500~999), no-pause: 300ms (<500).
     const r = makePron({
       wordResults: [
         { word: '한국', accuracyScore: 90, errorType: 'None', offsetMs: 0, durationMs: 500 },
-        // 멈춤 2100ms (long) → "한국" 다음에 멈춤
+        // 멈춤 2100ms (long) → "한국" 다음
         { word: '음식', accuracyScore: 90, errorType: 'None', offsetMs: 2600, durationMs: 500 },
-        // 멈춤 1000ms (short) → "음식" 다음
-        { word: '다', accuracyScore: 90, errorType: 'None', offsetMs: 4100, durationMs: 200 },
-        // 멈춤 400ms (no pause) → "다" 다음
-        { word: '좋아', accuracyScore: 90, errorType: 'None', offsetMs: 4700, durationMs: 500 },
+        // 멈춤 700ms (short) → "음식" 다음
+        { word: '다', accuracyScore: 90, errorType: 'None', offsetMs: 3800, durationMs: 200 },
+        // 멈춤 300ms (no pause) → "다" 다음
+        { word: '좋아', accuracyScore: 90, errorType: 'None', offsetMs: 4300, durationMs: 500 },
       ],
     })
     const sf = buildSpeechFlowContext(r)
@@ -102,8 +104,8 @@ describe('buildSpeechFlowContext', () => {
     expect(sf!.longPauseCount).toBe(1)
     expect(sf!.shortPauseCount).toBe(1)
     expect(sf!.longPauses![0]).toEqual({ afterWord: '한국', gapMs: 2100 })
-    expect(sf!.shortPauses![0]).toEqual({ afterWord: '음식', gapMs: 1000 })
-    expect(sf!.totalDurationMs).toBe(5200) // 4700 + 500 - 0
+    expect(sf!.shortPauses![0]).toEqual({ afterWord: '음식', gapMs: 700 })
+    expect(sf!.totalDurationMs).toBe(4800) // 4300 + 500 - 0
   })
 
   it('offsetMs/durationMs 미보유 단어 쌍은 건너뛴다', () => {

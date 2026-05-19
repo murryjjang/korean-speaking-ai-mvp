@@ -97,34 +97,38 @@ describe('단계 19.16 — buildPersonaSystemPrompt pronunciation/speechFlow 블
 
   describe('speechFlowContext 정상 전달', () => {
     it('긴 멈춤이 단어·시간과 함께 노출된다', () => {
+      // v1.1 단계 19.17: 임계 1500→1000ms 하향. 표시도 동적 PAUSE_LONG_MS 값.
       const ctx: SpeechFlowContext = {
         longPauses: [{ afterWord: '저는', gapMs: 1800 }],
         longPauseCount: 1,
       }
       const prompt = build({ speechFlowContext: ctx })
       expect(prompt).toContain('[직전 학습자 발화 — 발화 흐름]')
-      expect(prompt).toContain('긴 멈춤(≥1500ms) 1회')
+      expect(prompt).toContain('긴 멈춤(≥1000ms) 1회')
       expect(prompt).toContain('"저는" 뒤(1800ms)')
     })
 
     it('짧은 멈춤은 별도 임계로 표시', () => {
+      // v1.1 단계 19.17: 임계 800→500ms 하향. 표시 500~999ms.
       const ctx: SpeechFlowContext = {
-        shortPauses: [{ afterWord: '음', gapMs: 900 }, { afterWord: '그', gapMs: 1200 }],
+        shortPauses: [{ afterWord: '음', gapMs: 600 }, { afterWord: '그', gapMs: 850 }],
         shortPauseCount: 2,
       }
       const prompt = build({ speechFlowContext: ctx })
-      expect(prompt).toContain('짧은 멈춤(800~1499ms) 2회')
-      expect(prompt).toContain('"음" 뒤(900ms)')
-      expect(prompt).toContain('"그" 뒤(1200ms)')
+      expect(prompt).toContain('짧은 멈춤(500~999ms) 2회')
+      expect(prompt).toContain('"음" 뒤(600ms)')
+      expect(prompt).toContain('"그" 뒤(850ms)')
     })
 
-    it('멈춤이 1회 이하면 별도 언급 없이 자연 호응만 하라는 가이드', () => {
+    it('짧은 멈춤 1회만 있으면 별도 언급은 선택 (단계 19.17 완화)', () => {
+      // v1.1 단계 19.17: 기존 "≤1 → 침묵"을 "1회만 → 언급 선택"으로 완화.
+      // 발음 약점 짚는 호응 안에 자연스럽게 녹일 수 있게 함.
       const ctx: SpeechFlowContext = {
-        shortPauses: [{ afterWord: '음', gapMs: 900 }],
+        shortPauses: [{ afterWord: '음', gapMs: 700 }],
         shortPauseCount: 1,
       }
       const prompt = build({ speechFlowContext: ctx })
-      expect(prompt).toMatch(/짧은 멈춤이 1회 이하면 별도 언급 없이/)
+      expect(prompt).toMatch(/짧은 멈춤이 1회만 있으면 별도 언급은 선택/)
     })
 
     it('NPC는 친구이지 코치가 아니라는 톤 가이드', () => {

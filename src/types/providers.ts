@@ -117,8 +117,9 @@ export type PronunciationContext = {
 
 export type SpeechFlowContext = {
   totalDurationMs?: number
-  longPauses?: Array<{ afterWord: string; gapMs: number }>  // ≥1500ms
-  shortPauses?: Array<{ afterWord: string; gapMs: number }> // ≥800ms, <1500ms
+  // v1.1 단계 19.17: 임계 800/1500ms → 500/1000ms 하향 (PAUSE_SHORT_MS/PAUSE_LONG_MS 참고).
+  longPauses?: Array<{ afterWord: string; gapMs: number }>  // ≥PAUSE_LONG_MS
+  shortPauses?: Array<{ afterWord: string; gapMs: number }> // ≥PAUSE_SHORT_MS, <PAUSE_LONG_MS
   longPauseCount?: number
   shortPauseCount?: number
 }

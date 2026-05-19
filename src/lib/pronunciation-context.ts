@@ -14,10 +14,15 @@ import type {
 } from '@/src/types/providers'
 
 // pause 임계치 — 보고서에 명시. Azure timing은 100ns→ms 변환 후 단위.
-// "절었다"는 사용자 보고를 잡으려면 한국어 자연 발화 기준 800ms부터 인지 가능.
-// 길이 멈춤은 1500ms 이상.
-export const PAUSE_SHORT_MS = 800
-export const PAUSE_LONG_MS = 1500
+//
+// v1.1 단계 19.13: 800ms / 1500ms로 시작.
+// v1.1 단계 19.17: 500ms / 1000ms로 하향. 시연에서 "음...그...." 같은 명확한 어휘
+//   탐색 멈춤이 800ms 미만이면 단계 19.16 시스템 프롬프트의 발화 흐름 블록 자체가
+//   미포함되어 LLM이 멈춤을 인지하지 못하는 회귀 발생. 500ms는 한국어 자연 발화에서
+//   어휘 탐색이 시작되는 지점으로 인지 가능. 잦은 트리거 우려는 시스템 프롬프트의
+//   "한 턴 흐름 코멘트 최대 1회" 가드로 흡수.
+export const PAUSE_SHORT_MS = 500
+export const PAUSE_LONG_MS = 1000
 
 // 단어 약점 임계 — Azure word-level AccuracyScore가 70 미만이면 LLM에 노출.
 export const WEAK_WORD_THRESHOLD = 70

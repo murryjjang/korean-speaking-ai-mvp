@@ -9,6 +9,7 @@
 
 import type { Persona, FewShotExample } from '@/src/lib/personas'
 import type { PronunciationContext, SpeechFlowContext } from '@/src/types/providers'
+import { PAUSE_SHORT_MS, PAUSE_LONG_MS } from '@/src/lib/pronunciation-context'
 
 export type BuildPersonaSystemPromptArgs = {
   persona: Persona
@@ -23,7 +24,8 @@ export type BuildPersonaSystemPromptArgs = {
   /** v1.1 단계 19.16: 직전 발화의 Azure Pronunciation 결과에서 도출한 약점·점수.
    *  설정되면 NPC가 발음 점수에 어긋난 응답(낮은데 "잘했어요" 같은 환각)을 하지 않도록 가이드 추가. */
   pronunciationContext?: PronunciationContext | null
-  /** v1.1 단계 19.16: 직전 발화의 timing 기반 pause 정보 (≥800ms / ≥1500ms 임계).
+  /** v1.1 단계 19.16: 직전 발화의 timing 기반 pause 정보.
+   *  단계 19.17부터 임계 ≥PAUSE_SHORT_MS(500ms) / ≥PAUSE_LONG_MS(1000ms).
    *  설정되면 NPC가 학습자 발화 흐름을 자연스럽게 인지·언급하도록 가이드 추가. */
   speechFlowContext?: SpeechFlowContext | null
 }
@@ -353,9 +355,10 @@ function speechFlowContextBlock(ctx: SpeechFlowContext | null | undefined): stri
     ? ctx.shortPauses.map((p) => `"${p.afterWord}" 뒤(${p.gapMs}ms)`).join(', ')
     : ''
 
+  // v1.1 단계 19.17: 임계 표시를 동적으로 — pronunciation-context.ts 상수와 동기화.
   const lines: string[] = []
-  if (longCount > 0) lines.push(`- 긴 멈춤(≥1500ms) ${longCount}회: ${longList}`)
-  if (shortCount > 0) lines.push(`- 짧은 멈춤(800~1499ms) ${shortCount}회: ${shortList}`)
+  if (longCount > 0) lines.push(`- 긴 멈춤(≥${PAUSE_LONG_MS}ms) ${longCount}회: ${longList}`)
+  if (shortCount > 0) lines.push(`- 짧은 멈춤(${PAUSE_SHORT_MS}~${PAUSE_LONG_MS - 1}ms) ${shortCount}회: ${shortList}`)
 
   return `
 
@@ -363,8 +366,8 @@ function speechFlowContextBlock(ctx: SpeechFlowContext | null | undefined): stri
 ${lines.join('\n')}
 
 [발화 흐름 응답 규칙]
-- 긴 멈춤이 2회 이상이거나 단어를 떠올리는 듯한 흐름이면, 다정한 한 마디로 격려하고 끝까지 들어주는 톤을 유지합니다 — "천천히 말해도 괜찮아~" "지금 잘 하고 있어".
-- 짧은 멈춤이 1회 이하면 별도 언급 없이 자연스러운 호응만 합니다.
+- 긴 멈춤이 1회 이상이거나 짧은 멈춤이 2회 이상이면, 다정한 한 마디로 격려하고 끝까지 들어주는 톤을 유지합니다 — "천천히 말해도 괜찮아~" "지금 잘 하고 있어".
+- 짧은 멈춤이 1회만 있으면 별도 언급은 선택입니다. 발음 약점을 짚는 호응 안에 자연스럽게 녹여도 됩니다.
 - 멈춤을 "잘못"으로 지적하지 마세요. NPC는 친구이지 코치가 아닙니다.
 - 한 턴에 흐름 코멘트는 최대 1회 — 매 턴 반복 금지.`
 }
