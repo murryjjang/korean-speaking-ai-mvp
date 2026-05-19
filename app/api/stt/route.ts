@@ -84,8 +84,15 @@ export async function POST(request: Request) {
     })
   }
 
+  // 단계 19.16: 자유 대화는 더 정확한 STT가 필요 (referenceText·NPC 입력 환각 차단).
+  // FREE_CONVERSATION_STT_PROVIDER가 설정돼 있으면 그쪽을 따른다.
+  const sttFeature = questionId === 'free-conversation' ? 'free-conversation' : 'default'
+
   // Used to identify the intended provider in error-path logging.
-  const configuredProvider = process.env.STT_PROVIDER ?? 'mock'
+  const configuredProvider =
+    (sttFeature === 'free-conversation'
+      ? process.env.FREE_CONVERSATION_STT_PROVIDER ?? process.env.STT_PROVIDER
+      : process.env.STT_PROVIDER) ?? 'mock'
 
   // Demo mode: return cycling dialogue-aware transcript instead of generic mock text.
   if (configuredProvider === 'mock' && questionId) {
@@ -102,7 +109,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const provider = getSTTProvider()
+    const provider = getSTTProvider(sttFeature)
     const result = await provider.transcribe(blob)
 
     await logProviderEvent({
