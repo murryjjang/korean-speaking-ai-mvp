@@ -274,6 +274,23 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
     }
   }, [turns])
 
+  // v1.1 단계 19.14 [R1]: 주제 카드 선택 시 "다음" 버튼이 모바일 fixed 하단 내비
+  // 뒤로 가려 사용자가 "비활성화"로 오인. 카드 9개를 모두 스크롤해야 버튼이 보임.
+  // selectedCardLabel/customTopic이 truthy로 바뀌는 순간 해당 액션 버튼을 즉시
+  // viewport 안으로 끌어와 클릭 가능성을 보장한다.
+  const topicNextBtnRef = useRef<HTMLButtonElement | null>(null)
+  const customNextBtnRef = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    if (selectedCardLabel) {
+      topicNextBtnRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [selectedCardLabel])
+  useEffect(() => {
+    if (customTopic.trim().length > 0) {
+      customNextBtnRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [customTopic])
+
   // Timer (only during chat stage)
   const stopTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -900,11 +917,20 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                   )
                 })}
               </div>
-              <div>
+              {/* v1.1 단계 19.14 [R1]: "다음" 버튼을 sticky로 고정해 9개 카드 +
+                  모바일 하단 내비(min-h-44 + safe-area)에 가려지지 않게 한다.
+                  bottom offset = 52px(나비 + 약간의 여백) + env(safe-area-inset-bottom).
+                  md+에서는 하단 내비가 사라지므로 bottom-0으로 충분. min-h-[44px]
+                  터치 영역 보장. */}
+              <div
+                className="sticky -mx-5 px-5 py-3 bg-surface-raised border-t border-border z-10"
+                style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 52px)' }}
+              >
                 <button
+                  ref={topicNextBtnRef}
                   onClick={() => { if (selectedCardLabel) goToPersonaSelect(selectedCardLabel) }}
                   disabled={!selectedCardLabel}
-                  className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="btn-next-to-persona"
                 >
                   <Localized
@@ -939,11 +965,13 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                 className="w-full rounded-md border border-border bg-surface text-text-primary text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
                 data-testid="custom-topic-input"
               />
-              <div>
+              {/* v1.1 단계 19.14 [R1]: custom topic도 sticky bottom + min-h 보장. */}
+              <div className="sticky bottom-0 -mx-5 px-5 py-3 bg-surface-raised border-t border-border z-10">
                 <button
+                  ref={customNextBtnRef}
                   onClick={() => goToPersonaSelect(customTopic)}
                   disabled={customTopic.trim().length === 0}
-                  className="px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] rounded-md bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="btn-start-custom"
                 >
                   <Localized
