@@ -60,10 +60,13 @@ describe('단계 19.16 — buildPersonaSystemPrompt pronunciation/speechFlow 블
       expect(prompt).toContain('"한국어"(45/100)')
     })
 
-    it('환각 차단 가이드(50점 미만 칭찬 금지)가 항상 포함된다', () => {
+    it('환각 차단 가이드(저점 구간 평면 칭찬 금지)가 항상 포함된다', () => {
+      // v1.1 단계 19.17: 점수 구간을 4단계로 확장(0-49 / 50-69 / 70-84 / 85+).
+      // 최저 구간 라벨이 노출되고 친구 톤 가이드가 보존되는지 확인.
       const ctx: PronunciationContext = { overallAccuracy: 30 }
       const prompt = build({ pronunciationContext: ctx })
-      expect(prompt).toMatch(/50점 미만.*환각 칭찬.*절대 하지 마/)
+      expect(prompt).toContain('0~49점')
+      expect(prompt).toMatch(/평면 칭찬|환각 칭찬/)
       expect(prompt).toMatch(/페르소나.*친구 톤.*점수 언급 금지/)
     })
 

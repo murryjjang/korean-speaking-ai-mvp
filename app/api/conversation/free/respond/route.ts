@@ -21,7 +21,14 @@ const MAX_TOOL_ROUNDS = 3
 // v1.1 단계 19.16: 자유 대화 NPC LLM에 발음·발화 흐름 컨텍스트를 전달하기 시작한
 // 시점. 보고서·로그에서 변경 전·후를 구분할 수 있게 응답에 표기한다.
 // (단계 19.13 llm-eval의 stage19.13과 충돌하지 않게 별도 키.)
-const FEEDBACK_INPUTS_VERSION = 'stage19.16'
+//
+// v1.1 단계 19.17: reason 점수 구간별 차등 + pause 임계 하향(500/1000ms) 적용.
+// stage19.16 시연에서 발견된 60점 환각 칭찬·짧은 멈춤 미언급 회귀 보완.
+const FEEDBACK_INPUTS_VERSION = 'stage19.17'
+
+// v1.1 단계 19.17: 발음 점수가 낮을 때 평면 칭찬을 reason 폴백으로도 새지 않게 하는 임계.
+// 70점 미만이면 "자연스럽게 잘 말씀하셨어요" 대신 점수 인지형 대안 reason을 사용한다.
+const REASON_PRAISE_MIN_ACCURACY = 70
 
 // 입력에서 PronunciationContext / SpeechFlowContext 모양을 안전하게 추출한다.
 // 잘못된 형태(예: 클라이언트 버그)면 undefined로 떨어뜨려 시스템 프롬프트에 노출하지 않는다.
@@ -90,11 +97,28 @@ function parseSpeechFlowContext(raw: unknown): SpeechFlowContext | undefined {
   return empty ? undefined : ctx
 }
 
+// v1.1 단계 19.17: 발음 점수 인지형 reason 폴백. correction이 없거나 LLM이 reason을 빠뜨려
+// 서버가 폴백 reason을 채워 넣어야 할 때, pronunciationContext.overallAccuracy를 보고
+// 70점 미만이면 평면 칭찬 대신 학습자의 어려움을 인지하는 친근 코멘트를 돌려준다.
+// 70점 이상이거나 컨텍스트가 없으면 기존 칭찬 그대로(회귀 방지).
+function fallbackCorrectionReason(ctx: PronunciationContext | undefined): string {
+  const acc = ctx?.overallAccuracy
+  if (acc != null && acc < REASON_PRAISE_MIN_ACCURACY) {
+    if (acc < 50) {
+      return '조금 더 또박또박 해봐도 좋아요. 천천히 다시 한 번 해볼까요?'
+    }
+    return '잘 전달은 됐어요. 조금만 더 또박또박 하면 더 자연스러워요.'
+  }
+  return '자연스럽게 잘 말씀하셨어요.'
+}
+
 // 단위 테스트 전용. POST 핸들러 외부에서 도달할 수 없는 inner helper를 노출한다.
 export const __test__ = {
   parsePronunciationContext,
   parseSpeechFlowContext,
+  fallbackCorrectionReason,
   FEEDBACK_INPUTS_VERSION,
+  REASON_PRAISE_MIN_ACCURACY,
 }
 
 // 도구별 필수 환경변수 — 키가 없으면 그 도구는 LLM에 노출하지 않는다 (그 도구만 비활성화).
@@ -156,7 +180,11 @@ function resolvePersona(personaId: string): Persona {
 function mockResponse(
   latestStudentText: string,
   personaId: string,
-  meta: { pronunciationIncluded?: boolean; speechFlowIncluded?: boolean } = {},
+  meta: {
+    pronunciationIncluded?: boolean
+    speechFlowIncluded?: boolean
+    pronunciationContext?: PronunciationContext
+  } = {},
 ): Response {
   return Response.json({
     source: 'mock',
@@ -167,7 +195,7 @@ function mockResponse(
     learner_correction: {
       original: latestStudentText,
       corrected: latestStudentText,
-      reason: '자연스럽게 잘 말씀하셨어요.',
+      reason: fallbackCorrectionReason(meta.pronunciationContext),
     },
     feedback_inputs_version: FEEDBACK_INPUTS_VERSION,
     pronunciation_included: Boolean(meta.pronunciationIncluded),
@@ -222,6 +250,7 @@ export async function POST(request: Request) {
     return mockResponse(latest, persona.personaId, {
       pronunciationIncluded: pronunciationContext != null,
       speechFlowIncluded: speechFlowContext != null,
+      pronunciationContext,
     })
   }
 
@@ -311,7 +340,7 @@ export async function POST(request: Request) {
     let safeCorrection: { original: string; corrected: string; reason: string } = {
       original: latest,
       corrected: latest,
-      reason: '자연스럽게 잘 말씀하셨어요.',
+      reason: fallbackCorrectionReason(pronunciationContext),
     }
     if (correction && typeof correction === 'object') {
       const c = correction as Record<string, unknown>
@@ -326,13 +355,14 @@ export async function POST(request: Request) {
 
     // 23-h A-2: 단어 일치율 ≥ 0.85이면서 corrected !== original이면, 미세한 LLM
     // 노이즈일 가능성이 높으므로 교정 표시를 누른다(자연스러움 안내로 변환).
+    // v1.1 단계 19.17: 점수 인지형 reason 폴백으로 교체 — 발음 < 70점에서 평면 칭찬 회귀 차단.
     if (safeCorrection.corrected.trim() !== safeCorrection.original.trim()) {
       const ratio = wordMatchRatio(safeCorrection.original, safeCorrection.corrected)
       if (ratio >= 0.85) {
         safeCorrection = {
           original: safeCorrection.original,
           corrected: safeCorrection.original,
-          reason: '자연스럽게 잘 말씀하셨어요.',
+          reason: fallbackCorrectionReason(pronunciationContext),
         }
       }
     }
@@ -354,6 +384,7 @@ export async function POST(request: Request) {
     return mockResponse(latest, persona.personaId, {
       pronunciationIncluded: pronunciationContext != null,
       speechFlowIncluded: speechFlowContext != null,
+      pronunciationContext,
     })
   }
 }

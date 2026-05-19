@@ -1,7 +1,8 @@
 // v1.1 단계 19.16 [페이즈 3]: /api/conversation/free/respond API 흐름 검증.
+// v1.1 단계 19.17: feedback_inputs_version 'stage19.16' → 'stage19.17'로 갱신.
 //
 // pronunciationContext / speechFlowContext를 함께 보냈을 때:
-//  1) 응답에 feedback_inputs_version='stage19.16'
+//  1) 응답에 feedback_inputs_version='stage19.17'
 //  2) pronunciation_included / speech_flow_included가 정확히 채워짐
 //
 // 단계 19.15 흡수 검증의 핵심 — 자동화 가능한 API 계약 부분.
@@ -23,7 +24,7 @@ test.describe('/api/conversation/free/respond — 단계 19.16 메타', () => {
     })
     expect(res.ok()).toBe(true)
     const body = await res.json()
-    expect(body.feedback_inputs_version).toBe('stage19.16')
+    expect(body.feedback_inputs_version).toBe('stage19.17')
     expect(body.pronunciation_included).toBe(false)
     expect(body.speech_flow_included).toBe(false)
     // npc_response 필드는 항상 존재
@@ -49,7 +50,7 @@ test.describe('/api/conversation/free/respond — 단계 19.16 메타', () => {
     expect(res.ok()).toBe(true)
     const body = await res.json()
     expect(body.pronunciation_included).toBe(true)
-    expect(body.feedback_inputs_version).toBe('stage19.16')
+    expect(body.feedback_inputs_version).toBe('stage19.17')
   })
 
   test('speechFlowContext 정상 전달 → speech_flow_included=true', async ({ request }) => {

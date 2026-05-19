@@ -125,7 +125,9 @@ describe('단계 19.16 — parseSpeechFlowContext', () => {
 })
 
 describe('단계 19.16 — FEEDBACK_INPUTS_VERSION', () => {
-  it("'stage19.16'로 고정 (단계 19.13 'stage19.13'과 구분)", () => {
-    expect(FEEDBACK_INPUTS_VERSION).toBe('stage19.16')
+  // v1.1 단계 19.17: 점수 구간별 reason + pause 임계 변경으로 버전 분기.
+  // 단계 19.13 llm-eval의 'stage19.13'·단계 19.16의 'stage19.16'과 구분된다.
+  it("'stage19.17'로 고정 (이전 단계와 구분)", () => {
+    expect(FEEDBACK_INPUTS_VERSION).toBe('stage19.17')
   })
 })
