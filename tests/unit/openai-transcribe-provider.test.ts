@@ -36,12 +36,14 @@ describe('STT provider factory (단계 19.16)', () => {
     STT_PROVIDER: process.env.STT_PROVIDER,
     FREE_CONVERSATION_STT_PROVIDER: process.env.FREE_CONVERSATION_STT_PROVIDER,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    STT_VERBATIM_PROMPT_ENABLED: process.env.STT_VERBATIM_PROMPT_ENABLED,
   }
 
   beforeEach(() => {
     transcriptionsCreateMock.mockReset()
     delete process.env.STT_PROVIDER
     delete process.env.FREE_CONVERSATION_STT_PROVIDER
+    delete process.env.STT_VERBATIM_PROMPT_ENABLED
     process.env.OPENAI_API_KEY = 'sk-test'
   })
 
@@ -210,6 +212,72 @@ describe('STT provider factory (단계 19.16)', () => {
 
       const p = getSTTProvider()
       await expect(p.transcribe(makeBlob())).rejects.toThrow(/rate_limited/)
+    })
+  })
+
+  // ── 단계 19.18: STT_VERBATIM_PROMPT_ENABLED 토글 ─────────────────────────
+  // verbatim prompt는 gpt-4o-mini-transcribe의 발음 정정 ("마시써요" → "맛있어요")을
+  // 약화시키기 위한 hook이다. 효과는 실제 음성에서만 확인 가능 (단위 테스트는
+  // prompt 전달만 검증). 환경 변수 OFF/미설정이면 기존 prompt를 그대로 사용한다.
+  describe('verbatim prompt 토글 (STT_VERBATIM_PROMPT_ENABLED)', () => {
+    beforeEach(() => {
+      process.env.STT_PROVIDER = 'openai-transcribe'
+      transcriptionsCreateMock.mockResolvedValue({ text: 'ok' })
+    })
+
+    it('미설정이면 기본 prompt 전달 (verbatim 비적용)', async () => {
+      await getSTTProvider().transcribe(makeBlob())
+      const call = transcriptionsCreateMock.mock.calls[0][0]
+      expect(call.prompt).toMatch(/환각|받아쓰|학습자/)
+      // 기본 prompt에는 채움말 예시("음", "그", "어")가 없다.
+      expect(call.prompt).not.toMatch(/마시써요/)
+      expect(call.prompt).not.toMatch(/항쿡/)
+    })
+
+    it("'false' 설정 시 기본 prompt 그대로 (verbatim 비적용)", async () => {
+      process.env.STT_VERBATIM_PROMPT_ENABLED = 'false'
+      await getSTTProvider().transcribe(makeBlob())
+      const call = transcriptionsCreateMock.mock.calls[0][0]
+      expect(call.prompt).not.toMatch(/마시써요/)
+    })
+
+    it("'true' 설정 시 verbatim prompt 전달 (채움말 + 정정 사례 포함)", async () => {
+      process.env.STT_VERBATIM_PROMPT_ENABLED = 'true'
+      await getSTTProvider().transcribe(makeBlob())
+      const call = transcriptionsCreateMock.mock.calls[0][0]
+      // 채움말 예시
+      expect(call.prompt).toMatch(/음/)
+      expect(call.prompt).toMatch(/그/)
+      expect(call.prompt).toMatch(/어/)
+      // 정정 차단 사례
+      expect(call.prompt).toMatch(/마시써요/)
+      expect(call.prompt).toMatch(/맛있어요/)
+      expect(call.prompt).toMatch(/항쿡/)
+      // 비원어민 학습자 컨텍스트
+      expect(call.prompt).toMatch(/비원어민|학습자/)
+    })
+
+    it("대소문자 무관: 'TRUE'·'True'도 verbatim prompt 적용", async () => {
+      process.env.STT_VERBATIM_PROMPT_ENABLED = 'TRUE'
+      await getSTTProvider().transcribe(makeBlob())
+      const call = transcriptionsCreateMock.mock.calls[0][0]
+      expect(call.prompt).toMatch(/마시써요/)
+    })
+
+    it('whisper-1에도 동일 토글 적용', async () => {
+      process.env.STT_PROVIDER = 'whisper'
+      process.env.STT_VERBATIM_PROMPT_ENABLED = 'true'
+      await getSTTProvider().transcribe(makeBlob())
+      const call = transcriptionsCreateMock.mock.calls[0][0]
+      expect(call.model).toBe('whisper-1')
+      expect(call.prompt).toMatch(/마시써요/)
+    })
+
+    it('temperature는 0 유지 (verbatim 토글과 무관)', async () => {
+      process.env.STT_VERBATIM_PROMPT_ENABLED = 'true'
+      await getSTTProvider().transcribe(makeBlob())
+      const call = transcriptionsCreateMock.mock.calls[0][0]
+      expect(call.temperature).toBe(0)
     })
   })
 })
