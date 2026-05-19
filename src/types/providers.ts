@@ -102,6 +102,27 @@ export interface LLMEvalProvider {
 
 // ── Phase 8-G: rich speaking evaluation ─────────────────────────────────────
 
+// v1.1 단계 19.13 [페이즈 1·2]: 발음·발화 흐름 컨텍스트 — LLM 프롬프트 보강용.
+// Azure Pronunciation Assessment wordResults·점수와 timing 기반 pause를 가공하여 전달.
+export type PronunciationContext = {
+  overallAccuracy?: number      // 0-100 Azure AccuracyScore
+  fluencyScore?: number          // 0-100 Azure FluencyScore
+  completenessScore?: number     // 0-100 Azure CompletenessScore
+  weakWords?: Array<{
+    word: string
+    score: number               // 0-100
+    errorType?: 'None' | 'Omission' | 'Insertion' | 'Mispronunciation'
+  }>
+}
+
+export type SpeechFlowContext = {
+  totalDurationMs?: number
+  longPauses?: Array<{ afterWord: string; gapMs: number }>  // ≥1500ms
+  shortPauses?: Array<{ afterWord: string; gapMs: number }> // ≥800ms, <1500ms
+  longPauseCount?: number
+  shortPauseCount?: number
+}
+
 export type SpeakingEvalInput = {
   transcript: string
   rubricId: string
@@ -112,6 +133,10 @@ export type SpeakingEvalInput = {
   requiredElementAliases?: Record<string, string[]>
   pronunciationScore?: number
   pronunciationFeedback?: string
+  // v1.1 단계 19.13 [페이즈 1]: 단어별 약점·세부 점수 — Azure provider일 때만 채워짐.
+  pronunciationContext?: PronunciationContext
+  // v1.1 단계 19.13 [페이즈 2]: pause 감지 결과 — Q1 wordResults timing에서 도출.
+  speechFlowContext?: SpeechFlowContext
   // v1.1 단계 27: 학습자 모국어(ko/en/vi/ar/other). 외국어이면 OpenAI 평가가
   // learner_feedback_multilingual을 채워 반환하도록 프롬프트가 분기한다.
   motherTongue?: string | null

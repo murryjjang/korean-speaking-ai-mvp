@@ -479,6 +479,26 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
     ? (MOCK_MODEL_ANSWERS[input.questionId ?? ''] ?? '이 문항은 정해진 지문을 자연스럽게 낭독하는 문항입니다. 지문을 빠뜨리지 않고 또박또박 읽고, 문장 끝에서 자연스럽게 끊어 읽는 것이 중요합니다.')
     : (MOCK_MODEL_ANSWERS[input.questionId ?? ''] ?? MOCK_MODEL_ANSWERS_BY_TYPE[qType] ?? '')
 
+  // v1.1 단계 19.13 [페이즈 1·2]: mock 폴백도 발음·발화 흐름 컨텍스트가 있으면
+  // 학습자에게 구체적으로 약점을 짚어주는 한 줄을 improvements 앞쪽에 끼워준다.
+  const pronCtx = input.pronunciationContext
+  const flowCtx = input.speechFlowContext
+  const ctxImprovements: string[] = []
+  if (pronCtx?.weakWords && pronCtx.weakWords.length > 0) {
+    const w = pronCtx.weakWords[0]
+    ctxImprovements.push(`"${w.word}" 발음을 또박또박 다시 한 번 연습해 보세요.`)
+  }
+  if (flowCtx && (flowCtx.longPauseCount ?? 0) >= 2) {
+    const sample = flowCtx.longPauses?.[0]
+    ctxImprovements.push(
+      sample
+        ? `"${sample.afterWord}" 다음에서 멈춤이 길었어요. 자연스럽게 이어 말해 보세요.`
+        : '문장 사이에 긴 멈춤이 있었어요. 조금 더 자연스럽게 이어 말해 보세요.',
+    )
+  }
+
+  const mergedImprovements = [...ctxImprovements, ...improvements].filter(Boolean)
+
   return {
     overall_score: overall,
     task_completion_score: taskScore,
@@ -490,7 +510,7 @@ function getMockDetail(input: SpeakingEvalInput): SpeakingEvalDetail {
     strengths: found.length > 0
       ? [`"${found[0]}"을(를) 잘 포함했습니다.`, '기본적인 문장 구조를 사용했습니다.']
       : ['기본적인 문장 구조를 사용했습니다.'],
-    improvements: improvements.filter(Boolean),
+    improvements: mergedImprovements,
     corrected_answer: readingCorrectedAnswer,
     teacher_note: `필수 요소 ${found.length}/${requiredElements.length} 확인됨. 문법과 어휘 연습 권장.`,
     learner_feedback_ko:
@@ -560,7 +580,13 @@ CRITICAL rules:
    - corrected_answer for reading MUST describe ideal reading criteria, NOT copy the passage. Example: "이 문항은 정해진 지문을 자연스럽게 낭독하는 문항입니다. 지문을 빠뜨리지 않고 또박또박 읽고, 문장 끝에서 자연스럽게 끊어 읽는 것이 중요합니다."
 
 If transcript is empty or fewer than 5 words: set all scores to 20 or below and ask learner to try again.
-Strengths: 1-3 items in Korean. Improvements: 1-3 actionable suggestions in Korean.`
+Strengths: 1-3 items in Korean. Improvements: 1-3 actionable suggestions in Korean.
+
+9. PRONUNCIATION/FLUENCY context blocks ([발음 세부 분석], [발화 흐름 분석]) when present:
+   - If [발음 세부 분석] lists 발음 약한 단어, improvements MUST include at least one item referencing a specific weak word and how to improve it (e.g., "'음료'의 받침 발음을 또박또박 해 보세요.").
+   - If [발화 흐름 분석] reports 긴 멈춤 ≥ 2회, improvements MUST include guidance on 자연스러운 발화 흐름 — name a specific 멈춤 위치when available.
+   - Pronunciation/Fluency-related improvements must coexist with task-completion guidance (never replace it).
+   - Be encouraging — frame as "더 자연스럽게 말하려면" rather than "발음이 나쁩니다".`
 
 async function callOpenAI(
   input: SpeakingEvalInput,
@@ -582,6 +608,56 @@ async function callOpenAI(
       `[발음 평가 참고] 점수: ${input.pronunciationScore}/100` +
         (input.pronunciationFeedback ? ` / 피드백: ${input.pronunciationFeedback}` : ''),
     )
+  }
+
+  // v1.1 단계 19.13 [페이즈 1]: 단어별 약점·세부 점수를 LLM에 노출해 구체 피드백 생성 유도.
+  const pc = input.pronunciationContext
+  if (pc && (pc.overallAccuracy != null || pc.fluencyScore != null || (pc.weakWords?.length ?? 0) > 0)) {
+    const lines: string[] = ['[발음 세부 분석]']
+    if (pc.overallAccuracy != null) lines.push(`- 정확도(Accuracy): ${pc.overallAccuracy}/100`)
+    if (pc.fluencyScore != null) lines.push(`- 유창성(Fluency): ${pc.fluencyScore}/100`)
+    if (pc.completenessScore != null) lines.push(`- 완전성(Completeness): ${pc.completenessScore}/100`)
+    if (pc.weakWords && pc.weakWords.length > 0) {
+      lines.push('- 발음 약한 단어 (점수 낮은 순):')
+      for (const w of pc.weakWords) {
+        const tag = w.errorType && w.errorType !== 'None' ? ` [${w.errorType}]` : ''
+        lines.push(`  · "${w.word}" — ${w.score}/100${tag}`)
+      }
+    }
+    lines.push(
+      '피드백 작성 시 반드시 참고:',
+      '- improvements 또는 learner_feedback_ko에서 점수가 낮거나 ErrorType이 표시된 단어를 구체적으로 언급한다.',
+      '- 너무 엄격하지 말고 격려와 함께 어떤 발음을 어떻게 개선할지 안내한다.',
+      '- 모든 단어가 95+인 경우 발음 강점도 자연스럽게 언급한다.',
+    )
+    parts.push(lines.join('\n'))
+  }
+
+  // v1.1 단계 19.13 [페이즈 2]: 발화 흐름(pause) — 학습자가 절었던 부분을 구체 피드백에 반영.
+  const sf = input.speechFlowContext
+  if (sf && ((sf.longPauseCount ?? 0) > 0 || (sf.shortPauseCount ?? 0) > 0 || sf.totalDurationMs != null)) {
+    const lines: string[] = ['[발화 흐름 분석]']
+    if (sf.totalDurationMs != null) {
+      lines.push(`- 총 발화 시간: ${(sf.totalDurationMs / 1000).toFixed(1)}초`)
+    }
+    if ((sf.longPauseCount ?? 0) > 0) {
+      lines.push(`- 긴 멈춤(1.5초 이상): ${sf.longPauseCount}회`)
+      if (sf.longPauses && sf.longPauses.length > 0) {
+        for (const p of sf.longPauses) {
+          lines.push(`  · "${p.afterWord}" 다음에 ${(p.gapMs / 1000).toFixed(1)}초 멈춤`)
+        }
+      }
+    }
+    if ((sf.shortPauseCount ?? 0) > 0) {
+      lines.push(`- 짧은 멈춤(0.8~1.5초): ${sf.shortPauseCount}회`)
+    }
+    lines.push(
+      '피드백 작성 시 반드시 참고:',
+      '- 긴 멈춤이 2회 이상이면 improvements나 learner_feedback_ko에서 발화 흐름·자연스러운 연결을 언급한다.',
+      '- 멈춤이 거의 없으면 발화 흐름의 강점을 자연스럽게 언급할 수 있다.',
+      '- 너무 부정적이지 않게, 어디서 머뭇거렸는지 구체 위치를 짚어 격려와 함께 안내한다.',
+    )
+    parts.push(lines.join('\n'))
   }
 
   // v1.1 단계 27: 학습자 모국어가 외국어이면 learner_feedback_multilingual을 추가 요구.
@@ -715,6 +791,29 @@ export function _resetEvalBootLogForTests(): void {
  * Evaluates a speaking transcript using OpenAI when configured; falls back to
  * mock otherwise. Never throws — errors produce a mock-fallback result.
  */
+// v1.1 단계 19.13: LLM 입력 schema 버전 — 시험운영 변경 전·후 데이터 구분용.
+// raw_provider.feedback_inputs_version 으로 평가 결과에 기록.
+export const FEEDBACK_INPUTS_VERSION = 'stage19.13'
+
+function withInputsVersion(
+  detail: SpeakingEvalDetail,
+  input: SpeakingEvalInput,
+): SpeakingEvalDetail {
+  const hasPron = Boolean(input.pronunciationContext)
+  const hasFlow = Boolean(input.speechFlowContext)
+  if (!hasPron && !hasFlow) return detail
+  const prev = (detail.raw_provider ?? {}) as Record<string, unknown>
+  return {
+    ...detail,
+    raw_provider: {
+      ...prev,
+      feedback_inputs_version: FEEDBACK_INPUTS_VERSION,
+      pronunciation_context_attached: hasPron,
+      speech_flow_context_attached: hasFlow,
+    },
+  }
+}
+
 export async function evaluateSpeakingDetail(
   input: SpeakingEvalInput,
 ): Promise<EvaluateSpeakingResult> {
@@ -726,7 +825,7 @@ export async function evaluateSpeakingDetail(
   if (provider !== 'openai' || !apiKey) {
     await new Promise((resolve) => setTimeout(resolve, 600))
     return {
-      detail: maybeAttachMultilingual(getMockDetail(input), input),
+      detail: withInputsVersion(maybeAttachMultilingual(getMockDetail(input), input), input),
       providerName: 'mock',
       latencyMs: 600,
       status: 'fallback',
@@ -737,7 +836,7 @@ export async function evaluateSpeakingDetail(
   try {
     const detail = await callOpenAI(input, apiKey, model)
     return {
-      detail,
+      detail: withInputsVersion(detail, input),
       providerName: 'openai',
       model,
       latencyMs: Date.now() - start,
@@ -747,7 +846,7 @@ export async function evaluateSpeakingDetail(
     const errorMessage = err instanceof Error ? err.message : String(err)
     console.error('[llm-eval] OpenAI call failed, using mock fallback:', errorMessage)
     return {
-      detail: maybeAttachMultilingual(getMockDetail(input), input),
+      detail: withInputsVersion(maybeAttachMultilingual(getMockDetail(input), input), input),
       providerName: 'mock',
       latencyMs: Date.now() - start,
       status: 'fallback',

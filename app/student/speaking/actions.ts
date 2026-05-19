@@ -3,6 +3,7 @@
 import { getSTTProvider } from '@/src/providers/stt'
 import { getPronunciationProvider } from '@/src/providers/pronunciation'
 import { evaluateSpeakingDetail, detailToLLMEvalResult } from '@/src/providers/llm-eval'
+import { buildPronunciationContext, buildSpeechFlowContext } from '@/src/lib/pronunciation-context'
 import { saveSpeakingEval, type SpeakingEvalRecord } from '@/src/lib/mock/speaking-store'
 import { saveAttemptSubmission } from '@/src/lib/attempt/attempt-store'
 import { getEvaluationRepository } from '@/src/lib/repositories'
@@ -41,7 +42,13 @@ export type ClientPronunciationResult = {
   fluencyScore?: number | null
   completenessScore?: number | null
   recognizedText?: string
-  wordResults?: Array<{ word: string; accuracyScore: number; errorType: string }>
+  wordResults?: Array<{
+    word: string
+    accuracyScore: number
+    errorType: string
+    offsetMs?: number
+    durationMs?: number
+  }>
 }
 
 export interface SpeakingSubmitMeta {
@@ -204,6 +211,10 @@ export async function submitSpeaking(
   // ── 4. LLM evaluation ────────────────────────────────────────────────────────
   const pronunciationForEval = clientPronunciation ?? null
 
+  // v1.1 단계 19.13 [페이즈 1·2]: Azure wordResults·timing → LLM 입력 컨텍스트로 변환.
+  const pronunciationContext = buildPronunciationContext(pronunciationForEval)
+  const speechFlowContext = buildSpeechFlowContext(pronunciationForEval)
+
   const llmEvalPromise = evaluateSpeakingDetail({
     transcript,
     rubricId: question?.rubricId ?? 'rubric-speaking-01',
@@ -214,6 +225,8 @@ export async function submitSpeaking(
     requiredElementAliases: (question as { requiredElementAliases?: Record<string, string[]> })?.requiredElementAliases,
     pronunciationScore: pronunciationForEval?.normalizedScore,
     pronunciationFeedback: pronunciationForEval?.feedback,
+    pronunciationContext,
+    speechFlowContext,
     motherTongue: meta?.motherTongue ?? null,
   })
 

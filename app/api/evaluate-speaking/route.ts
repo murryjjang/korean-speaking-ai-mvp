@@ -1,12 +1,27 @@
 import { evaluateSpeakingDetail } from '@/src/providers/llm-eval'
 import { logProviderEvent } from '@/src/lib/supabase/provider-events'
+import { buildPronunciationContext, buildSpeechFlowContext } from '@/src/lib/pronunciation-context'
 import questionsJson from '@/src/content/questions.json'
+import type { PronunciationResult } from '@/src/types/providers'
 
 export async function POST(request: Request) {
   let body: {
     questionId?: string
     transcript?: string
-    pronunciationResult?: { normalizedScore: number; feedback?: string }
+    pronunciationResult?: {
+      normalizedScore: number
+      feedback?: string
+      accuracyScore?: number | null
+      fluencyScore?: number | null
+      completenessScore?: number | null
+      wordResults?: Array<{
+        word: string
+        accuracyScore: number
+        errorType?: string
+        offsetMs?: number
+        durationMs?: number
+      }>
+    }
     referenceText?: string
     rubricId?: string
   }
@@ -31,6 +46,22 @@ export async function POST(request: Request) {
 
   const configuredProvider = process.env.LLM_EVAL_PROVIDER ?? 'mock'
 
+  // v1.1 단계 19.13 [페이즈 1·2]: Azure wordResults·timing → LLM 컨텍스트 변환.
+  const pronunciationForCtx: PronunciationResult | null = pronunciationResult
+    ? ({
+        normalizedScore: pronunciationResult.normalizedScore,
+        wordScores: [],
+        feedback: pronunciationResult.feedback ?? '',
+        providerName: 'azure',
+        providerVersion: '1.0',
+        latencyMs: 0,
+        accuracyScore: pronunciationResult.accuracyScore ?? undefined,
+        fluencyScore: pronunciationResult.fluencyScore ?? undefined,
+        completenessScore: pronunciationResult.completenessScore ?? undefined,
+        wordResults: pronunciationResult.wordResults as PronunciationResult['wordResults'],
+      } as PronunciationResult)
+    : null
+
   const result = await evaluateSpeakingDetail({
     transcript,
     rubricId,
@@ -41,6 +72,8 @@ export async function POST(request: Request) {
     requiredElementAliases: (question as { requiredElementAliases?: Record<string, string[]> })?.requiredElementAliases,
     pronunciationScore: pronunciationResult?.normalizedScore,
     pronunciationFeedback: pronunciationResult?.feedback,
+    pronunciationContext: buildPronunciationContext(pronunciationForCtx),
+    speechFlowContext: buildSpeechFlowContext(pronunciationForCtx),
   })
 
   // Log provider events
