@@ -16,7 +16,7 @@ export default defineConfig({
     // API smoke tests — HTTP only, no browser binary required
     {
       name: 'api',
-      testMatch: '**/api-smoke.spec.ts',
+      testMatch: ['**/api-smoke.spec.ts', '**/stage1916-respond-api-smoke.spec.ts'],
     },
     // E2E smoke tests — requires Chromium (sudo npx playwright install-deps chromium on WSL2)
     {
