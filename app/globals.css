@@ -88,6 +88,21 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* v1.1 단계 19.13 [페이즈 3]: 한국어 본문은 어절(eojeol) 단위 줄바뀜이 자연스럽다.
+   `word-break: keep-all`로 어절 중간 줄바뀜 방지, `overflow-wrap: break-word`로
+   매우 긴 토큰(URL·코드)은 폴백 줄바뀜 허용. 영어/숫자 토큰은 그대로 단어 단위
+   끊김. 아랍어 등 RTL은 영향 받지 않으나 명시적으로 word-break 차이를 두지 않음.
+   sm 이상에서는 viewport 폭이 충분해 회귀 위험이 낮음. */
+body, p, li, h1, h2, h3, h4, h5, h6, span, button, a, label, div {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 단, 모노스페이스/코드/입력값 등 토큰 보존 영역은 단어 보존 해제 */
+code, pre, .tabular-nums, .font-mono, input, textarea {
+  word-break: normal;
+}
+
 h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
   line-height: 1.3;

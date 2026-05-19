@@ -171,6 +171,17 @@ export default async function StudentProgressPage() {
         </div>
       </header>
 
+      {/* v1.1 단계 19.13 [페이즈 3]: 모바일에서 학습 시작 CTA를 첫 viewport 안으로
+          끌어올린다. 데스크톱(sm+)에서는 본래 위치(데이터 다운로드 위)에 남기고
+          모바일에서만 노출 — DOM에 두 번 등장하나 한 번만 표시. data-testid는
+          하단 인스턴스를 그대로 두어 기존 테스트(nav-free-conversation 등) 호환. */}
+      <div className="sm:hidden" data-testid="start-learning-mobile-top">
+        <StartLearningSection
+          motherTongueHint={participant.motherTongue}
+          hideTestIds
+        />
+      </div>
+
       {/* v1.1 단계 19.5 [P.2]: 한국어 본문 위주 컨테이너는 ar 토글 시에도 LTR 유지.
           내부의 다국어 라벨은 자체 dir 속성으로 RTL 회복 가능. */}
       <div
@@ -351,61 +362,9 @@ export default async function StudentProgressPage() {
       </SectionCard>
       </div>{/* /research-progress-pdf-target */}
 
-      <SectionCard
-        titleSpec={{ kind: 'chart', key: 'startLearning' }}
-        motherTongueHint={participant.motherTongue}
-      >
-        <nav className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Link
-            href="/student/conversation-practice"
-            className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50"
-            data-testid="nav-free-conversation"
-          >
-            <p className="text-sm font-semibold text-text-primary">
-              <Localized spec={{ kind: 'modeCard', key: 'freeConvTitle' }} motherTongueHint={participant.motherTongue} />
-            </p>
-            <p className="text-xs text-text-muted mt-1">
-              <Localized spec={{ kind: 'modeCard', key: 'freeConvSubtitle' }} motherTongueHint={participant.motherTongue} />
-            </p>
-          </Link>
-          <Link
-            href="/student/speaking"
-            className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50"
-            data-testid="nav-speaking"
-          >
-            <p className="text-sm font-semibold text-text-primary">
-              <Localized spec={{ kind: 'modeCard', key: 'speakingTitle' }} motherTongueHint={participant.motherTongue} />
-            </p>
-            <p className="text-xs text-text-muted mt-1">
-              <Localized spec={{ kind: 'modeCard', key: 'speakingSubtitle' }} motherTongueHint={participant.motherTongue} />
-            </p>
-          </Link>
-          <Link
-            href="/student/presentation-practice"
-            className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50"
-            data-testid="nav-presentation"
-          >
-            <p className="text-sm font-semibold text-text-primary">
-              <Localized spec={{ kind: 'modeCard', key: 'presentationTitle' }} motherTongueHint={participant.motherTongue} />
-            </p>
-            <p className="text-xs text-text-muted mt-1">
-              <Localized spec={{ kind: 'modeCard', key: 'presentationSubtitle' }} motherTongueHint={participant.motherTongue} />
-            </p>
-          </Link>
-          <Link
-            href="/student/reading-practice"
-            className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50"
-            data-testid="nav-reading"
-          >
-            <p className="text-sm font-semibold text-text-primary">
-              <Localized spec={{ kind: 'modeCard', key: 'readingTitle' }} motherTongueHint={participant.motherTongue} />
-            </p>
-            <p className="text-xs text-text-muted mt-1">
-              <Localized spec={{ kind: 'modeCard', key: 'readingSubtitle' }} motherTongueHint={participant.motherTongue} />
-            </p>
-          </Link>
-        </nav>
-      </SectionCard>
+      <div className="hidden sm:block">
+        <StartLearningSection motherTongueHint={participant.motherTongue} />
+      </div>
 
       <SectionCard
         titleSpec={{ kind: 'dataDownload', key: 'sectionTitle' }}
@@ -424,6 +383,76 @@ export default async function StudentProgressPage() {
         </a>
       </SectionCard>
     </main>
+  )
+}
+
+// v1.1 단계 19.13 [페이즈 3]: 학습 시작 4-card nav 추출. 모바일 상단 + 데스크톱 하단 두 곳에서 사용.
+// hideTestIds=true로 호출하면 data-testid를 제거 — 동일 페이지에 두 인스턴스가 있어도
+// 기존 셀렉터(nav-free-conversation 등) 충돌 회피.
+function StartLearningSection({
+  motherTongueHint,
+  hideTestIds = false,
+}: {
+  motherTongueHint?: string | null
+  hideTestIds?: boolean
+}) {
+  const tid = (id: string) => (hideTestIds ? undefined : id)
+  return (
+    <SectionCard
+      titleSpec={{ kind: 'chart', key: 'startLearning' }}
+      motherTongueHint={motherTongueHint}
+    >
+      <nav className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Link
+          href="/student/conversation-practice"
+          className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50 min-h-[64px]"
+          data-testid={tid('nav-free-conversation')}
+        >
+          <p className="text-sm font-semibold text-text-primary">
+            <Localized spec={{ kind: 'modeCard', key: 'freeConvTitle' }} motherTongueHint={motherTongueHint} />
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            <Localized spec={{ kind: 'modeCard', key: 'freeConvSubtitle' }} motherTongueHint={motherTongueHint} />
+          </p>
+        </Link>
+        <Link
+          href="/student/speaking"
+          className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50 min-h-[64px]"
+          data-testid={tid('nav-speaking')}
+        >
+          <p className="text-sm font-semibold text-text-primary">
+            <Localized spec={{ kind: 'modeCard', key: 'speakingTitle' }} motherTongueHint={motherTongueHint} />
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            <Localized spec={{ kind: 'modeCard', key: 'speakingSubtitle' }} motherTongueHint={motherTongueHint} />
+          </p>
+        </Link>
+        <Link
+          href="/student/presentation-practice"
+          className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50 min-h-[64px]"
+          data-testid={tid('nav-presentation')}
+        >
+          <p className="text-sm font-semibold text-text-primary">
+            <Localized spec={{ kind: 'modeCard', key: 'presentationTitle' }} motherTongueHint={motherTongueHint} />
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            <Localized spec={{ kind: 'modeCard', key: 'presentationSubtitle' }} motherTongueHint={motherTongueHint} />
+          </p>
+        </Link>
+        <Link
+          href="/student/reading-practice"
+          className="block rounded-lg border border-border bg-surface p-4 hover:bg-slate-50 min-h-[64px]"
+          data-testid={tid('nav-reading')}
+        >
+          <p className="text-sm font-semibold text-text-primary">
+            <Localized spec={{ kind: 'modeCard', key: 'readingTitle' }} motherTongueHint={motherTongueHint} />
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            <Localized spec={{ kind: 'modeCard', key: 'readingSubtitle' }} motherTongueHint={motherTongueHint} />
+          </p>
+        </Link>
+      </nav>
+    </SectionCard>
   )
 }
 

@@ -8,8 +8,9 @@ import { loginAsResearchParticipant } from './_helpers/login'
 
 async function loginAndConsent(page: Page, code: string, pin: string): Promise<void> {
   await loginAsResearchParticipant(page, code, pin)
-  if (page.url().includes('/research/consent')) {
-    await page.getByRole('button', { name: /동의하고 시작/ }).click()
+  const btn = page.getByTestId('btn-consent-agree')
+  if (await btn.count() > 0) {
+    await btn.click()
     await page.waitForURL(/\/research\/student\/progress/, { timeout: 10_000 })
   }
 }
@@ -31,15 +32,18 @@ const PAGES = [
   { path: '/student/presentation-practice', name: 'presentation-practice', requiresAuth: true },
 ]
 
+test.describe.configure({ timeout: 180_000 })
+
 test.describe('단계 19.13 모바일 진단 스크린샷', () => {
   for (const vp of VIEWPORTS) {
     test.describe(`viewport ${vp.name}`, () => {
       test.use({ viewport: { width: vp.width, height: vp.height } })
 
       test(`${vp.name} 전 페이지 캡처`, async ({ page }) => {
+        test.setTimeout(180_000)
         // 인증이 필요 없는 페이지 먼저 (로그인 페이지)
         for (const p of PAGES.filter((x) => !x.requiresAuth)) {
-          await page.goto(p.path, { waitUntil: 'networkidle', timeout: 15_000 }).catch(() => {})
+          await page.goto(p.path, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {})
           await page.waitForTimeout(400)
           await page.screenshot({
             path: `${OUT_DIR}/${vp.name}__${p.name}.png`,
@@ -50,7 +54,7 @@ test.describe('단계 19.13 모바일 진단 스크린샷', () => {
         await loginAndConsent(page, 'P040', '1040').catch(() => {})
         // 인증 페이지 캡처
         for (const p of PAGES.filter((x) => x.requiresAuth)) {
-          await page.goto(p.path, { waitUntil: 'networkidle', timeout: 15_000 }).catch(() => {})
+          await page.goto(p.path, { waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => {})
           await page.waitForTimeout(500)
           await page.screenshot({
             path: `${OUT_DIR}/${vp.name}__${p.name}.png`,
