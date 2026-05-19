@@ -8,6 +8,7 @@
 // 동작을 그대로 보존한다 — 회귀 없이 페르소나·주제 유지 가이드만 강화.
 
 import type { Persona, FewShotExample } from '@/src/lib/personas'
+import type { PronunciationContext, SpeechFlowContext } from '@/src/types/providers'
 
 export type BuildPersonaSystemPromptArgs = {
   persona: Persona
@@ -19,6 +20,12 @@ export type BuildPersonaSystemPromptArgs = {
   /** v1.1 16-10-2: 학습자 모국어 힌트(ko/en/vi/ar). 외국어이면 learner_correction.reason을
    *  다국어 객체로 응답하도록 가이드한다. */
   motherTongue?: string | null
+  /** v1.1 단계 19.16: 직전 발화의 Azure Pronunciation 결과에서 도출한 약점·점수.
+   *  설정되면 NPC가 발음 점수에 어긋난 응답(낮은데 "잘했어요" 같은 환각)을 하지 않도록 가이드 추가. */
+  pronunciationContext?: PronunciationContext | null
+  /** v1.1 단계 19.16: 직전 발화의 timing 기반 pause 정보 (≥800ms / ≥1500ms 임계).
+   *  설정되면 NPC가 학습자 발화 흐름을 자연스럽게 인지·언급하도록 가이드 추가. */
+  speechFlowContext?: SpeechFlowContext | null
 }
 
 function fewShotBlock(persona: Persona): string {
@@ -283,6 +290,71 @@ function outputFormatBlock(motherTongue?: string | null): string {
 }`
 }
 
+// v1.1 단계 19.16: 자유 대화 NPC에게 직전 학습자 발화의 발음 점수·약점을 알려서
+// "점수는 30점인데 잘했어요" 같은 환각 응답을 차단하고, 자연스러운 친구 톤으로
+// 약점을 한 번씩 짚어주도록 가이드한다.
+//
+// 단계 19.13 llm-eval과 차이점:
+//  - llm-eval은 평가자(코치) 시점이라 improvements 배열에 약점을 명시함.
+//  - 자유 대화 NPC는 친구 페르소나이므로 "고치라"는 직접 지시 대신, 짧은 호응 후
+//    그 단어/표현을 자연스럽게 다시 한 번 정확히 발음해 보여주는 정도로 노출한다.
+function pronunciationContextBlock(ctx: PronunciationContext | null | undefined): string {
+  if (!ctx) return ''
+  const lines: string[] = []
+  if (ctx.overallAccuracy != null) lines.push(`- 발음 정확도: ${ctx.overallAccuracy}/100`)
+  if (ctx.fluencyScore != null) lines.push(`- 발음 유창성: ${ctx.fluencyScore}/100`)
+  if (ctx.completenessScore != null) lines.push(`- 발음 완전성: ${ctx.completenessScore}/100`)
+  if (ctx.weakWords && ctx.weakWords.length > 0) {
+    const weakList = ctx.weakWords
+      .map((w) => `"${w.word}"(${w.score}/100${w.errorType && w.errorType !== 'None' ? `, ${w.errorType}` : ''})`)
+      .join(', ')
+    lines.push(`- 발음 약한 단어: ${weakList}`)
+  }
+  if (lines.length === 0) return ''
+
+  return `
+
+[직전 학습자 발화 — 발음 평가 결과]
+${lines.join('\n')}
+
+[발음 기반 응답 규칙 — 환각 차단]
+- 정확도가 50점 미만이면 "잘했어요"·"발음 좋네요" 같은 환각 칭찬을 절대 하지 마세요.
+- 70점 이상이면 발음에 대한 코멘트 없이 자연스럽게 다음 대화로 이어가세요.
+- 50~69점이면 친구가 다정하게 한 번 짚어주는 톤으로 — "아 ○○? 같이 발음해 볼까~" 정도.
+- 약한 단어가 있으면 NPC 응답 안에서 그 단어를 정확하게 한 번 다시 말해 모델링하세요 (한국어 모어 화자 자연 발화).
+  단, 매번 모든 약한 단어를 짚지 마세요. 한 턴에 한 단어만, 가장 약한 것 하나.
+- 페르소나(친구 톤)는 그대로 유지하세요. 평가자처럼 "발음 ○점이에요" 같은 점수 언급 금지.`
+}
+
+function speechFlowContextBlock(ctx: SpeechFlowContext | null | undefined): string {
+  if (!ctx) return ''
+  const longCount = ctx.longPauseCount ?? 0
+  const shortCount = ctx.shortPauseCount ?? 0
+  if (longCount === 0 && shortCount === 0) return ''
+
+  const longList = ctx.longPauses && ctx.longPauses.length > 0
+    ? ctx.longPauses.map((p) => `"${p.afterWord}" 뒤(${p.gapMs}ms)`).join(', ')
+    : ''
+  const shortList = ctx.shortPauses && ctx.shortPauses.length > 0
+    ? ctx.shortPauses.map((p) => `"${p.afterWord}" 뒤(${p.gapMs}ms)`).join(', ')
+    : ''
+
+  const lines: string[] = []
+  if (longCount > 0) lines.push(`- 긴 멈춤(≥1500ms) ${longCount}회: ${longList}`)
+  if (shortCount > 0) lines.push(`- 짧은 멈춤(800~1499ms) ${shortCount}회: ${shortList}`)
+
+  return `
+
+[직전 학습자 발화 — 발화 흐름]
+${lines.join('\n')}
+
+[발화 흐름 응답 규칙]
+- 긴 멈춤이 2회 이상이거나 단어를 떠올리는 듯한 흐름이면, 다정한 한 마디로 격려하고 끝까지 들어주는 톤을 유지합니다 — "천천히 말해도 괜찮아~" "지금 잘 하고 있어".
+- 짧은 멈춤이 1회 이하면 별도 언급 없이 자연스러운 호응만 합니다.
+- 멈춤을 "잘못"으로 지적하지 마세요. NPC는 친구이지 코치가 아닙니다.
+- 한 턴에 흐름 코멘트는 최대 1회 — 매 턴 반복 금지.`
+}
+
 function responsePrincipleBlock(): string {
   return `
 
@@ -311,7 +383,15 @@ function responsePrincipleBlock(): string {
  * 요약/피드백 라우트가 자체적으로 출력 형식을 덧붙일 수 있게 한다.
  */
 export function buildPersonaSystemPrompt(args: BuildPersonaSystemPromptArgs): string {
-  const { persona, topic, availableToolNames, forSummary, motherTongue } = args
+  const {
+    persona,
+    topic,
+    availableToolNames,
+    forSummary,
+    motherTongue,
+    pronunciationContext,
+    speechFlowContext,
+  } = args
 
   const header = `당신은 한국어 학습자와 자유롭게 대화하는 한국 사람입니다.
 
@@ -335,6 +415,8 @@ ${persona.systemPromptTemplate}
     toolBlock(availableToolNames) +
     topicMaintenanceBlock(topic) +
     correctionBlock() +
+    pronunciationContextBlock(pronunciationContext) +
+    speechFlowContextBlock(speechFlowContext) +
     fewShotBlock(persona) +
     outputFormatBlock(motherTongue)
   )

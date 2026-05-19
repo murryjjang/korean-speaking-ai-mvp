@@ -11,11 +11,91 @@ import type { ChatCompletionMessageParam } from 'openai/resources/chat/completio
 import { buildPersonaSystemPrompt } from '@/src/lib/llm/build-persona-system-prompt'
 import { getPersona, PERSONAS, type Persona } from '@/src/lib/personas'
 import { runTool, toolDefinitions, type OpenAIToolDefinition } from '@/src/lib/llm/tools'
+import type { PronunciationContext, SpeechFlowContext } from '@/src/types/providers'
 
 type Turn = { role: 'student' | 'ai'; text: string }
 
 const DEFAULT_PERSONA_ID = 'friend_casual'
 const MAX_TOOL_ROUNDS = 3
+
+// v1.1 단계 19.16: 자유 대화 NPC LLM에 발음·발화 흐름 컨텍스트를 전달하기 시작한
+// 시점. 보고서·로그에서 변경 전·후를 구분할 수 있게 응답에 표기한다.
+// (단계 19.13 llm-eval의 stage19.13과 충돌하지 않게 별도 키.)
+const FEEDBACK_INPUTS_VERSION = 'stage19.16'
+
+// 입력에서 PronunciationContext / SpeechFlowContext 모양을 안전하게 추출한다.
+// 잘못된 형태(예: 클라이언트 버그)면 undefined로 떨어뜨려 시스템 프롬프트에 노출하지 않는다.
+function parsePronunciationContext(raw: unknown): PronunciationContext | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const ctx: PronunciationContext = {}
+  if (typeof r.overallAccuracy === 'number' && Number.isFinite(r.overallAccuracy)) {
+    ctx.overallAccuracy = r.overallAccuracy
+  }
+  if (typeof r.fluencyScore === 'number' && Number.isFinite(r.fluencyScore)) {
+    ctx.fluencyScore = r.fluencyScore
+  }
+  if (typeof r.completenessScore === 'number' && Number.isFinite(r.completenessScore)) {
+    ctx.completenessScore = r.completenessScore
+  }
+  if (Array.isArray(r.weakWords)) {
+    type WeakWord = NonNullable<PronunciationContext['weakWords']>[number]
+    const weak = r.weakWords.flatMap((w): WeakWord[] => {
+      if (!w || typeof w !== 'object') return []
+      const ww = w as Record<string, unknown>
+      if (typeof ww.word !== 'string' || typeof ww.score !== 'number') return []
+      const errorType: WeakWord['errorType'] =
+        ww.errorType === 'Omission' || ww.errorType === 'Insertion' || ww.errorType === 'Mispronunciation'
+          ? ww.errorType
+          : 'None'
+      return [{ word: ww.word, score: ww.score, errorType }]
+    })
+    if (weak.length > 0) ctx.weakWords = weak
+  }
+  const empty = ctx.overallAccuracy == null
+    && ctx.fluencyScore == null
+    && ctx.completenessScore == null
+    && (!ctx.weakWords || ctx.weakWords.length === 0)
+  return empty ? undefined : ctx
+}
+
+function parseSpeechFlowContext(raw: unknown): SpeechFlowContext | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const ctx: SpeechFlowContext = {}
+  if (typeof r.totalDurationMs === 'number' && Number.isFinite(r.totalDurationMs)) {
+    ctx.totalDurationMs = r.totalDurationMs
+  }
+  const parsePauses = (val: unknown): Array<{ afterWord: string; gapMs: number }> => {
+    if (!Array.isArray(val)) return []
+    return val.flatMap((p): Array<{ afterWord: string; gapMs: number }> => {
+      if (!p || typeof p !== 'object') return []
+      const pp = p as Record<string, unknown>
+      if (typeof pp.afterWord !== 'string' || typeof pp.gapMs !== 'number') return []
+      return [{ afterWord: pp.afterWord, gapMs: pp.gapMs }]
+    })
+  }
+  const longPauses = parsePauses(r.longPauses)
+  const shortPauses = parsePauses(r.shortPauses)
+  if (longPauses.length > 0) ctx.longPauses = longPauses
+  if (shortPauses.length > 0) ctx.shortPauses = shortPauses
+  if (typeof r.longPauseCount === 'number') ctx.longPauseCount = r.longPauseCount
+  if (typeof r.shortPauseCount === 'number') ctx.shortPauseCount = r.shortPauseCount
+  if (ctx.longPauseCount == null && ctx.longPauses) ctx.longPauseCount = ctx.longPauses.length
+  if (ctx.shortPauseCount == null && ctx.shortPauses) ctx.shortPauseCount = ctx.shortPauses.length
+
+  const empty = ctx.totalDurationMs == null
+    && (!ctx.longPauses || ctx.longPauses.length === 0)
+    && (!ctx.shortPauses || ctx.shortPauses.length === 0)
+  return empty ? undefined : ctx
+}
+
+// 단위 테스트 전용. POST 핸들러 외부에서 도달할 수 없는 inner helper를 노출한다.
+export const __test__ = {
+  parsePronunciationContext,
+  parseSpeechFlowContext,
+  FEEDBACK_INPUTS_VERSION,
+}
 
 // 도구별 필수 환경변수 — 키가 없으면 그 도구는 LLM에 노출하지 않는다 (그 도구만 비활성화).
 function toolEnvAvailable(name: string): boolean {
@@ -73,7 +153,11 @@ function resolvePersona(personaId: string): Persona {
   return getPersona(personaId) ?? getPersona(DEFAULT_PERSONA_ID) ?? PERSONAS[0]
 }
 
-function mockResponse(latestStudentText: string, personaId: string): Response {
+function mockResponse(
+  latestStudentText: string,
+  personaId: string,
+  meta: { pronunciationIncluded?: boolean; speechFlowIncluded?: boolean } = {},
+): Response {
   return Response.json({
     source: 'mock',
     persona_id: personaId,
@@ -85,6 +169,9 @@ function mockResponse(latestStudentText: string, personaId: string): Response {
       corrected: latestStudentText,
       reason: '자연스럽게 잘 말씀하셨어요.',
     },
+    feedback_inputs_version: FEEDBACK_INPUTS_VERSION,
+    pronunciation_included: Boolean(meta.pronunciationIncluded),
+    speech_flow_included: Boolean(meta.speechFlowIncluded),
   })
 }
 
@@ -113,6 +200,11 @@ export async function POST(request: Request) {
         return [{ role: turn.role, text: turn.text }]
       })
     : []
+  // v1.1 단계 19.16: 클라이언트가 Azure Pronunciation 결과를 가공해 함께 보낸 경우
+  // NPC 시스템 프롬프트에 발음 약점·발화 흐름 블록을 추가한다.
+  const pronunciationContext = parsePronunciationContext(b.pronunciationContext)
+  const speechFlowContext = parseSpeechFlowContext(b.speechFlowContext)
+  const motherTongue = typeof b.motherTongue === 'string' ? b.motherTongue : null
 
   if (!topic) {
     return Response.json({ error: 'missing_topic' }, { status: 400 })
@@ -127,7 +219,10 @@ export async function POST(request: Request) {
   const persona = resolvePersona(personaId)
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    return mockResponse(latest, persona.personaId)
+    return mockResponse(latest, persona.personaId, {
+      pronunciationIncluded: pronunciationContext != null,
+      speechFlowIncluded: speechFlowContext != null,
+    })
   }
 
   try {
@@ -145,6 +240,9 @@ export async function POST(request: Request) {
       persona,
       topic,
       availableToolNames: enabledToolNames,
+      motherTongue,
+      pronunciationContext,
+      speechFlowContext,
     })
     const userContent = `[기존 대화 이력]\n${formatHistory(turns)}\n\n[학습자 최신 발화]\n${latest}`
 
@@ -246,9 +344,16 @@ export async function POST(request: Request) {
       tool_results: toolResults,
       npc_response: npcText.trim(),
       learner_correction: safeCorrection,
+      // v1.1 단계 19.16: 응답 메타 — 어떤 입력이 NPC 프롬프트에 들어갔는지 후속 분석용.
+      feedback_inputs_version: FEEDBACK_INPUTS_VERSION,
+      pronunciation_included: pronunciationContext != null,
+      speech_flow_included: speechFlowContext != null,
     })
   } catch (err) {
     console.error('[conversation/free/respond] LLM error, falling back to mock:', err)
-    return mockResponse(latest, persona.personaId)
+    return mockResponse(latest, persona.personaId, {
+      pronunciationIncluded: pronunciationContext != null,
+      speechFlowIncluded: speechFlowContext != null,
+    })
   }
 }

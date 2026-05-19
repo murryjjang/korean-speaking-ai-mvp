@@ -18,6 +18,16 @@ import {
   startResearchSession,
 } from '@/src/lib/research/client-logger'
 import { sanitizeForTTS } from '@/src/lib/text-utils/sanitize-for-tts'
+import {
+  buildPronunciationContext,
+  buildSpeechFlowContext,
+} from '@/src/lib/pronunciation-context'
+import type {
+  AzureWordResult,
+  PronunciationContext,
+  PronunciationResult,
+  SpeechFlowContext,
+} from '@/src/types/providers'
 
 // 추천 주제 9개 (페르소나 메타데이터 없음 — 페르소나는 별도 단계에서 선택)
 const RECOMMENDED_TOPICS: ReadonlyArray<{ id: string; label: string }> = [
@@ -457,9 +467,16 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
     }
   }, [])
 
-  // 최신 sendMessageWithText 참조를 ref로 보관해 STT onstop 클로저에서 호출.
+  // v1.1 단계 19.16: STT onstop 흐름에서 발음 응답(↓)을 받아 NPC LLM 호출 시 함께 전달하기 위한 옵션 타입.
+  // 발음 평가 토글이 OFF이거나 응답이 실패하면 두 필드 모두 null/undefined.
+  type SendMessageOptions = {
+    pronunciationContext?: PronunciationContext | null
+    speechFlowContext?: SpeechFlowContext | null
+  }
   // (text는 클로저로 캡처하므로 stale X — ref는 함수 참조 자체만 최신화.)
-  const sendMessageWithTextRef = useRef<((text: string, studentTurnId?: string) => Promise<string | null>) | null>(null)
+  const sendMessageWithTextRef = useRef<
+    ((text: string, studentTurnId?: string, options?: SendMessageOptions) => Promise<string | null>) | null
+  >(null)
 
   // ── NPC TTS (v1.1 8-3): 서버 Azure TTS ───────────────────────────────────
   // 학습자 녹음 중에는 자동 재생 안 함 (충돌 방지). 종료 화면(stage='end')에서도 재생 안 함.
@@ -595,7 +612,11 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
   // ── 발화 전송 ─────────────────────────────────────────────────────────────
   // 23-h A-3: studentTurnId 옵션 추가 — STT 경로에서 발화한 학습자 turn 식별 후
   // Azure PA 응답이 도착하면 해당 turn에 pronScore를 비동기로 부착할 수 있게 함.
-  const sendMessageWithText = useCallback(async (rawText: string, studentTurnId?: string): Promise<string | null> => {
+  const sendMessageWithText = useCallback(async (
+    rawText: string,
+    studentTurnId?: string,
+    options?: SendMessageOptions,
+  ): Promise<string | null> => {
     const trimmed = rawText.trim()
     if (!trimmed || sending) return null
     if (trimmed.length > 1000) {
@@ -617,6 +638,8 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
       const apiTurns = turns.map((t) => ({ role: t.role, text: t.text }))
       const startAt = Date.now()
       lastStudentSendAtRef.current = startAt
+      // v1.1 단계 19.16: pronunciation/speechFlow context는 STT 경로에서만 전달.
+      // 텍스트 입력(키보드) 경로에서는 음성 자체가 없어 undefined.
       const res = await fetch('/api/conversation/free/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -625,6 +648,8 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
           personaId,
           turns: apiTurns,
           latestStudentText: trimmed,
+          pronunciationContext: options?.pronunciationContext ?? undefined,
+          speechFlowContext: options?.speechFlowContext ?? undefined,
         }),
       })
       if (!res.ok) throw new Error(`status_${res.status}`)
@@ -745,34 +770,67 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
           if (!transcript) {
             setVoiceError('음성을 인식하지 못했습니다. 다시 한 번 말씀해 주세요.')
           } else {
-            // 23-f: STT 결과 도착 즉시 전송 (카운트다운 없음).
             const fn = sendMessageWithTextRef.current
-            // 23-h A-3: 발음 평가 토글 ON 시, Azure PA를 병렬 호출하고 응답이
-            // 도착하면 해당 student turn에 pronScore를 부착한다. transcript를
-            // referenceText로 사용 (자유 대화는 정답 스크립트가 없으므로 자기 발화 기준).
+            // v1.1 단계 19.16: 발음 평가가 ON이면 pronunciation-azure 응답을 먼저
+            // 기다린 뒤 NPC LLM을 호출한다 — 그래야 LLM이 발음 점수를 알고 환각
+            // 칭찬/맥락 어긋난 응답을 차단할 수 있다 (도미노 효과의 핵심).
+            // 발음 평가가 OFF이면 기존처럼 즉시 LLM만 호출한다.
             if (fn) {
               const studentTurnId = crypto.randomUUID()
-              void fn(transcript, studentTurnId)
+
               if (pronEvalEnabled) {
-                void (async () => {
-                  try {
-                    const fd = new FormData()
-                    fd.append('audio', blob, 'recording.webm')
-                    fd.append('referenceText', transcript)
-                    const paRes = await fetch('/api/pronunciation-azure', { method: 'POST', body: fd })
-                    if (!paRes.ok) return
-                    const paData = await paRes.json()
-                    const score = typeof paData?.pronScore === 'number'
-                      ? paData.pronScore
-                      : typeof paData?.normalizedScore === 'number'
-                        ? paData.normalizedScore
-                        : null
-                    if (score == null) return
+                let paData: {
+                  pronScore?: number | null
+                  normalizedScore?: number | null
+                  accuracyScore?: number | null
+                  fluencyScore?: number | null
+                  completenessScore?: number | null
+                  recognizedText?: string | null
+                  wordResults?: AzureWordResult[] | null
+                } | null = null
+                try {
+                  const fd = new FormData()
+                  fd.append('audio', blob, 'recording.webm')
+                  fd.append('referenceText', transcript)
+                  const paRes = await fetch('/api/pronunciation-azure', { method: 'POST', body: fd })
+                  if (paRes.ok) paData = await paRes.json()
+                } catch (err) {
+                  console.warn('[free-conversation] pron eval pre-LLM error', err)
+                }
+
+                // 발음 응답으로부터 LLM 입력용 컨텍스트 추출.
+                // 응답 형태가 PronunciationResult shape와 호환 — 그대로 빌더에 넘긴다.
+                let pronCtx: PronunciationContext | null = null
+                let flowCtx: SpeechFlowContext | null = null
+                if (paData) {
+                  const asResult: Partial<PronunciationResult> = {
+                    accuracyScore: paData.accuracyScore ?? null,
+                    fluencyScore: paData.fluencyScore ?? null,
+                    completenessScore: paData.completenessScore ?? null,
+                    wordResults: Array.isArray(paData.wordResults) ? paData.wordResults : undefined,
+                  }
+                  pronCtx = buildPronunciationContext(asResult as PronunciationResult) ?? null
+                  flowCtx = buildSpeechFlowContext(asResult as PronunciationResult) ?? null
+                }
+
+                // LLM 호출 (pronunciation/flow 컨텍스트 포함).
+                void fn(transcript, studentTurnId, {
+                  pronunciationContext: pronCtx,
+                  speechFlowContext: flowCtx,
+                })
+
+                // 기존 23-h A-3 흐름 — pronScore turn 부착 + research_assessments 누적.
+                if (paData) {
+                  const score = typeof paData.pronScore === 'number'
+                    ? paData.pronScore
+                    : typeof paData.normalizedScore === 'number'
+                      ? paData.normalizedScore
+                      : null
+                  if (score != null) {
                     const rounded = Math.round(score)
                     setTurns((prev) => prev.map((t) =>
                       t.id === studentTurnId ? { ...t, pronScore: rounded } : t,
                     ))
-                    // v1.1 14-4: 자유 대화도 발화별 발음 점수를 research_assessments에 누적 기록.
                     const sid = researchSessionIdRef.current
                     if (sid) {
                       void logAssessment({
@@ -782,21 +840,22 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
                         scoresDetail: {
                           type: 'pronunciation_turn',
                           pronScore: rounded,
-                          accuracyScore: typeof paData?.accuracyScore === 'number' ? paData.accuracyScore : null,
-                          fluencyScore: typeof paData?.fluencyScore === 'number' ? paData.fluencyScore : null,
-                          completenessScore: typeof paData?.completenessScore === 'number' ? paData.completenessScore : null,
+                          accuracyScore: typeof paData.accuracyScore === 'number' ? paData.accuracyScore : null,
+                          fluencyScore: typeof paData.fluencyScore === 'number' ? paData.fluencyScore : null,
+                          completenessScore: typeof paData.completenessScore === 'number' ? paData.completenessScore : null,
                         },
                         pronunciationData: {
                           referenceText: transcript,
-                          recognizedText: typeof paData?.recognizedText === 'string' ? paData.recognizedText : null,
-                          wordResults: Array.isArray(paData?.wordResults) ? paData.wordResults : null,
+                          recognizedText: typeof paData.recognizedText === 'string' ? paData.recognizedText : null,
+                          wordResults: Array.isArray(paData.wordResults) ? paData.wordResults : null,
                         },
                       })
                     }
-                  } catch (err) {
-                    console.warn('[free-conversation] pron eval error', err)
                   }
-                })()
+                }
+              } else {
+                // 발음 평가 OFF — 기존처럼 즉시 LLM 호출.
+                void fn(transcript, studentTurnId)
               }
             }
           }
