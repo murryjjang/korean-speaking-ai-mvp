@@ -109,4 +109,27 @@ test.describe('R2 — 모바일 progress 학습 콘텐츠 위치 진단', () => 
     expect(inViewport2).toBe(true)
     expect(inViewport3).toBe(true)
   })
+
+  // v1.1 단계 19.14 [R2 breakpoint fix]: 단계 19.13에서 mobile-top은
+  // sm:hidden(<640), 하단 내비는 md:hidden(<768)이라 640~767px 구간에서
+  // mobile-top 숨김 + 데스크톱 instance 노출 + 하단 내비 노출이 동시에 발생.
+  // 사용자에게는 "맨 아래로" 회귀로 보임. md 정렬 후 이 구간에서도 mobile-top 노출.
+  test('640~767px 구간에서도 mobile-top 노출 (breakpoint 정렬 검증)', async ({ page }) => {
+    test.setTimeout(120_000)
+    const TABLET_PORTRAIT = { width: 700, height: 1000 }
+    await page.setViewportSize(TABLET_PORTRAIT)
+    await loginAndConsent(page, 'P062', '1062')
+    await page.goto('/research/student/progress', { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    await page.waitForTimeout(800)
+    const top = page.getByTestId(TOP_TID)
+    await expect(top).toBeAttached()
+    const bbox = await top.boundingBox()
+    // breakpoint 정렬 전: this would be { x: 0, y: 0, width: 0, height: 0 } (hidden)
+    // 정렬 후: 실제 위치값 + viewport 내 표시
+    expect(bbox).not.toBeNull()
+    expect(bbox!.height).toBeGreaterThan(0)
+    expect(bbox!.y).toBeLessThan(TABLET_PORTRAIT.height)
+    console.log(`[R2 breakpoint] 700px에서 mobile-top y=${bbox!.y}, h=${bbox!.height}`)
+    await page.screenshot({ path: `${OUT_DIR}/r2-04-tablet-700px.png`, fullPage: true })
+  })
 })

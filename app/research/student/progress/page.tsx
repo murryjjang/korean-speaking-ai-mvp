@@ -172,10 +172,14 @@ export default async function StudentProgressPage() {
       </header>
 
       {/* v1.1 단계 19.13 [페이즈 3]: 모바일에서 학습 시작 CTA를 첫 viewport 안으로
-          끌어올린다. 데스크톱(sm+)에서는 본래 위치(데이터 다운로드 위)에 남기고
+          끌어올린다. 데스크톱에서는 본래 위치(데이터 다운로드 위)에 남기고
           모바일에서만 노출 — DOM에 두 번 등장하나 한 번만 표시. data-testid는
-          하단 인스턴스를 그대로 두어 기존 테스트(nav-free-conversation 등) 호환. */}
-      <div className="sm:hidden" data-testid="start-learning-mobile-top">
+          하단 인스턴스를 그대로 두어 기존 테스트(nav-free-conversation 등) 호환.
+          v1.1 단계 19.14 [R2]: breakpoint를 sm(640)→md(768)로 정정.
+          모바일 하단 fixed 내비가 md:hidden이므로 640~767px 구간에서 mobile-top이
+          숨고 데스크톱 instance가 노출되면 사용자에게는 "맨 아래로" 보이는 회귀가
+          발생. 두 인스턴스의 breakpoint를 동일하게 맞춘다. */}
+      <div className="md:hidden" data-testid="start-learning-mobile-top">
         <StartLearningSection
           motherTongueHint={participant.motherTongue}
           hideTestIds
@@ -362,7 +366,9 @@ export default async function StudentProgressPage() {
       </SectionCard>
       </div>{/* /research-progress-pdf-target */}
 
-      <div className="hidden sm:block">
+      {/* v1.1 단계 19.14 [R2]: 데스크톱 하단 instance도 mobile-top과 같은 md
+          breakpoint로 정렬해 640~767px 회귀 차단. */}
+      <div className="hidden md:block">
         <StartLearningSection motherTongueHint={participant.motherTongue} />
       </div>
 

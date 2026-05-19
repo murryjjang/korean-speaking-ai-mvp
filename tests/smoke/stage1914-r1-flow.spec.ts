@@ -68,12 +68,22 @@ test.describe('R1 픽스 검증 — 자유 대화 + 평가 + 발표 버튼', () 
 
     // 직접 입력 textarea
     const input = page.getByTestId('custom-topic-input')
+    await input.click() // focus
     await input.fill('한국 드라마 이야기')
-    await page.waitForTimeout(500) // scrollIntoView smooth 대기
+    // 명시적으로 input event 발생 — 일부 React 렌더 상황에서 fill만으로는 state 미반영
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-testid=custom-topic-input]') as HTMLTextAreaElement | null
+        return !!el && el.value.trim().length > 0
+      },
+      undefined,
+      { timeout: 5_000 },
+    )
+    await page.waitForTimeout(800) // scrollIntoView smooth 대기
 
     const customNext = page.getByTestId('btn-start-custom')
     await expect(customNext).toBeVisible()
-    await expect(customNext).toBeEnabled()
+    await expect(customNext).toBeEnabled({ timeout: 10_000 })
     await page.screenshot({ path: `${OUT_DIR}/r1-fix-04-custom-filled.png`, fullPage: false })
 
     await customNext.click()
