@@ -21,7 +21,22 @@ Korean Speaking AI MVP — Phase 6-A 설계 문서.
 | `provider_events` | API 호출 로그 |
 | `content_versions` | 콘텐츠 변경 이력 |
 
-DDL 전문: `SUPABASE_SCHEMA.sql`
+**Sprint 1 신규 (2026-05-20, 적용 보류 — Option A):**
+
+| 테이블 | 설명 |
+|---|---|
+| `vocabulary_terms` | 어휘 마스터 (CEFR별) |
+| `content_tags` | 콘텐츠 태깅 (주제·CEFR·register, content당 1행) |
+| `content_vocabulary` | 콘텐츠↔어휘 junction (basic/core/challenging) |
+| `pronunciation_focus` | 콘텐츠 발음 포커스 규칙 |
+| `vocab_cards` | 학습자 어휘 카드 (SM-2 간격반복) |
+| `model_answers` | 콘텐츠×CEFR 모범답안 |
+| `groups` | 학습 그룹 |
+| `group_members` | 그룹 구성원·역할 (member/instructor/admin) |
+| `level_tests` | 레벨 테스트 결과 |
+| `action_log` | 학습 행동 로그 |
+
+DDL 전문: `SUPABASE_SCHEMA.sql` · 적용 정본(+RLS): `supabase/migrations/20260520_sprint1_new_tables.sql`
 
 ---
 
@@ -265,6 +280,97 @@ UNIQUE (content_type, content_id, version)
 ```
 
 인덱스: `(content_type, content_id)`
+
+---
+
+## Sprint 1 신규 테이블 (2026-05-20)
+
+> **적용 보류 (Option A).** 적용 정본 DDL + RLS(auth.uid 모델) + SECURITY DEFINER 헬퍼는
+> `supabase/migrations/20260520_sprint1_new_tables.sql`. 아래는 구조 요약.
+>
+> **결정**: `user_id → auth.users(id)` · `content_id(text) → questions(id)` ·
+> `pause_count → speaking_submissions` · RLS = 표준 `auth.uid()`.
+> **주의**: 현재 라이브 파일럿(P060–P066)은 `research_participants` 기반(auth.users 아님) →
+> 이 테이블들은 파일럿 계정 마이그레이션(backlog #18) 전까지 forward-looking.
+> 자유대화는 persona+자유 topic이라 고정 content 행이 없어 태깅 대상 아님(낭독·발표·듣고답하기·대화미션=questions만).
+
+### `vocabulary_terms`
+```
+id uuid PK · term text UNIQUE NOT NULL · cefr_level text (A1-C2) · created_at
+```
+인덱스: `cefr_level`
+
+### `content_tags`  (content당 1행)
+```
+id uuid PK · content_id text UNIQUE → questions.id (cascade)
+topic_tags text[] · cefr_level (A1-C2) · register (casual-banmal|polite-spoken|formal-spoken|formal-written|instructional)
+register_consistency (consistent|mixed) DEFAULT consistent · learning_objective text · prompt_version DEFAULT 'v3'
+tagged_at · created_at · updated_at
+```
+인덱스: `cefr_level`, `register`, `gin(topic_tags)`
+
+### `content_vocabulary`  (junction)
+```
+id uuid PK · content_id text → questions.id · term_id uuid → vocabulary_terms.id · category (basic|core|challenging)
+UNIQUE (content_id, term_id, category)
+```
+인덱스: `content_id`, `term_id`, `category`
+
+### `pronunciation_focus`
+```
+id uuid PK · content_id text → questions.id · term text (FK 아님) · rule text · created_at
+```
+인덱스: `content_id`
+
+### `vocab_cards`  (SM-2)
+```
+id uuid PK · user_id uuid → auth.users.id · term_id uuid → vocabulary_terms.id
+ease_factor numeric(4,2) DEFAULT 2.50 (≥1.30) · interval_days int DEFAULT 1 (≥0) · repetitions int DEFAULT 0 (≥0)
+last_quality smallint (0-5) · last_reviewed_at · next_review_at DEFAULT now() · added_at · created_at · updated_at
+UNIQUE (user_id, term_id)
+```
+인덱스: `user_id`, `(user_id, next_review_at)`
+
+### `model_answers`  (content×cefr당 1행)
+```
+id uuid PK · content_id text → questions.id · cefr_level (A1-C2) · answer_text text · audio_url · audio_voice
+generated_at · created_at · updated_at · UNIQUE (content_id, cefr_level)
+```
+인덱스: `content_id`
+
+### `groups`
+```
+id uuid PK · name text · description text NULL · anonymize_ranking boolean DEFAULT true · created_at · updated_at
+```
+
+### `group_members`
+```
+id uuid PK · group_id uuid → groups.id · user_id uuid → auth.users.id
+role text DEFAULT 'member' (member|instructor|admin) · joined_at · UNIQUE (group_id, user_id)
+```
+인덱스: `group_id`, `user_id`, `role`
+
+### `level_tests`
+```
+id uuid PK · user_id uuid → auth.users.id · taken_at · estimated_cefr (A1-C2)
+confidence_score numeric(3,2) (0-1) · results jsonb NOT NULL · duration_seconds int NULL · created_at
+```
+인덱스: `user_id`, `(user_id, taken_at desc)`
+
+### `action_log`
+```
+id uuid PK · user_id uuid → auth.users.id
+action_type text: content_started|content_completed|vocab_reviewed|level_test_taken|model_answer_played|login|logout|group_ranking_viewed
+meta jsonb NULL · occurred_at · created_at
+```
+인덱스: `user_id`, `action_type`, `(user_id, occurred_at desc)`
+
+### ALTER (기존 테이블, additive)
+| 테이블 | 추가 컬럼 |
+|---|---|
+| `user_profiles` ('users' 매핑) | `current_cefr_level` text (A1-C2, NULL), `current_cefr_updated_at` timestamptz NULL |
+| `questions` ('contents' 매핑) | `is_tagged` boolean NOT NULL DEFAULT false, `last_tagged_at` timestamptz NULL |
+| `speaking_submissions` | `pause_count` integer NOT NULL DEFAULT 0 |
 
 ---
 

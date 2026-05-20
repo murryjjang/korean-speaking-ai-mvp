@@ -458,3 +458,134 @@ create index if not exists idx_content_versions_type_id on content_versions(cont
 -- 2. teacher dashboard DbSubmissionsSection은 anon key로 read — teacher RLS 정책 필요.
 -- 3. service_role key 사용 금지 방침 재확인 (현재 코드에 미포함).
 -- 4. 각 정책 적용 후 기존 smoke test + 실제 제출 흐름 재검증 필수.
+
+-- ════════════════════════════════════════════════════════════
+-- Sprint 1 신규 테이블 (2026-05-20) — 적용 보류 (Option A)
+-- ────────────────────────────────────────────────────────────
+-- 실제 적용 DDL + RLS(auth.uid 모델) + SECURITY DEFINER 헬퍼는
+--   supabase/migrations/20260520_sprint1_new_tables.sql 가 정본(canonical).
+-- 본 섹션은 구조 참조용 요약(테이블 + ALTER). FK·인덱스는 마이그레이션과 동일.
+--
+-- 결정: user_id → auth.users(id) / content_id(text) → questions(id)
+--       pause_count → speaking_submissions / RLS = 표준 auth.uid().
+-- 주의: 현재 라이브 파일럿(P060-P066)은 research_participants 기반(auth.users 아님)
+--       → 이 테이블들은 파일럿 계정 마이그레이션(backlog #18) 전까지 forward-looking.
+-- ────────────────────────────────────────────────────────────
+
+create table if not exists public.vocabulary_terms (
+  id uuid primary key default gen_random_uuid(),
+  term text not null unique,
+  cefr_level text not null check (cefr_level in ('A1','A2','B1','B2','C1','C2')),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.content_tags (
+  id uuid primary key default gen_random_uuid(),
+  content_id text not null unique references public.questions(id) on delete cascade,
+  topic_tags text[] not null,
+  cefr_level text not null check (cefr_level in ('A1','A2','B1','B2','C1','C2')),
+  register text not null check (register in ('casual-banmal','polite-spoken','formal-spoken','formal-written','instructional')),
+  register_consistency text not null default 'consistent' check (register_consistency in ('consistent','mixed')),
+  learning_objective text not null,
+  prompt_version text not null default 'v3',
+  tagged_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- idx: cefr_level, register, gin(topic_tags)
+
+create table if not exists public.content_vocabulary (
+  id uuid primary key default gen_random_uuid(),
+  content_id text not null references public.questions(id) on delete cascade,
+  term_id uuid not null references public.vocabulary_terms(id) on delete cascade,
+  category text not null check (category in ('basic','core','challenging')),
+  created_at timestamptz not null default now(),
+  unique (content_id, term_id, category)
+);
+
+create table if not exists public.pronunciation_focus (
+  id uuid primary key default gen_random_uuid(),
+  content_id text not null references public.questions(id) on delete cascade,
+  term text not null,           -- FK 아님: 어휘 마스터 외 grammatical endings 허용
+  rule text not null,           -- 연음/격음화/구개음화/경음화/비음화/ㅎ약화 등
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.vocab_cards (              -- SM-2 간격 반복
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  term_id uuid not null references public.vocabulary_terms(id) on delete cascade,
+  added_at timestamptz not null default now(),
+  ease_factor numeric(4,2) not null default 2.50 check (ease_factor >= 1.30),
+  interval_days integer not null default 1 check (interval_days >= 0),
+  repetitions integer not null default 0 check (repetitions >= 0),
+  last_quality smallint check (last_quality between 0 and 5),
+  last_reviewed_at timestamptz,
+  next_review_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, term_id)
+);
+-- idx: user_id, (user_id, next_review_at)
+
+create table if not exists public.model_answers (
+  id uuid primary key default gen_random_uuid(),
+  content_id text not null references public.questions(id) on delete cascade,
+  cefr_level text not null check (cefr_level in ('A1','A2','B1','B2','C1','C2')),
+  answer_text text not null,
+  audio_url text,
+  audio_voice text,
+  generated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (content_id, cefr_level)
+);
+
+create table if not exists public.groups (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text,
+  anonymize_ranking boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.group_members (
+  id uuid primary key default gen_random_uuid(),
+  group_id uuid not null references public.groups(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null default 'member' check (role in ('member','instructor','admin')),
+  joined_at timestamptz not null default now(),
+  unique (group_id, user_id)
+);
+-- idx: group_id, user_id, role
+
+create table if not exists public.level_tests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  taken_at timestamptz not null default now(),
+  estimated_cefr text not null check (estimated_cefr in ('A1','A2','B1','B2','C1','C2')),
+  confidence_score numeric(3,2) check (confidence_score between 0 and 1),
+  results jsonb not null,
+  duration_seconds integer,
+  created_at timestamptz not null default now()
+);
+-- idx: user_id, (user_id, taken_at desc)
+
+create table if not exists public.action_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  action_type text not null check (action_type in (
+    'content_started','content_completed','vocab_reviewed','level_test_taken',
+    'model_answer_played','login','logout','group_ranking_viewed')),
+  meta jsonb,
+  occurred_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+-- idx: user_id, action_type, (user_id, occurred_at desc)
+
+-- ── ALTER (additive) ────────────────────────────────────────
+-- user_profiles: + current_cefr_level text check(A1-C2), + current_cefr_updated_at timestamptz
+-- questions:     + is_tagged boolean not null default false, + last_tagged_at timestamptz
+-- speaking_submissions: + pause_count integer not null default 0
+-- (정확한 ALTER 문 + RLS는 마이그레이션 파일 참조)
