@@ -134,12 +134,15 @@ STT_VERBATIM_PROMPT_ENABLED=true                        # 유지
 | systemd `kdli-mvp` | active, 메모리 51.7M |
 | 공개 터널 URL | `/login` HTTP 200 |
 | 재시작 시뮬레이션 | `restart kdli-mvp` 후 자동 복구, 터널 URL 불변 ✅ |
-| **참여자 1명 sanity check** | **⏳ 사용자 확인 대기** (로그인→자유대화→점수, 실계정 필요) |
+| **참여자 1명 sanity check** | **✅ 통과** (2026-05-20 사용자 확인: 로그인→자유대화→점수) |
+| 컷오버 | ✅ 완료 (노트북 cloudflared 종료, 운영 트래픽 Lightsail 단일화) |
 
 ---
 
 ## 7. 컷오버 절차 (노트북 → Lightsail)
 
+> **2026-05-20 실행 완료** — 노트북 cloudflared 종료됨. 아래는 참고용 절차.
+>
 > 새 URL 검증 완료 후 진행. 끄는 순간 기존 URL이 죽으므로 참여자 공지와 함께.
 
 ```bash
