@@ -106,6 +106,8 @@ type Stage = 'start' | 'chat' | 'end'
 type SummaryFeedback = { strengths: string[]; next_steps: string[] }
 type SummaryResult = {
   source: 'llm' | 'mock'
+  // backlog #13: 주제 일치 신호 (없으면 'on' 취급).
+  topic_adherence?: 'on' | 'partial' | 'off'
   summary_ko: string
   summary_l1: string
   feedback_ko: SummaryFeedback
@@ -114,6 +116,9 @@ type SummaryResult = {
   summary?: { ko: string; en?: string; vi?: string; ar?: string }
   feedback?: { ko: SummaryFeedback; en?: SummaryFeedback; vi?: SummaryFeedback; ar?: SummaryFeedback }
 }
+
+// backlog #13: 주제 일치(topic_adherence) → 종합 점수 멀티플라이어.
+const ADHERENCE_MULTIPLIER: Record<'on' | 'partial' | 'off', number> = { on: 1, partial: 0.75, off: 0.5 }
 
 function formatTime(sec: number): string {
   const m = Math.floor(sec / 60)
@@ -193,9 +198,11 @@ function diffWordsInline(original: string, corrected: string): DiffSeg[] {
 function PronunciationScoreSummary({
   turns,
   motherTongue,
+  topicAdherence = 'on',
 }: {
   turns: ChatTurn[]
   motherTongue: string | null
+  topicAdherence?: 'on' | 'partial' | 'off'
 }) {
   const scores = turns
     .filter((t): t is ChatTurn & { pronScore: number } =>
@@ -230,7 +237,10 @@ function PronunciationScoreSummary({
     )
   }
 
-  const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+  // backlog #13: 발음 평균(rawAvg)에 주제 일치 멀티플라이어를 곱해 종합 점수 보정.
+  const rawAvg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+  const multiplier = ADHERENCE_MULTIPLIER[topicAdherence]
+  const avg = Math.round(rawAvg * multiplier)
   const buckets = {
     low: scores.filter((s) => s < 50).length,
     mid: scores.filter((s) => s >= 50 && s < 70).length,
@@ -266,6 +276,15 @@ function PronunciationScoreSummary({
               {avg}
               <span className="text-sm font-normal text-text-muted">/100</span>
             </p>
+            {multiplier !== 1 && (
+              <p
+                className="mt-1 text-[10px] text-amber-700"
+                lang="ko"
+                data-testid="pron-summary-topic-adjust"
+              >
+                주제 반영 보정 ×{multiplier} (발음 평균 {rawAvg})
+              </p>
+            )}
           </div>
           <div
             className="rounded-md border border-border bg-surface-raised p-3"
@@ -531,15 +550,29 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
       if (!isRefresh) {
         const sessionId = researchSessionIdRef.current
         if (sessionId) {
+          // backlog #13: 주제 일치 신호로 종합 점수 보정 후 저장.
+          const adherence = data.topic_adherence ?? 'on'
+          const multiplier = ADHERENCE_MULTIPLIER[adherence]
+          const pronScores = currentTurns
+            .filter((t) => t.role === 'student' && typeof t.pronScore === 'number')
+            .map((t) => t.pronScore as number)
+          const rawAvg = pronScores.length
+            ? Math.round(pronScores.reduce((a, b) => a + b, 0) / pronScores.length)
+            : null
+          const adjusted = rawAvg != null ? Math.round(rawAvg * multiplier) : null
           void logAssessment({
             sessionId,
             mode: 'free_conversation',
+            scoreTotal: adjusted,
             feedbackText: data.summary_ko,
             scoresDetail: {
               feedback_ko: data.feedback_ko,
               feedback_l1: data.feedback_l1,
               summary_l1: data.summary_l1,
               helper_lang: lang,
+              topic_adherence: adherence,
+              score_multiplier: multiplier,
+              raw_pron_avg: rawAvg,
             },
           })
         }
@@ -1735,7 +1768,11 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
               본문에서 이미 표시되며, 여기서는 평균·구간별 분포·평가 발화 수를 묶어
               학습자가 본인 진척도를 한눈에 추적할 수 있게 한다. 자유 대화는 표현
               연습용이라 "참고용" 주의문을 함께 노출한다. */}
-          <PronunciationScoreSummary turns={turns} motherTongue={motherTongue} />
+          <PronunciationScoreSummary
+            turns={turns}
+            motherTongue={motherTongue}
+            topicAdherence={summary?.topic_adherence ?? 'on'}
+          />
 
           <Card data-testid="conversation-summary">
             <CardHeader

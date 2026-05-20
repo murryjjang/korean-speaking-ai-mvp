@@ -46,6 +46,7 @@ ko·en·vi·ar 외 언어는 절대 출력하지 마세요.`
   const outputBlock = multilingual
     ? `출력 형식 (반드시 JSON, 다른 텍스트 금지):
 {
+  "topic_adherence": "on | partial | off 중 하나",
   "summary": { "ko": "...", "en": "...", "vi": "...", "ar": "..." },
   "feedback": {
     "ko": { "strengths": ["..."], "next_steps": ["..."] },
@@ -56,6 +57,7 @@ ko·en·vi·ar 외 언어는 절대 출력하지 마세요.`
 }`
     : `출력 형식 (반드시 JSON, 다른 텍스트 금지):
 {
+  "topic_adherence": "on | partial | off 중 하나",
   "summary_ko": "...",
   "summary_l1": "...",
   "feedback_ko": {"strengths": ["..."], "next_steps": ["..."]},
@@ -70,11 +72,12 @@ ko·en·vi·ar 외 언어는 절대 출력하지 마세요.`
 
 학습자(외국인)와 NPC의 자유 대화 세션을 분석해 다음 절차로 평가하세요:
 
-[1단계 — 주제 일치 판단 (내부 분석, 출력에 포함하지 말 것)]
+[1단계 — 주제 일치 판단 (topic_adherence 필드로 반드시 출력)]
 대화 주제: "${topic}"
-학습자의 한국어 발화 전체가 이 주제와 직접 관련되는지 내부적으로 판정:
-- 직접 관련: 주제 영역의 질문에 답하거나 관련된 경험·의견을 표현
-- 주제 이탈: 주제와 다른 화제, 한 마디만 던지고 끝남, 또는 관련성 모호
+학습자의 한국어 발화 전체가 이 주제와 얼마나 관련되는지 3단계로 판정해, 출력 JSON의 topic_adherence 필드에 "on"|"partial"|"off" 중 하나로 넣으세요:
+- "on" (주제와 일치): 주제 영역의 질문에 답하거나 관련된 경험·의견을 표현
+- "partial" (일부 관련 + 일부 이탈): 주제를 일부만 다루거나 곁가지로 자주 새는 경우
+- "off" (거의/완전 이탈): 주제와 다른 화제, 한 마디만 던지고 끝남, 또는 관련성 모호
 
 [2단계 — 발화 분량 점검 (내부 분석, 출력에 포함하지 말 것)]
 학습자의 총 한국어 발화 글자 수와 발화 턴 수를 헤아릴 것.
@@ -83,12 +86,13 @@ ko·en·vi·ar 외 언어는 절대 출력하지 마세요.`
 1. 대화 요약 (summary): 어떤 주제로 어떤 흐름의 대화를 했는지 3~5줄
 2. 학습 피드백 (feedback):
    - strengths: 학습자의 실제 발화에서 인용 가능한 구체적 근거가 있는 경우에만 작성.
-     * 1단계에서 "주제 이탈"로 판단 → strengths는 빈 배열 [] (이탈한 발화에 대한 칭찬 절대 금지)
+     * topic_adherence가 "off" → strengths는 빈 배열 [] (이탈한 발화에 대한 칭찬 절대 금지)
+     * topic_adherence가 "partial" → 실제 주제와 관련된 발화에 한해 최대 1개
      * 2단계에서 단일 턴이거나 총 20자 이하 → strengths는 최대 1개
      * 그 외 정상 대화 → 2~3개. 각 항목마다 학습자 발화의 구체적 표현·내용을 짚어야 함
      * 금지 어구 (근거 없는 일반론적 칭찬, 절대 출력하지 말 것): "주제에 대해 자연스럽게 대화를 이어갔어요", "NPC의 질문에 적절히 응답했어요", "자기 생각을 표현했어요", "한국어로 표현했어요", "자연스럽게 말했어요"
    - next_steps: 1~2개
-     * 1단계에서 "주제 이탈"로 판단된 경우, 첫 항목은 "주제(${topic})에 맞춰 답변해 보세요" 형식의 주제 복귀 안내
+     * topic_adherence가 "off" 또는 "partial"인 경우, 첫 항목은 "주제(${topic})에 맞춰 답변해 보세요" 형식의 주제 복귀 안내
 
 ${languagesBlock}
 
@@ -106,6 +110,12 @@ function formatTranscript(topic: string, turns: Turn[]): string {
     .map((t) => (t.role === 'student' ? `학습자: ${t.text}` : `AI: ${t.text}`))
     .join('\n')
   return `[주제]\n${topic}\n\n[전체 대화]\n${lines}`
+}
+
+// backlog #13: LLM이 출력한 주제 일치 신호 파싱. 누락/이상값은 'on'으로 폴백.
+type TopicAdherence = 'on' | 'partial' | 'off'
+function parseTopicAdherence(v: unknown): TopicAdherence {
+  return v === 'partial' || v === 'off' ? v : 'on'
 }
 
 function mockL1(lang: FeedbackLanguage, topic: string): {
@@ -157,6 +167,7 @@ function mockSummary(lang: FeedbackLanguage, topic: string, multilingual: boolea
 
   const base: Record<string, unknown> = {
     source: 'mock',
+    topic_adherence: 'on',
     summary_ko: summaryKo,
     summary_l1: l1.summary,
     feedback_ko: feedbackKo,
@@ -284,6 +295,7 @@ export async function POST(request: Request) {
       }
       return Response.json({
         source: 'llm',
+        topic_adherence: parseTopicAdherence(parsed.topic_adherence),
         // 다국어 신규 필드
         summary,
         feedback,
@@ -316,6 +328,7 @@ export async function POST(request: Request) {
 
     return Response.json({
       source: 'llm',
+      topic_adherence: parseTopicAdherence(parsed.topic_adherence),
       summary_ko: requiredText('summary_ko'),
       summary_l1: requiredText('summary_l1'),
       feedback_ko: safeFeedback('feedback_ko'),

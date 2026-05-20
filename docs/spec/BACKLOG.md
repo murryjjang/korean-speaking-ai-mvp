@@ -35,3 +35,26 @@ FK로 연결됨. **자유대화는 persona(코드 상수) + 자유 입력 topic*
 - 자유대화 세션의 사후 태깅 모델 정의 (예: 통합 content 테이블 도입, 또는 personas/scenarios
   태깅, 또는 research_sessions 단위 사후 라벨링)
 - 태깅 대상 식별자(고정 content_id가 없는 동적 콘텐츠) 처리 방안 결정
+
+---
+
+## #15 — topic_adherence LLM 판정 실측
+
+**상태:** 미착수 (backlog #13 옵션 A 후속)
+**배경:** backlog #13 옵션 A로 summary LLM이 `topic_adherence`(on/partial/off)를 출력하고
+종합 점수에 멀티플라이어(1.0/0.75/0.5)를 적용. 단 LLM 판정 정확도는 미실측.
+
+**해야 할 일:**
+- mock/로컬 시나리오 3–5건으로 on/partial/off 판정 실측 (실제 OPENAI 호출)
+- 특히 **partial 경계 케이스** 검증 (일부 관련 + 일부 이탈을 LLM이 on/off로 쏠리지 않는지)
+- 필요 시 프롬프트의 partial 정의·예시 보강
+
+## #16 — 보정 안내 UI wording 다듬기
+
+**상태:** 미착수 (backlog #13 옵션 A 후속, 시연 후)
+**배경:** 옵션 A에서 보정 시 `주제 반영 보정 ×0.5 (발음 평균 N)`를 종합 점수 카드에 노출.
+"×0.5" 등 기술 표현이라 학습자 친화적이지 않음.
+
+**해야 할 일:**
+- 시연 피드백 반영해 학습자 친화 문구로 교체 (예: "주제와 다른 이야기가 많아 점수가 조정됐어요")
+- i18n(Localized spec) 키로 다국어 처리 검토 (현재 `lang="ko"` 평문)
