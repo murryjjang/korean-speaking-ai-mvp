@@ -169,6 +169,22 @@
 
 ---
 
+## D-010 — 낭독 learning_objective = 하이브리드 (콘텐츠 + 읽기 능력) + peer 정합
+
+- **일자**: 2026-05-21
+- **상태**: 확정 (lock-in) — D-009(b)의 "낭독=읽기 능력" 부분을 supersede.
+- **배경**: D-009(b)(낭독 목표=읽기 능력)가 검수자(gpt-4o) rubric("콘텐츠 반영")과 **충돌**해 1.3 잔여 3건 FAIL. 또 낭독 가이드가 발표(qt-material-desc)에 **과적용**돼 회귀(advanced-q2: "그래프를 소리 내어 읽을 수 있다").
+- **결정** (rubric 정책):
+  - **(a) 낭독(qt-reading)** learning_objective = **하이브리드**: 콘텐츠 주제 + "정확한 발음으로 …소리 내어 읽을 수 있다" 결합. 콘텐츠만/읽기만 단독 금지. (예: "병원·약국 안내문을 정확한 발음으로 소리 내어 읽을 수 있다")
+  - **(b) 발표·자료설명(qt-material-desc)** = 콘텐츠 + 설명·발표 능력. 낭독 가이드(읽기·연음) 과적용 금지.
+  - **(c) 그 외 유형** = 콘텐츠 중심 과제 행위.
+  - **(d) peer rubric를 유형별로 정렬** — 작성자 prompt와 검수자 기준이 같은 유형별 정상형을 공유(설계 원칙 4). 작성자↔검수자 충돌 종식.
+- **근거**: 작성자·검수자가 같은 기준을 공유해야 통과 가능. thrash 임계 — 1회 변경으로 종식 못 하면 3-A(편집 경로)로 전환(추가 튜닝 금지).
+- **영향/적용**: `src/lib/prompts/content-tagging.ts`(유형별 목표 가이드) · `src/lib/tagging/validate-tagging.ts`(PEER_REVIEW_RULES rule 4 유형별) · `scripts/tag-content-batch.ts`(peer 컨텍스트에 type·prompt) · M3-b fixture(하이브리드 예시).
+- **관련**: D-009(supersede 낭독 목표 부분) · D-001 · BACKLOG 야간3.
+
+---
+
 ## 변경 이력
 
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
@@ -176,3 +192,4 @@
 - 2026-05-21: D-001 보완 (1.3 dry-run drift 발견 — learning_objective 정규식을 능력표현 일반형 `[가-힣] 수 있다`로 정정 + 재발 방지 메모).
 - 2026-05-21: D-001 보완 2 (1.3 dry-run 재실행 drift — 낭독 pronunciation_focus 필수: prompt v3 유형별 지침 + 정량 rule 8 `reading_pron`).
 - 2026-05-21: D-009 추가 (야간 3-C — 작성자 temp 0.0 + learning_objective/topic_tags 정확성 가이드, 잔여 4건 정정).
+- 2026-05-21: D-010 추가 (낭독 목표=하이브리드 + peer rubric 유형별 정렬 — 작성자↔검수자 충돌 종식, D-009b supersede).

@@ -154,7 +154,7 @@ export const PEER_REVIEW_RULES = [
   'topic_tags 가 콘텐츠 주제를 정확하고 충분히 반영하는가',
   'cefr_level 이 콘텐츠 실제 난이도와 부합하는가',
   'register 가 콘텐츠 실제 문체와 일치하는가',
-  'learning_objective 가 콘텐츠 핵심 학습목표를 "…할 수 있다" 형식으로 반영하는가',
+  'learning_objective 가 콘텐츠 핵심 학습목표를 "-(으)ㄹ 수 있다" 형식으로 반영하는가 (유형별 정상형: 낭독/qt-reading=콘텐츠 주제+정확히 읽는 능력 하이브리드 / 발표·자료설명/qt-material-desc=콘텐츠+설명·발표 능력 / 그 외=콘텐츠 중심 — 유형에 맞으면 통과시킬 것)',
   'vocabulary 분류(basic/core/challenging)가 난이도상 타당하고 고유명사(인명·상호·특정 지명)를 제외했는가(NER)',
   'pronunciation_focus 의 발음 규칙 적용이 한국어 음운론상 정확한가',
 ] as const

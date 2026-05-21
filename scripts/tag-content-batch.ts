@@ -226,7 +226,7 @@ async function main(): Promise<void> {
       const raw = await author(buildContentTaggingSystemPrompt(), buildContentTaggingUserPrompt(input))
       const result = JSON.parse(raw) as ContentTagResult
       const quant = validateQuantitative(result, { typeId: input.type_id })
-      const peerRes = quant.ok ? await runPeerReview(peer, result, `content_id: ${input.content_id}\ntitle: ${input.title}`) : null
+      const peerRes = quant.ok ? await runPeerReview(peer, result, `content_id: ${input.content_id}\ntype: ${input.type_id ?? ''}\ntitle: ${input.title}\nprompt: ${input.prompt}`) : null
       const verdict = classify(quant, peerRes)
       if (verdict === 'pass' && !DRY) await persist(supabase, input, result)
       outcomes.push({ input, result, verdict, quant_failures: quant.failures.map((f) => `${f.rule}: ${f.message}`), peer: peerRes })

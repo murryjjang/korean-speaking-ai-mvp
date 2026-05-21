@@ -57,11 +57,13 @@ describe('M3-b prompt v3 — 시스템 프롬프트 계약 (drift 가드)', () =
     expect(sys).toMatch(/마크다운|코드펜스/)
   })
 
-  it('3-C 정확성 가이드 주입 (drift 가드): 낭독 목표=읽기능력 · topic 본문 한정 · 일반표현 금지', () => {
+  it('정확성·유형별 목표 가이드 주입 (drift 가드, D-009·D-010)', () => {
     expect(sys).toContain('본문') // topic_tags 본문 한정
     expect(sys).toMatch(/추측.*금지|일반화 금지/)
-    expect(sys).toContain('소리 내어 읽는') // 낭독 목표 = 읽기 능력
+    expect(sys).toContain('소리 내어') // 낭독 하이브리드 (콘텐츠+읽기)
+    expect(sys).toContain('하이브리드')
     expect(sys).toContain('의사소통할 수 있다') // 막연한 표현 금지 예시
+    expect(sys).toContain('설명할 수 있다') // 발표·자료설명 — 낭독 가이드 과적용 차단
   })
 })
 

@@ -134,8 +134,8 @@ export const CONTENT_TAGGING_FIXTURES: TaggingFixture[] = [
       cefr_level: 'C1',
       register: 'formal-written',
       register_consistency: 'consistent',
-      // 글 주제(의사소통)가 아니라 낭독 능력을 기술
-      learning_objective: '설명문을 정확한 발음과 억양으로 소리 내어 읽을 수 있다.',
+      // 하이브리드: 콘텐츠 주제 + 읽기 능력 (D-010)
+      learning_objective: '외국어 교육과 의사소통 능력에 관한 설명문을 정확한 발음으로 소리 내어 읽을 수 있다.',
       vocabulary: { basic: ['문법'], core: ['의사소통', '평가'], challenging: ['숙달도'] },
       pronunciation_focus: ['숙달도(경음화)', '논리적으로(유음화)'],
     },
@@ -155,7 +155,7 @@ export const CONTENT_TAGGING_FIXTURES: TaggingFixture[] = [
       cefr_level: 'A2',
       register: 'formal-spoken',
       register_consistency: 'consistent',
-      learning_objective: '하루 일정을 설명하는 글을 정확한 발음으로 소리 내어 읽을 수 있다.',
+      learning_objective: '병원·약국 등 하루 일정을 소개하는 글을 정확한 발음으로 소리 내어 읽을 수 있다.',
       vocabulary: { basic: ['병원', '약국', '학교'], core: ['진료', '예정'], challenging: [] },
       pronunciation_focus: ['병원에(연음)', '학교에서(경음화)'],
     },
@@ -174,7 +174,7 @@ export const CONTENT_TAGGING_FIXTURES: TaggingFixture[] = [
       cefr_level: 'B1',
       register: 'formal-written',
       register_consistency: 'consistent',
-      learning_objective: '공공시설 안내문을 정확한 발음으로 소리 내어 읽을 수 있다.',
+      learning_objective: '도서관 운영 시간 안내문을 정확한 발음으로 소리 내어 읽을 수 있다.',
       vocabulary: { basic: ['시간', '도서관'], core: ['운영', '변경', '이용'], challenging: ['공휴일'] },
       pronunciation_focus: ['운영(연음)', '확인한(연음)'],
     },
