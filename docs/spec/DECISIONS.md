@@ -229,6 +229,21 @@
 
 ---
 
+## D-014 — 1.6 배너 research 흐름 wire-in (야간 5 진단·수정) + today-tasks 흐름 범위 명시
+
+- **일자**: 2026-05-22
+- **상태**: 확정 (구현 완료 — 배포·모바일 sanity는 본인 트리거)
+- **배경(진단)**: 라이브(P062, 모바일) 1.6 배너 미노출. 원인 = 배너가 정식 학생 대시보드(`/student`)에만 wire-in 됐고, research 참여자가 보는 `/research/student/progress`에는 미배치. D-013이 "today-tasks 상단"으로만 기술(정식 학생 흐름 가정)한 데서 기인. 디스미스·데이터·role 조건 문제 아님(원인 A 확정).
+- **결정**:
+  - **(a) wire-in (A안)**: `DashboardBanner`를 `/research/student/progress` 헤더 아래·학습 시작 카드 위(모바일/데스크톱 공통)에 배치. PDF 대상(`research-progress-pdf-target`) **밖** → 내보내기에서 제외.
+  - **(b) props**: `lang=participant.motherTongue`(7언어, 미지원 시 ko 폴백 — `resolveBannerLang`). `vocabDueCount=0` → research엔 SRS 미적용이라 vocab 배너 자동 숨김(progress·model_answer 2종). `hrefs={ progress:null(현재 페이지라 클릭 비활성), model_answer:'/student/speaking'(말하기 진입) }`.
+  - **(c) 컴포넌트 변경(소, 옵션 A)**: `buildBannerItems`·`resolveBannerLang`·`DEFAULT_BANNER_HREFS`·`BannerItem`을 `src/lib/i18n/banner-labels.ts`로 추출(node 단위테스트 가능)하고 `DashboardBanner`에 `hrefs?` prop 추가. `/student` 호출부는 기본값 유지로 **무변경**. 흐름별 wrapper(옵션 B)는 변경 범위가 커 보류 → BL-#8.
+  - **(d) today-tasks 흐름 범위**: `app/student/today-tasks.tsx`는 정식 학생 흐름 전용. research 흐름은 `/research/student/progress` **단일 페이지**가 진척+학습 시작(모바일 상단 4-card nav)을 통합 — 별도 today/today-tasks 페이지 없음(설계대로). 혼동 방지 위해 명시.
+- **검증**: vitest 1317 통과(배너 6→12) · lint 0 error · build green · e2e research-login(deploy gate)·auth-routes(116건, `/student` 렌더 포함) green · 로컬 SMOKE `/student` 배너 렌더 확인(testid·라벨·vocab 자동 숨김). **`/research/student/progress` 인증 렌더는 실 참여자 세션 필요 → 라이브 모바일 sanity로 위임**(로컬 read는 공유 DB 정책상 보류).
+- **관련**: D-013(1.6 원설계) · BL-#8(배너 흐름 비종속 일반화 B안).
+
+---
+
 ## 변경 이력
 
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
@@ -240,3 +255,4 @@
 - 2026-05-21: D-011 추가 (작성자 gpt-4o 격상 야간3 한정 → 11/12, 잔여 1건 advanced-q1-reading은 3-A).
 - 2026-05-21: D-012 추가 (Task 1.4 SRS 설계 — 콘텐츠 통과 등록·recall 자가채점·vocabulary_glosses 다국어 캐시·일일 20·TTS 재사용).
 - 2026-05-21: D-013 추가 (야간 4 — 1.5 모범답안·1.6 UX 배너·1.7 콘텐츠 admin(questions CRUD·수동 태깅) 설계).
+- 2026-05-22: D-014 추가 (야간 5 — 1.6 배너 라이브 미노출 진단=원인 A → research 흐름 `/research/student/progress` wire-in(A안, hrefs prop) + today-tasks 정식 학생 전용 명시).
