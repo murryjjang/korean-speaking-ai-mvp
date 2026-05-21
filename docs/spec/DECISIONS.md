@@ -132,6 +132,20 @@
 
 ---
 
+## D-008 — 야간 2 실측 발견 (Task 1.2 라이브 적용 · 태깅 풀 규모)
+
+- **일자**: 2026-05-21
+- **상태**: 확정 (실측 사실 기록)
+- **결정/사실**:
+  - **(1) Task 1.2 마이그레이션이 라이브 Supabase에 이미 적용됨** — `questions.is_tagged` 컬럼·`content_tags` 테이블 존재(1.3a `inspect-content-pool.ts` 실측). AUTOMATION_DESIGN 상 pending이었으나 정정 → **1.3 실 INSERT unblocked**.
+  - **(2) 태깅 풀 = active·미태깅 questions 12건 전체** — `content_tags` FK는 `questions(id)` 일반이라 특정 type 한정 아님. 대화미션은 `qt-dialogue-mission`으로 questions 안에 존재(별도 `mission_scenarios` 1행과 무관).
+- **근거**: `scripts/inspect-content-pool.ts` 라이브 read-only 실측 (footprint 0).
+- **영향/적용**: 야간 3 1.3b 실 INSERT(`BATCH_DRY=0`) 진입 조건 충족. AUTOMATION_DESIGN 야간1 "Task 1.2 적용" [x] 정정. 단 **파일럿 #18(P060–P066 auth.users 계정)은 별개로 여전히 미적용**(D-005) — 콘텐츠 태깅 데이터의 research-login 사용자 노출 여부는 앱 read 경로에 의존.
+- **관련**: AUTOMATION_DESIGN.md · `scripts/inspect-content-pool.ts` · BACKLOG #18(D-005).
+
+---
+
 ## 변경 이력
 
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
+- 2026-05-21: D-008 추가 (야간 2 1.3a 실측 — Task 1.2 라이브 적용 확인·태깅 풀 12건).

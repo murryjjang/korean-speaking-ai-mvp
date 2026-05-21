@@ -127,6 +127,21 @@ FK로 연결됨. **자유대화는 persona(코드 상수) + 자유 입력 topic*
 
 ---
 
+## 야간2 자동화 후속
+
+### prompt v4 — per-term CEFR
+**상태(enum):** `pending`
+**의존성:** 1.3 일괄 적용 + 검토 결과(태깅 데이터 품질 보고)에 의존.
+**시점:** 야간 3 vocabulary_terms 데이터 품질 보고 시 우선순위 결정
+
+**배경:** 현재 `vocabulary_terms.cefr_level`은 콘텐츠 CEFR ±1 근사 — prompt v3가 어휘별
+절대 CEFR를 출력하지 않아 1.3b가 `cefrForCategory()`(basic=−1·core=0·challenging=+1,
+A1~C2 클램프)로 채운다 (D-001 보완).
+**해야 할 일:** prompt v4에서 어휘별 절대 CEFR를 직접 출력하도록 확장 → 근사 제거.
+정량 규칙·M3-b fixture·`src/lib/tagging/schema.ts` 동반 갱신.
+
+---
+
 ## 의존성 그래프
 
 ```
@@ -139,7 +154,8 @@ Task 1.2 (마이그레이션 적용)
   └─ #16 (보정 안내 UI wording) ←── 시연 피드백
 
 prompt v3 lock-in (D-001)
-  └─ task 1.4 후속 (자유대화 사후 태깅, D-004) ←── 동적 콘텐츠 태깅 모델 설계
+  ├─ task 1.4 후속 (자유대화 사후 태깅, D-004) ←── 동적 콘텐츠 태깅 모델 설계
+  └─ prompt v4 (per-term CEFR) ←── 1.3 일괄 적용 + 품질 보고
 
 M3-a (ko/en/vi fixture)
   ├─ ar fixture (즉시 가능)
