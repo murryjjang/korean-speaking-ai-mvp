@@ -293,7 +293,7 @@ M5 ┘
 - [x] M1 `verify-migration.ts` + `verify-migration.sql` + `rollback.sql` 작성 (2026-05-21)
   - FK expected 11 (12 아님 — grep 자체검증으로 drift 정정), 정책 24, 인덱스 19
   - ⚠️ supabase-js `head:true` 가 없는 테이블에 204+null 반환(가짜 PASS) → non-head GET 으로 수정
-- [ ] Task 1.2 적용 (Supabase SQL Editor 수동 실행) + verify 실행
+- [x] Task 1.2 적용 — **실측 확인** (야간 2 1.3a inspect: is_tagged 컬럼·content_tags 테이블 존재, content_tags 0행). 즉 야간 3 실 INSERT unblocked. verify-migration.sql 재실행 권장.
 - [x] M2 `deploy.sh` + `smoke-test.sh` + `rollback-deploy.sh` + `/api/healthz` 작성 (2026-05-21)
   - 로컬 검증: build 통과 · healthz 200(db.ok 49ms·buildId 일치·cloudflared best-effort) · smoke 5/5 PASS
   - 실제 라이브 배포는 본인 트리거 (deploy.sh, #13 P060-P066 영향 검토 후)
@@ -308,13 +308,18 @@ M5 ┘
 - [x] AUTOMATION_DESIGN.md 진행 체크박스 업데이트 (이 커밋)
 - 다음 진입점: Task 1.2 적용(SQL Editor) → verify → deploy.sh 라이브(#13) → 야간 2(M4·M6·M7)
 
-### 야간 2: 인프라 2차 + 1.3 사전 (목표 active 60-90분)
-- [ ] M4 검수 layer (정량 + LLM peer review)
-- [ ] Task 1.3a 콘텐츠 풀 식별 (questions 테이블 양·유형·언어)
-- [ ] Task 1.3b batch runner + 검증 통합
-- [ ] M6 운영 모니터링 (UptimeRobot + monitor.sh)
-- [ ] M7 DECISIONS.md 신규 + 백필 (어제 결정 전체)
-- [ ] 야간 2 commit & push
+### 야간 2: 인프라 2차 + 1.3 사전 (목표 active 60-90분) — 완료 (2026-05-21)
+- [x] prompt v3 정식 모듈 신규 (`src/lib/prompts/content-tagging.ts`) + 공유 스키마 `src/lib/tagging/schema.ts`(단일 진실 원천) + M3-b 회귀(mock 16 + real 6 opt-in)
+- [x] M4 검수 layer — 정량 7규칙 + 분류 순수 모듈(`src/lib/tagging/validate-tagging.ts`, 단위 31) + peer review(gpt-4o, 6규칙) + CLI(`scripts/validate-tagging.ts`, 통계·검토 큐·approve/reject/edit·샘플 5%)
+- [x] Task 1.3a 콘텐츠 풀 식별 (`scripts/inspect-content-pool.ts`, read-only 라이브)
+  - **실측**: questions 12(active 12·미태깅 12) / type 분포 qt-reading 3·qt-material-desc 2·qt-dialogue-mission 2·qt-self-intro 2·qt-listening-resp 1·qt-opinion 1·qt-picture 1 / content_tags 0 / mission_scenarios 1(별도, FK 대상 아님) / content_versions 0
+  - **확정**: content_tags FK는 questions(id) 전체 → 즉시 일괄 풀 = active·미태깅 12건 (대화미션은 qt-dialogue-mission 으로 questions 안에 존재)
+- [x] Task 1.3b batch runner + 검증 통합 (`scripts/tag-content-batch.ts`, **BATCH_DRY=1 기본**) — dry-run 스모크 2건 PASS(작성자 gpt-4o-mini ↔ 검수자 gpt-4o), DB 무변경 확인. 실 INSERT(BATCH_DRY=0)는 야간 3.
+- [x] M6 운영 모니터링 (`scripts/monitor.sh`·`scripts/get-current-tunnel-url.sh`·`docs/ops/MONITORING.md`, UptimeRobot+cron, 이메일)
+- [x] M7 DECISIONS.md 신규(D-001~D-007 백필) + BACKLOG 강화(상태 enum·의존성·시점)
+- [x] 검증: vitest 1183 → 1236(+53, real opt-in skip) · lint 0 error · build 통과
+- [ ] 야간 2 commit & push (모듈별 독립 → origin/feat/q4-llm-provider)
+- 다음 진입점: 야간 3 — 1.3b 전체 dry-run(12건) 검토 → BATCH_DRY=0 일괄 적용 → 라이브 배포 + e2e
 
 ### 야간 3: 1.3 일괄 적용 (목표 active 30-60분)
 - [ ] M4 dry-run 5-10건 (자동 검증 보고서 확인)
