@@ -244,6 +244,20 @@
 
 ---
 
+## D-015 — 1.6 배너 UX 보정 (ko+모국어 병기 + 앵커 스크롤, 야간 5)
+
+- **일자**: 2026-05-22
+- **상태**: 확정 (구현 완료 — 배포·모바일 sanity는 본인 트리거)
+- **배경**: D-014 wire-in 후 라이브 UX 2건. (1) 진척 페이지 다른 요소(종합 점수·평가 누적)는 본문 ko + mother_tongue 병기인데 **배너만 모국어 단독** → 시각 불일치. (2) "오늘의 학습" 클릭 비활성(D-014)은 의도였으나 UX 어색.
+- **결정**:
+  - **(a) 병기**: 배너도 본문 ko 고정 + mother_tongue 보조 병기(진척 페이지 `<Localized>` 와 동일 톤 — `text-xs text-text-muted opacity-80 leading-snug`, `block mt-0.5`, ar은 `dir=rtl`+`unicodeBidi:isolate`). `bl===ko` 면 보조 미노출 → 정식 학생 흐름 `/student`(lang 기본 ko) **무변경**. 별도 prop 없이 "항상 병기 + ko dedup" 채택(변경 범위 작은 쪽).
+  - **(b) 표시언어 추론 정렬**: `resolveBannerLang` 이 `inferDisplayLanguageFromMotherTongue` 사용 → 자연어 모국어("Vietnamese"·"베트남어"·"العربية")도 진척 페이지와 동일 추론. 기존 2글자 코드 정확매칭만 했어서 자연어 mother_tongue 이면 ko 로 오폴백되던 잠재 불일치 해소.
+  - **(c) 앵커 스크롤**: progress 배너 progress href `null → '#start-learning'`. `DashboardBanner` 는 `#`-href 를 같은 페이지 부드러운 스크롤로 처리(`scrollIntoView({behavior:'smooth'})`). 학습 시작 영역은 모바일/데스크톱 **두 인스턴스**(단계19.13·19.14)라 unique-`id` 불가 → `data-scroll-target="start-learning"` 을 두 인스턴스에 부여하고 **화면에 보이는(offsetParent≠null) 인스턴스로 스크롤**. model_answer(`/student/speaking`)·일자별 디스미스는 변화 없음.
+- **검증**: vitest 1319 통과(배너 12→14) · lint 0 error · build green · live e2e(research-login) green · 로컬 `/student` ko 경로 회귀 없음(병기 미노출 확인). **병기·앵커 실동작은 비-ko 참여자 인증 렌더 필요 → 라이브 모바일 sanity로 위임**(로컬 read 공유 DB 정책상 보류, D-014와 동일).
+- **관련**: D-014(wire-in) · BL-#8(배너 일반화) · BL-#9(모바일/데스크톱 학습시작 위치 일관성 — 앵커 dual-instance 우회 흡수 대상).
+
+---
+
 ## 변경 이력
 
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
@@ -256,3 +270,4 @@
 - 2026-05-21: D-012 추가 (Task 1.4 SRS 설계 — 콘텐츠 통과 등록·recall 자가채점·vocabulary_glosses 다국어 캐시·일일 20·TTS 재사용).
 - 2026-05-21: D-013 추가 (야간 4 — 1.5 모범답안·1.6 UX 배너·1.7 콘텐츠 admin(questions CRUD·수동 태깅) 설계).
 - 2026-05-22: D-014 추가 (야간 5 — 1.6 배너 라이브 미노출 진단=원인 A → research 흐름 `/research/student/progress` wire-in(A안, hrefs prop) + today-tasks 정식 학생 전용 명시).
+- 2026-05-22: D-015 추가 (야간 5 — 1.6 배너 UX 보정: ko+모국어 병기(자연어 모국어 추론 정렬) + "오늘의 학습" 앵커 스크롤(#start-learning, 보이는 인스턴스)).
