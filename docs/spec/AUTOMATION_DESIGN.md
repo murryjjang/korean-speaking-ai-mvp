@@ -298,10 +298,15 @@ M5 ┘
   - 로컬 검증: build 통과 · healthz 200(db.ok 49ms·buildId 일치·cloudflared best-effort) · smoke 5/5 PASS
   - 실제 라이브 배포는 본인 트리거 (deploy.sh, #13 P060-P066 영향 검토 후)
 - [ ] #13 fix 라이브 배포 (M2 첫 사용)
-- [ ] M3-a `free-conversation-summary.test.ts` (15 cases × 3+ lang)
-- [ ] M5 e2e 시나리오 1-3건 (research-login / free-conv-basic / free-conv-offtopic)
-- [ ] 야간 1 commit & push
-- [ ] AUTOMATION_DESIGN.md 진행 체크박스 업데이트
+- [x] M3-a `free-conversation-summary.test.ts` (mock 10 + real 15 opt-in, ko/en/vi) (2026-05-21)
+  - vitest 1173 → 1183(+10 mock), real 15 skip. `tests/llm-regression/` + vitest include 추가
+  - real 실측은 `LLM_REGRESSION_REAL=true` 로 별도 실행 대기 (#15)
+- [x] M5 e2e 시나리오 3건 (research-login / free-conv-basic / free-conv-offtopic) (2026-05-21)
+  - 로컬 3/3 PASS · LIVE_URL 게이트 경로=research-login만 실행+free-conv 2 skip 확인
+  - #13 ≤50 수치는 `tests/unit/free-conversation-score.test.ts`(+6)로 결정론적 가드(score 헬퍼 추출)
+- [~] 야간 1 commit (M1·M2·M3-a·M5 + doc, 모듈별 독립) — **push 대기**(본인 승인 후)
+- [x] AUTOMATION_DESIGN.md 진행 체크박스 업데이트 (이 커밋)
+- 다음 진입점: Task 1.2 적용(SQL Editor) → verify → deploy.sh 라이브(#13) → 야간 2(M4·M6·M7)
 
 ### 야간 2: 인프라 2차 + 1.3 사전 (목표 active 60-90분)
 - [ ] M4 검수 layer (정량 + LLM peer review)

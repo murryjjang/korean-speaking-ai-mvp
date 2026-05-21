@@ -58,3 +58,28 @@ FK로 연결됨. **자유대화는 persona(코드 상수) + 자유 입력 topic*
 **해야 할 일:**
 - 시연 피드백 반영해 학습자 친화 문구로 교체 (예: "주제와 다른 이야기가 많아 점수가 조정됐어요")
 - i18n(Localized spec) 키로 다국어 처리 검토 (현재 `lang="ko"` 평문)
+
+---
+
+## 야간1 자동화 후속 (M3-a·M5 발견)
+
+### #15 후속 — LLM 회귀 실측 실행
+**상태:** harness 완료, 실측 미실행
+**배경:** `tests/llm-regression/free-conversation-summary.real.test.ts` 가 on×5/partial×5/off×5
+(ko/en/vi) 실호출 분류 정확도 + anti-hallucination(off→strengths[], partial→≤1, 복귀 안내)을
+검증한다. mock 10건은 CI 상시 통과(`free-conversation-summary.test.ts`).
+**해야 할 일:** `LLM_REGRESSION_REAL=true npx vitest run tests/llm-regression/free-conversation-summary.real.test.ts`
+실행 → 특히 partial 경계 5건 판정 확인 → 필요 시 프롬프트 partial 정의·예시 보강.
+
+### M3-a fixture 7언어 확장
+**상태:** 미착수 (fixture 파일에 TODO 주석)
+**배경:** 현재 ko/en/vi. ar 은 multilingual 경로(motherTongue 'ar'). th/ms/km 은
+비multilingual 경로지만 helperLang 이 en/vi/ar 만 유효해 매핑 정책 미정의.
+**해야 할 일:** ar fixture 즉시 추가 가능 · th/ms/km 은 helperLang 폴백 정책 결정 후 추가.
+
+### M5 후속 — 자유대화 풀스코어 e2e (오디오 픽스처)
+**상태:** 미착수
+**배경:** 현재 free-conv e2e 는 채팅 진입까지만(헤드리스 마이크 한계). #13 "주제 이탈 → ≤50"
+수치 보증은 `tests/unit/free-conversation-score.test.ts` 가 결정론적으로 가드 중.
+**해야 할 일:** 사전 녹음 오디오 픽스처 주입 → 발음 점수 → end 단계 점수 카드
+(`pron-summary-topic-adjust` ×0.5)까지 보는 풀스코어 e2e (시연 1주 전 우선순위 검토).
