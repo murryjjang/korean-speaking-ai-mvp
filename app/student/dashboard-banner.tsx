@@ -7,22 +7,23 @@ import Link from 'next/link'
 import {
   BANNER_LABELS,
   bannerBody,
+  buildBannerItems,
   dismissKey,
-  isBannerLang,
-  type BannerLang,
+  resolveBannerLang,
   type BannerType,
 } from '@/src/lib/i18n/banner-labels'
-
-type BannerItem = { type: BannerType; n?: number; href: string }
 
 export function DashboardBanner({
   vocabDueCount = 0,
   lang = 'ko',
+  hrefs,
 }: {
   vocabDueCount?: number
   lang?: string
+  // 흐름별 목적지 주입(미지정 시 정식 학생 흐름 기본값). null = 클릭 비활성.
+  hrefs?: Partial<Record<BannerType, string | null>>
 }) {
-  const bl: BannerLang = isBannerLang(lang) ? lang : 'ko'
+  const bl = resolveBannerLang(lang)
   const [dismissed, setDismissed] = useState<Record<string, boolean>>({})
 
   // 클라이언트에서 오늘 디스미스 상태 로드.
@@ -49,12 +50,8 @@ export function DashboardBanner({
     setDismissed((d) => ({ ...d, [t]: true }))
   }
 
-  // 표시 대상: progress 항상 · vocab(due>0) · model_answer 안내.
-  const items: BannerItem[] = [
-    { type: 'progress', href: '/student' },
-    ...(vocabDueCount > 0 ? [{ type: 'vocab' as BannerType, n: vocabDueCount, href: '/student/vocab' }] : []),
-    { type: 'model_answer', href: '/student' },
-  ]
+  // 표시 대상: progress 항상 · vocab(due>0) · model_answer 안내. (목적지는 hrefs 로 주입)
+  const items = buildBannerItems(vocabDueCount, hrefs)
   const visible = items.filter((it) => !dismissed[it.type])
   if (visible.length === 0) return null
 
@@ -62,15 +59,25 @@ export function DashboardBanner({
     <div className="flex flex-col gap-2" data-testid="dashboard-banner">
       {visible.map((it) => {
         const label = BANNER_LABELS[bl][it.type]
+        const inner = (
+          <>
+            <span className="text-sm font-medium text-primary-700">{label.title}</span>
+            <span className="text-xs text-text-muted">{bannerBody(label, it.n)}</span>
+          </>
+        )
         return (
           <div
             key={it.type}
             className="flex items-center justify-between gap-3 rounded border border-primary-100 bg-primary-50 px-4 py-2"
           >
-            <Link href={it.href} className="flex flex-col">
-              <span className="text-sm font-medium text-primary-700">{label.title}</span>
-              <span className="text-xs text-text-muted">{bannerBody(label, it.n)}</span>
-            </Link>
+            {/* href=null(예: research 흐름 progress)면 클릭 비활성 — 단순 안내 텍스트. */}
+            {it.href ? (
+              <Link href={it.href} className="flex flex-col">
+                {inner}
+              </Link>
+            ) : (
+              <div className="flex flex-col">{inner}</div>
+            )}
             <button
               type="button"
               onClick={() => dismiss(it.type)}

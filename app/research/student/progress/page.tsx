@@ -21,6 +21,7 @@ import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { MODE_LABELS, scoreLevelKey } from '@/src/lib/i18n/dashboard-labels'
 import { LocalizedModeLabel, LocalizedScore } from '@/src/components/ui/localized-extras'
 import { KdliBrand } from '@/src/components/layout/kdli-brand'
+import { DashboardBanner } from '@/app/student/dashboard-banner'
 
 import { logoutAction } from '../actions'
 
@@ -170,6 +171,17 @@ export default async function StudentProgressPage() {
           </form>
         </div>
       </header>
+
+      {/* Task 1.6 [야간5]: UX 배너 — research 흐름 wire-in (D-013 A안).
+          헤더 아래·학습 시작 카드 위(모바일/데스크톱 공통). PDF 대상(research-progress-pdf-target)
+          밖에 둬 내보내기에서 제외. lang=mother_tongue(7언어, 미지원 시 ko 폴백).
+          vocabDueCount=0 → research 흐름엔 SRS 미적용으로 vocab 배너 자동 숨김(progress·model_answer 2종).
+          progress 는 현재 페이지라 클릭 비활성(null), model_answer 는 말하기 진입(/student/speaking)으로 매핑. */}
+      <DashboardBanner
+        lang={participant.motherTongue ?? 'ko'}
+        vocabDueCount={0}
+        hrefs={{ progress: null, model_answer: '/student/speaking' }}
+      />
 
       {/* v1.1 단계 19.13 [페이즈 3]: 모바일에서 학습 시작 CTA를 첫 viewport 안으로
           끌어올린다. 데스크톱에서는 본래 위치(데이터 다운로드 위)에 남기고

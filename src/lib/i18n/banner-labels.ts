@@ -56,6 +56,38 @@ export function isBannerLang(v: unknown): v is BannerLang {
   return typeof v === 'string' && (BANNER_LANGS as readonly string[]).includes(v)
 }
 
+/** 표시 언어 결정 — 지원 언어면 그대로, 아니면 ko 폴백.
+ *  (research 흐름의 mother_tongue 가 7언어 밖일 때도 안전.) */
+export function resolveBannerLang(lang?: string | null): BannerLang {
+  return isBannerLang(lang) ? lang : 'ko'
+}
+
+export type BannerItem = { type: BannerType; n?: number; href: string | null }
+
+/** 정식 학생 흐름(/student) 기본 목적지. 흐름별로 hrefs 로 덮어쓴다. */
+export const DEFAULT_BANNER_HREFS: Record<BannerType, string | null> = {
+  progress: '/student',
+  vocab: '/student/vocab',
+  model_answer: '/student',
+}
+
+/** 표시 대상 배너 항목 — progress·model_answer 는 항상, vocab 은 due>0 시에만.
+ *  hrefs 로 흐름별 목적지를 주입(미지정 키는 DEFAULT_BANNER_HREFS). null href = 클릭 비활성. */
+export function buildBannerItems(
+  vocabDueCount = 0,
+  hrefs: Partial<Record<BannerType, string | null>> = {},
+): BannerItem[] {
+  const href = (t: BannerType): string | null =>
+    t in hrefs ? (hrefs[t] ?? null) : DEFAULT_BANNER_HREFS[t]
+  return [
+    { type: 'progress', href: href('progress') },
+    ...(vocabDueCount > 0
+      ? [{ type: 'vocab' as BannerType, n: vocabDueCount, href: href('vocab') }]
+      : []),
+    { type: 'model_answer', href: href('model_answer') },
+  ]
+}
+
 /** body {n} 치환. */
 export function bannerBody(label: BannerLabel, n?: number): string {
   return label.body.replace('{n}', String(n ?? 0))
