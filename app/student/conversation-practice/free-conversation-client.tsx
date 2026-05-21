@@ -11,6 +11,7 @@ import { RECOMMENDED_TOPIC_LABELS } from '@/src/lib/i18n/content-labels'
 import { ToolResultCards } from '@/src/components/tool-result-cards'
 import { PdfDownloadButton } from '@/src/components/pdf-download-button'
 import { getPersona } from '@/src/lib/personas'
+import { ADHERENCE_MULTIPLIER, adjustConversationScore } from '@/src/lib/conversation/free-conversation-score'
 import {
   endResearchSession,
   logAssessment,
@@ -118,7 +119,7 @@ type SummaryResult = {
 }
 
 // backlog #13: 주제 일치(topic_adherence) → 종합 점수 멀티플라이어.
-const ADHERENCE_MULTIPLIER: Record<'on' | 'partial' | 'off', number> = { on: 1, partial: 0.75, off: 0.5 }
+// 추출: src/lib/conversation/free-conversation-score.ts (ADHERENCE_MULTIPLIER·adjustConversationScore).
 
 function formatTime(sec: number): string {
   const m = Math.floor(sec / 60)
@@ -240,7 +241,7 @@ function PronunciationScoreSummary({
   // backlog #13: 발음 평균(rawAvg)에 주제 일치 멀티플라이어를 곱해 종합 점수 보정.
   const rawAvg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
   const multiplier = ADHERENCE_MULTIPLIER[topicAdherence]
-  const avg = Math.round(rawAvg * multiplier)
+  const avg = adjustConversationScore(rawAvg, topicAdherence)
   const buckets = {
     low: scores.filter((s) => s < 50).length,
     mid: scores.filter((s) => s >= 50 && s < 70).length,
@@ -559,7 +560,7 @@ export function FreeConversationClient({ motherTongue = null }: { motherTongue?:
           const rawAvg = pronScores.length
             ? Math.round(pronScores.reduce((a, b) => a + b, 0) / pronScores.length)
             : null
-          const adjusted = rawAvg != null ? Math.round(rawAvg * multiplier) : null
+          const adjusted = rawAvg != null ? adjustConversationScore(rawAvg, adherence) : null
           void logAssessment({
             sessionId,
             mode: 'free_conversation',
