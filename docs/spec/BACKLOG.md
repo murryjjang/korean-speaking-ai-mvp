@@ -170,6 +170,21 @@ A1~C2 클램프)로 채운다 (D-001 보완).
 **배경:** D-011로 야간3 한정 gpt-4o 작성자 사용(비용 5~10배). 12~100건 풀에선 무시 가능하나 1000건+에선 비용 유의.
 **해야 할 일:** 대량 풀에서 gpt-4o-mini 복귀 + per-item fail만 gpt-4o 재시도하는 2단 전략 검토, 또는 mini prompt 추가 보강. 비용/품질 트레이드오프 재측정.
 
+### BL-#4 — 자유대화 transcript 기반 어휘 자동 등록
+**상태(enum):** `pending`
+**의존성:** Task 1.4(자동 단어장) 기본 구현(콘텐츠 통과 트리거, D-012a) 완료 후 확장.
+**시점:** 시연 후 (1.4 안정화 뒤)
+
+**배경:** 1.4 자동 등록은 콘텐츠 통과(content_vocabulary core/challenging)만 트리거(D-012a). 자유대화 발화 transcript에서 학습자가 실제 쓴/마주친 어휘를 추출해 등록하면 개인화 강화.
+**해야 할 일:** transcript 형태소·어휘 추출(LLM 또는 NER) → vocabulary_terms 매칭/신규 → vocab_cards 등록. 동적 콘텐츠라 식별자 처리 설계 필요([[task 1.4 후속]]과 연계).
+
+### BL-#5 — 단어장 퀴즈 객관식 모드
+**상태(enum):** `pending`
+**의존성:** 1.4 주관식 recall(D-012b) 출시 후 학습자 선호 검증.
+**시점:** 시연 후
+
+**배경:** 1.4 답변은 주관식 recall+자가채점(D-012b, 능동 회상 학습효과). 객관식(4지선다) 선호 학습자용 모드는 별도. 오답 보기 생성(LLM) + quality 매핑(정오±속도) 필요.
+
 ### 야간3-C — prompt v3 미세조정
 **상태(enum):** `done` (2026-05-21)
 **배경/결과:** D-009(작성자 temp 0.0 + learning_objective/topic_tags 정확성) + D-010(낭독 목표 하이브리드 + peer rubric 유형별 정렬). 효과: material-desc 회귀 수정·작성자↔검수자 충돌 종식·낭독 `pronunciation_focus` end-to-end 작동(intermediate-q1-reading: 운영(연음)·변경된(경음화)). 1.3 8/12 → 10/12.

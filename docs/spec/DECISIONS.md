@@ -198,6 +198,23 @@
 
 ---
 
+## D-012 — Task 1.4 자동 단어장(SRS) 설계 결정
+
+- **일자**: 2026-05-21
+- **상태**: 확정 (구현은 야간 4)
+- **결정**:
+  - **(a) 자동 등록**: 콘텐츠 학습 통과 트리거 → 해당 `content_vocabulary`의 **core·challenging** 어휘 자동 등록(basic 제외). idempotent(`vocab_cards` unique user_id,term_id).
+  - **(b) 퀴즈 답변**: **주관식 recall + 자가채점**(quality 0-5, Anki식) — SM-2와 직결.
+  - **(c) 의미·예문(gloss)**: 신규 캐시 테이블 **`vocabulary_glosses`**(term_id·lang·gloss·example_ko·example_translated·generated_at), **unique(term_id, lang)**, 다국어(en/vi/ar/ko/th/ms/km). **M3-c** LLM 생성, **첫 노출 시 미캐시 lang on-demand 생성**, 작성자 모델 기본 mini(격상은 BACKLOG).
+  - **(d) 일일 임계**: **20** (`next_review_at <= now()` 추출, limit). env 또는 `user_profiles` 컬럼으로 사용자별 조정(default 20).
+  - **TTS**: 1.4에서 `/api/tts` 재사용(1.5 모범답안과 공유 인프라).
+- **근거**: 우리가 적재한 `content_vocabulary`(57건) 활용(자동 등록); SM-2 표준은 자가채점 recall과 정합; gloss 캐시로 퀴즈 지연·비용↓. 자유대화 어휘 추출(옵션3)·객관식 답변은 BACKLOG(BL-#4·옵션).
+- **영향/적용(예정 야간4)**: `src/lib/srs/{sm2,enroll}.ts` · `src/lib/prompts/vocabulary-gloss.ts`(M3-c) · `app/student/vocab/` · `app/api/vocab/*` · 신규 마이그레이션 `vocabulary_glosses`(+rollback 페어, M1 원칙) · e2e 2건(`vocabulary-card-create`·`vocabulary-quiz-flow`).
+- **전제**: `vocab_cards.user_id → auth.users` → 파일럿(P060–P066) 노출은 #18 선행(D-005).
+- **관련**: 마이그레이션 `vocab_cards` · D-011 · BACKLOG 야간4.
+
+---
+
 ## 변경 이력
 
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
@@ -207,3 +224,4 @@
 - 2026-05-21: D-009 추가 (야간 3-C — 작성자 temp 0.0 + learning_objective/topic_tags 정확성 가이드, 잔여 4건 정정).
 - 2026-05-21: D-010 추가 (낭독 목표=하이브리드 + peer rubric 유형별 정렬 — 작성자↔검수자 충돌 종식, D-009b supersede).
 - 2026-05-21: D-011 추가 (작성자 gpt-4o 격상 야간3 한정 → 11/12, 잔여 1건 advanced-q1-reading은 3-A).
+- 2026-05-21: D-012 추가 (Task 1.4 SRS 설계 — 콘텐츠 통과 등록·recall 자가채점·vocabulary_glosses 다국어 캐시·일일 20·TTS 재사용).
