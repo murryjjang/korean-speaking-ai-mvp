@@ -44,8 +44,9 @@ export const VOCAB_CATEGORIES = ['basic', 'core', 'challenging'] as const
 export type VocabCategory = (typeof VOCAB_CATEGORIES)[number]
 
 // ── 정규식 (검수 규칙 4·5의 권위 기준) ─────────────────────────
-// 규칙 4: learning_objective 는 "…할 수 있다(.)" 로 끝난다.
-export const LEARNING_OBJECTIVE_RE = /할 수 있다\.?$/
+// 규칙 4: learning_objective 는 능력표현 "-(으)ㄹ 수 있다(.)" 로 끝난다.
+//   하다 동사 한정 아님(읽을/들을/만들 수 있다 등 고유어 동사 포함) — D-001 보완.
+export const LEARNING_OBJECTIVE_RE = /[가-힣] 수 있다\.?$/
 // 규칙 5: pronunciation_focus 각 항목은 "표현(규칙)" 형식. 예: "꽃이(연음)".
 export const PRONUNCIATION_FOCUS_RE = /^.+\(.+\)$/
 

@@ -33,7 +33,8 @@ export const CONTENT_TAGGING_FIXTURES: TaggingFixture[] = [
       cefr_level: 'A2',
       register: 'polite-spoken',
       register_consistency: 'consistent',
-      learning_objective: '일상적인 장소에서 있었던 일을 말할 수 있다.',
+      // 능력표현 일반형 회귀 가드: 고유어 동사 읽다 → "읽을 수 있다" (D-001 보완)
+      learning_objective: '주어진 문장을 자연스럽게 읽을 수 있다.',
       vocabulary: { basic: ['친구', '봄'], core: ['카페'], challenging: [] },
       pronunciation_focus: ['꽃이(연음)', '갔어요(경음화)'],
     },
@@ -52,7 +53,7 @@ export const CONTENT_TAGGING_FIXTURES: TaggingFixture[] = [
       cefr_level: 'B2',
       register: 'formal-written',
       register_consistency: 'consistent',
-      learning_objective: '격식 있는 문어체 문장을 정확히 낭독할 수 있다.',
+      learning_objective: '격식 있는 문어체 문장을 정확히 읽을 수 있다.',
       vocabulary: { basic: [], core: ['정부', '정책'], challenging: ['발표하다'] },
       pronunciation_focus: ['정책을(연음)', '발표했습니다(경음화)'],
     },

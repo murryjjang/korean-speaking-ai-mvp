@@ -21,7 +21,7 @@
   2. `cefr_level` — 6값 enum `{A1, A2, B1, B2, C1, C2}`
   3. `register` — 5값 enum `{casual-banmal, polite-spoken, formal-spoken, formal-written, instructional}`
   4. `register_consistency` — `{consistent, mixed}`
-  5. `learning_objective` — 정규식 `~할 수 있다\.?$` (한 문장, "~할 수 있다." 종결)
+  5. `learning_objective` — 한 문장, 능력표현 `-(으)ㄹ 수 있다` 종결. 정규식 `[가-힣] 수 있다\.?$` (보완 ↓)
   6. `vocabulary` — 3카테고리 `{basic, core, challenging}`
   7. `pronunciation_focus` — 각 항목 `term(rule)` 형식 (정규식 `^.+\(.+\)$`)
   - 반말 콘텐츠(`register=casual-banmal`)는 **표준 반말 경고 문구**를 일관되게 부착한다.
@@ -29,8 +29,13 @@
 - **영향/적용**:
   - `supabase/migrations/20260520_sprint1_new_tables.sql` — `content_tags`(register/cefr_level/register_consistency check), `vocabulary_terms`, `content_vocabulary`(category), `pronunciation_focus`.
   - 검수 자동화 정량 규칙(M4 A단계): 7필드 존재 · register 5값 · cefr 6값 · `learning_objective` 정규식 · `pronunciation_focus` 정규식 · 반말 경고 일관성.
-  - 회귀 테스트(M3-b) `tests/llm-regression/prompt-v3-content-tagging.test.ts`(예정).
-- **관련**: AUTOMATION_DESIGN.md M3-b·M4 · `content_tags` 스키마 · BACKLOG "task 1.4 후속 자유대화 사후 태깅".
+  - 회귀 테스트(M3-b) `tests/llm-regression/prompt-v3-content-tagging.test.ts`.
+- **보완 (2026-05-21, 1.3 dry-run에서 drift 발견·정정)**:
+  - **증상**: rule 4 정규식을 `할 수 있다\.?$`로 문자 그대로 구현 → 하다 동사만 통과. "읽을 수 있다"·"들을 수 있다" 등 고유어 동사 능력표현이 **false FAIL**(1.3 dry-run 12건 중 2건).
+  - **원인**: spec 약식 표기 `~할 수 있다`의 실제 의도는 한국어 능력표현 일반형 `-(으)ㄹ 수 있다`. 코드가 약식 표기를 협소하게 받음 = drift.
+  - **정정**: `LEARNING_OBJECTIVE_RE = /[가-힣] 수 있다\.?$/` (능력표현 일반화). prompt v3 문구·M3-b fixture(고유어 동사 활용형)·단위테스트 동반 갱신.
+  - **재발 방지**: 약식 표기 spec은 반드시 코드/테스트에 **명시적 패턴 + 경계 케이스(하다 외 동사)**를 동반한다. M3-b "능력표현 일반형 회귀 가드"가 미래 prompt/정규식 변경 시 자동 차단.
+- **관련**: AUTOMATION_DESIGN.md M3-b·M4 · `content_tags` 스키마 · BACKLOG "task 1.4 후속 자유대화 사후 태깅" · `src/lib/tagging/schema.ts`(LEARNING_OBJECTIVE_RE).
 
 ---
 
@@ -149,3 +154,4 @@
 
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
 - 2026-05-21: D-008 추가 (야간 2 1.3a 실측 — Task 1.2 라이브 적용 확인·태깅 풀 12건).
+- 2026-05-21: D-001 보완 (1.3 dry-run drift 발견 — learning_objective 정규식을 능력표현 일반형 `[가-힣] 수 있다`로 정정 + 재발 방지 메모).

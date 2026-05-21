@@ -73,6 +73,12 @@ describe('M4 정량 — 규칙별 fail 가드', () => {
     expect(validateQuantitative({ ...validResult(), learning_objective: '주문할 수 있다.' }).ok).toBe(true)
   })
 
+  it('규칙4 objective: 비-하다 동사 능력표현 허용 (-(으)ㄹ 수 있다 일반형, D-001 보완)', () => {
+    expect(validateQuantitative({ ...validResult(), learning_objective: '안내문을 읽을 수 있다.' }).ok).toBe(true)
+    expect(validateQuantitative({ ...validResult(), learning_objective: '대화를 듣고 핵심을 알 수 있다' }).ok).toBe(true)
+    expect(validateQuantitative({ ...validResult(), learning_objective: '문장을 만들 수 있다.' }).ok).toBe(true)
+  })
+
   it('규칙5 pronunciation: "표현(규칙)" 형식 위반 → pronunciation fail', () => {
     const q = validateQuantitative({ ...validResult(), pronunciation_focus: ['꽃이 연음'] })
     expect(q.failures.some((f) => f.rule === 'pronunciation')).toBe(true)

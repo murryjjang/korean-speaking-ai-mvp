@@ -45,8 +45,9 @@ describe('M3-b prompt v3 — 시스템 프롬프트 계약 (drift 가드)', () =
     for (const c of CEFR_VALUES) expect(sys).toContain(c)
   })
 
-  it('learning_objective "할 수 있다" 형식 + pronunciation "표현(규칙)" 형식 주입', () => {
-    expect(sys).toContain('할 수 있다')
+  it('learning_objective 능력표현 일반형 + pronunciation "표현(규칙)" 형식 주입', () => {
+    expect(sys).toContain('수 있다')
+    expect(sys).toContain('읽을 수 있다') // 비-하다 동사 예시 주입 (drift 재발 가드)
     expect(sys).toContain('표현(규칙)')
   })
 
@@ -81,5 +82,25 @@ describe('M3-b prompt v3 — 유효 fixture 정량 규칙 통과 (스펙↔fixtu
   it('낭독/발표/듣고답하기 3유형 모두 fixture 보유', () => {
     const types = new Set(CONTENT_TAGGING_FIXTURES.map((f) => f.type))
     expect(types).toEqual(new Set(['reading', 'material-desc', 'listening-resp']))
+  })
+})
+
+describe('M3-b prompt v3 — 능력표현 일반형 회귀 가드 (D-001 drift 재발 차단)', () => {
+  // 약식 표기 "~할 수 있다" 의 실제 의도는 -(으)ㄹ 수 있다 일반형. 하다 동사 외
+  // 고유어 동사 활용형도 정량 rule 4 를 통과해야 한다(미래 prompt/정규식 변경 시 가드).
+  const base = CONTENT_TAGGING_FIXTURES[0].valid
+  it.each([
+    '안내문을 소리 내어 읽을 수 있다.',
+    '대화를 듣고 핵심 정보를 알 수 있다.',
+    '자기소개를 짧게 쓸 수 있다',
+    '자신의 의견을 말할 수 있다.',
+    '간단한 문장을 만들 수 있다.',
+  ])('능력표현 통과: %s', (lo) => {
+    expect(validateQuantitative({ ...base, learning_objective: lo }).ok).toBe(true)
+  })
+
+  it('능력표현 아님 → rule 4 fail', () => {
+    const q = validateQuantitative({ ...base, learning_objective: '안내문 읽기' })
+    expect(q.failures.some((f) => f.rule === 'objective')).toBe(true)
   })
 })
