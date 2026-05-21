@@ -190,6 +190,22 @@ A1~C2 클램프)로 채운다 (D-001 보완).
 **배경/결과:** D-009(작성자 temp 0.0 + learning_objective/topic_tags 정확성) + D-010(낭독 목표 하이브리드 + peer rubric 유형별 정렬). 효과: material-desc 회귀 수정·작성자↔검수자 충돌 종식·낭독 `pronunciation_focus` end-to-end 작동(intermediate-q1-reading: 운영(연음)·변경된(경음화)). 1.3 8/12 → 10/12.
 **잔여:** per-item 품질(야간3-B)은 prompt 차원 한계 — 더 튜닝하지 않음(thrash 임계).
 
+### BL-#6 — 콘텐츠 admin: mission_scenarios·question_sets 전체 CRUD
+**상태(enum):** `pending`
+**의존성:** 1.7 questions CRUD(D-013) 완료. 두 엔티티는 스키마가 더 복잡(jsonb question_ids·시나리오 구조).
+**시점:** 시연 후 (questions 관리 안정화 뒤)
+
+**배경:** 1.7 MVP는 `questions` 전체 CRUD만(D-013b). `mission_scenarios`(대화미션)·`question_sets`(문항세트, question_ids jsonb)는 범위 외.
+**해야 할 일:** 두 엔티티 CRUD UI/API 추가(question_sets는 question_ids 편집기 필요). 자유대화 personas/scenarios는 [[task 1.4 후속]]과 별개로 계속 범위 외.
+
+### BL-#7 — 콘텐츠 admin 풀스택(검색·필터·일괄)
+**상태(enum):** `pending`
+**의존성:** 1.7 MVP CRUD 출시 후 콘텐츠 수 증가 시.
+**시점:** 풀 규모 확대 시 / 시연 후
+
+**배경:** 1.7은 MVP(목록·생성·수정·비활성). 콘텐츠가 많아지면 검색·type/난이도 필터·일괄 태깅(M4 큐 연동)·CSV 입출력 필요.
+**해야 할 일:** 목록 검색·필터·정렬·페이지네이션 + 일괄 태깅(tag-content-batch 연동) + import/export.
+
 ---
 
 ## 의존성 그래프

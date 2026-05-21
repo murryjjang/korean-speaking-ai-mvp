@@ -215,6 +215,20 @@
 
 ---
 
+## D-013 — Task 1.5·1.6·1.7 설계 결정 (야간 4 풀가동)
+
+- **일자**: 2026-05-21
+- **상태**: 확정 (1.5·1.6·1.7-questions 구현 완료)
+- **결정**:
+  - **1.5 모범답안**: 답안 = 콘텐츠 CEFR(목표) + 한 단계 위(도전) 2개 · 작성자 기본 mini · TTS `/api/tts` 재사용(미저장, 라이브 합성) · side-by-side UI · on-demand 생성 캐시(`model_answers`).
+  - **1.6 UX 배너**: 3종(진도·새단어·모범답안) × 7언어 · today-tasks 상단 · 일자별 디스미스. 기본 문안 작성(본인 wording 검토 대상).
+  - **1.7 콘텐츠 admin**: (a) 권한 = 기존 `user_profiles.role='admin'` + `requireRole`(신규 인프라 0) (b) UI = **MVP CRUD** — 이번 round는 **questions** 전체 CRUD(목록·생성·수정·비활성) (c) 태깅 = **수동 버튼 trigger**(`/api/admin/tag`, 1.3 비결정성·검토 필요 경험 반영). mission_scenarios/question_sets 전체 CRUD·풀스택(검색/필터/일괄)은 BACKLOG(BL-#6·#7).
+- **근거**: 기존 인프라(role 게이팅·/api/tts·content_vocabulary·tag 파이프라인) 최대 재사용, 비용·범위 압축. 수동 태깅은 자동 INSERT의 오태깅 위험 회피.
+- **영향/적용**: `src/lib/prompts/{model-answer,...}` · `src/lib/model-answers/levels.ts` · `src/lib/i18n/banner-labels.ts` · `src/lib/tagging/persist.ts`(batch와 공유 추출) · `app/api/{model-answer,admin/content,admin/tag}` · `app/student/{model-answer,dashboard-banner}` · `app/admin/content/*`.
+- **관련**: D-011(작성자 모델) · D-012(SRS) · BL-#6·#7.
+
+---
+
 ## 변경 이력
 
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
@@ -225,3 +239,4 @@
 - 2026-05-21: D-010 추가 (낭독 목표=하이브리드 + peer rubric 유형별 정렬 — 작성자↔검수자 충돌 종식, D-009b supersede).
 - 2026-05-21: D-011 추가 (작성자 gpt-4o 격상 야간3 한정 → 11/12, 잔여 1건 advanced-q1-reading은 3-A).
 - 2026-05-21: D-012 추가 (Task 1.4 SRS 설계 — 콘텐츠 통과 등록·recall 자가채점·vocabulary_glosses 다국어 캐시·일일 20·TTS 재사용).
+- 2026-05-21: D-013 추가 (야간 4 — 1.5 모범답안·1.6 UX 배너·1.7 콘텐츠 admin(questions CRUD·수동 태깅) 설계).

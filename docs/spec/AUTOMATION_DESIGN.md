@@ -334,10 +334,11 @@ M5 ┘
 
 ### 야간 4-7: 본작업 (각 active 30-60분)
 - [x] Task 1.4 자동 단어장 (SRS) — SM-2(`src/lib/srs/sm2.ts`)·자동등록(`enroll.ts`)·gloss 다국어 캐시(M3-c·`vocabulary_glosses` 마이그레이션)·API(`app/api/vocab/*`)·UI(`app/student/vocab/*` recall 퀴즈)·e2e 2건. vitest 1290·build·lint·e2e 2/2 green. ⚠️ `vocabulary_glosses` 마이그레이션 적용은 본인 트리거(SQL Editor, M1 패턴) + 정식 학습자(auth.users)에서 동작(#18 후 파일럿).
-- [ ] Task 1.5 모범답안 (Azure TTS)
-- [ ] Task 1.6 UX 배너
-- [ ] Task 1.7 콘텐츠 admin
-- [ ] e2e 시나리오 추가 (각 task마다)
+- [x] Task 1.5 모범답안 — M3-d 생성·목표 CEFR(목표+도전)·side-by-side UI·on-demand 캐시(`model_answers`)·`/api/tts` 재사용. e2e 1.
+- [x] Task 1.6 UX 배너 — 3종×7언어·today-tasks 상단·일자별 디스미스. (wording 본인 검토)
+- [x] Task 1.7 콘텐츠 admin (MVP) — **questions 전체 CRUD** + 수동 태깅 버튼(`/api/admin/tag`) + requireRole 게이팅. mission_scenarios/question_sets·풀스택은 BL-#6·#7. e2e 1.
+- [x] e2e 시나리오 추가 (vocab 2·model-answer 1·admin 1 — 로컬 SMOKE, LIVE skip)
+- [x] M3-c·M3-d 회귀 (gloss·model-answer, mock+real opt-in)
 - [x] M3-b `prompt-v3-content-tagging.test.ts` (야간 2 완료 — mock + real opt-in)
 - [ ] named tunnel 도입 (시연 1주 전 마지노선)
 
