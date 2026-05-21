@@ -258,6 +258,21 @@
 
 ---
 
+## D-016 — 1.6 배너 전면 재설계 = 제거 (기능 분산, 야간 5)
+
+- **일자**: 2026-05-22
+- **상태**: 확정 (구현 완료 — 배포·모바일 sanity는 본인 트리거)
+- **배경**: D-014·D-015 로 배너를 wire-in·보정했으나, 디자인 검토 결과 배너 3종이 모두 **잉여**로 판단. (1) progress = 학습 시작 카드와 중복 (2) model_answer = 학습 페이지 인-라인이 자연스러움 (3) vocab = 메뉴에 단어장 존재 + 동적 알림은 통계 영역이 적합.
+- **결정**: 배너를 어느 화면에서도 노출하지 않고, 3 기능을 각 맥락에 분산.
+  - **(a) /student·/research/student/progress 에서 `DashboardBanner` 제거.** research 의 D-015 앵커 타깃(`data-scroll-target`)도 함께 정리(배너가 유일 사용처였음).
+  - **(b) 모범답안 인-라인**: speaking **결과 페이지** 하단 액션에 "모범답안 보기"(→`/student/model-answer/[questionId]`). 답변 후 '내 답변과 비교'가 자연스러운 위치. 모범답안은 `questions` 기반이라 speaking 흐름에만 존재 → reading·발표·미션 제외. 결과 페이지에서도 **낭독(q1)·대화미션(q4)** 은 모범답안 개념이 맞지 않아 버튼 비노출(q2·q3·일반 말하기만).
+  - **(c) vocab 통계 통합**: `/student` 통계(StatCard) 영역에 "오늘 복습 N개" 카드(→`/student/vocab`). `vocabDueCount>0` 시에만 노출(0/미적용 비표시). 중복이던 `TodayTasks` vocab 줄은 제거. research 흐름은 SRS 미적용이라 미표시(조건부, 자동).
+  - **(d) 컴포넌트 보존**: `DashboardBanner`·`banner-labels.ts`·단위테스트는 유지(미사용). → BL-#10(배너 재도입/재설계, PMS 개편 BL-#9와 함께).
+- **검증**: vitest 1319(불변, 배너 lib 테스트 유지) · lint 0 err · build green · live e2e(research-login)·auth-routes(/student·speaking 렌더) green · 로컬 `/student` 배너 제거 확인(testid 0, TodayTasks·통계 유지). vocab 카드·모범답안 버튼 실동작은 로그인 SRS 사용자/제출 기록 필요 → 라이브 sanity로 위임.
+- **관련**: D-014·D-015(supersede — 배너 wire-in·보정 무효화) · BL-#10(배너 보존) · BL-#9(PMS 개편).
+
+---
+
 ## 변경 이력
 
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
@@ -271,3 +286,4 @@
 - 2026-05-21: D-013 추가 (야간 4 — 1.5 모범답안·1.6 UX 배너·1.7 콘텐츠 admin(questions CRUD·수동 태깅) 설계).
 - 2026-05-22: D-014 추가 (야간 5 — 1.6 배너 라이브 미노출 진단=원인 A → research 흐름 `/research/student/progress` wire-in(A안, hrefs prop) + today-tasks 정식 학생 전용 명시).
 - 2026-05-22: D-015 추가 (야간 5 — 1.6 배너 UX 보정: ko+모국어 병기(자연어 모국어 추론 정렬) + "오늘의 학습" 앵커 스크롤(#start-learning, 보이는 인스턴스)).
+- 2026-05-22: D-016 추가 (야간 5 — 1.6 배너 전면 재설계=제거. progress/research 배너 제거 + 모범답안 speaking 결과 인-라인 + vocab /student 통계 카드. 컴포넌트는 보존, BL-#10. D-014·D-015 supersede).
