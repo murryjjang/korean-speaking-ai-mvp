@@ -94,7 +94,9 @@ function cefrForCategory(contentCefr: CefrLevel, cat: VocabCategory): CefrLevel 
 // 검수자(peer) 모델 — Q2 확정: 기본 gpt-4o, 동일 OPENAI_API_KEY 재사용.
 //   env 이름은 PEER_REVIEW_MODEL(권장). OPENAI_ 접두 별칭도 허용(프로젝트 관행).
 const PEER_MODEL = process.env.PEER_REVIEW_MODEL ?? process.env.OPENAI_PEER_REVIEW_MODEL ?? 'gpt-4o'
-const AUTHOR_MODEL = process.env.OPENAI_TAGGING_MODEL ?? 'gpt-4o-mini'
+// 작성자 모델 — 기본 gpt-4o-mini(cost-aware). per-item 품질 한계 시
+//   CONTENT_TAGGING_AUTHOR_MODEL=gpt-4o 로 격상(D-011, 야간 3 한정). 1000건+ 시 재평가(BL-#3).
+const AUTHOR_MODEL = process.env.CONTENT_TAGGING_AUTHOR_MODEL ?? process.env.OPENAI_TAGGING_MODEL ?? 'gpt-4o-mini'
 
 function makeChatCaller(model: string, temperature: number): ChatCaller {
   const apiKey = process.env.OPENAI_API_KEY as string

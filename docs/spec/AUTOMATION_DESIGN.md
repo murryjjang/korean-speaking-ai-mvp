@@ -325,10 +325,11 @@ M5 ┘
 
 ### 야간 3: 1.3 잔여 + 라이브 (목표 active 30-60분)
 - [x] M4 dry-run (12건, 야간2 연장) — 자동 검증 보고서 확인
-- [~] 전체 풀 일괄 적용 — **10/12 적용 완료** (content_tags 10·vocab 50·content_vocab 57·pronunciation_focus 2·is_tagged 10/2), 잔여 2건 → 야간3-B
-- [ ] 야간3-A: CLI `--review` edit → DB INSERT 경로 구현 (현재 미구현 — 잔여 2건 처리 전제)
-- [ ] 야간3-B: 잔여 2건 per-item (advanced-q1-reading 어색한 하이브리드·beginner-q1-reading 장르 오인) — 3-A 편집 또는 작성자 모델 격상
+- [~] 전체 풀 일괄 적용 — **11/12 적용 완료** (content_tags 11·pronunciation_focus 5·is_tagged 11/1), 잔여 1건 → 야간3-B
+- [ ] 야간3-A: CLI `--review` edit → DB INSERT 경로 구현 (현재 미구현 — 잔여 1건 처리 전제)
+- [~] 야간3-B: 잔여 — beginner-q1-reading은 gpt-4o 격상(D-011)으로 해소·INSERT. **advanced-q1-reading만 잔여**(gpt-4o로도 author/peer 불일치 — 3-A 사람 편집 영역)
 - [x] 야간3-C: prompt v3 미세조정 — D-009(temp 0·정확성) + D-010(낭독 하이브리드·peer 정합). 충돌 종식·material-desc 회귀 수정·낭독 pronunciation_focus 작동
+- [x] 야간3-B' 작성자 모델 격상 (D-011, 야간3 한정 gpt-4o) → 11/12
 - [ ] 라이브 배포 + e2e (본인 트리거)
 
 ### 야간 4-7: 본작업 (각 active 30-60분)

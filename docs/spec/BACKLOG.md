@@ -142,7 +142,7 @@ A1~C2 클램프)로 채운다 (D-001 보완).
 
 ---
 
-## 야간3 진입 항목 (1.3 후속 — 10/12 적용 완료, 잔여 2건)
+## 야간3 진입 항목 (1.3 후속 — 11/12 적용 완료, 잔여 1건)
 
 ### 야간3-A — CLI `--review` edit → DB INSERT 경로 구현
 **상태(enum):** `pending`
@@ -152,15 +152,23 @@ A1~C2 클램프)로 채운다 (D-001 보완).
 **배경:** 현재 `validate-tagging.ts --review`는 `review-decisions.json`(approve/reject/edit)만 쓰고 **DB에 반영하지 않음**. `tag-content-batch.ts`는 자기 run의 pass만 INSERT. → 사람이 edit/approve한 결정을 `content_tags` 등에 적재하는 경로가 없다.
 **해야 할 일:** `review-decisions.json`의 approve/edit → `persist()` 재사용해 upsert + `questions.is_tagged` 갱신.
 
-### 야간3-B — 잔여 미태깅 2건 per-item 처리
-**상태(enum):** `blocked` (3-A 또는 강한 작성자 모델에 의존)
-**의존성:** 야간3-A(편집→INSERT 경로) 또는 작성자 모델 격상. **rubric 충돌은 D-010로 종식** — 잔여는 mini의 per-item 품질 미스라 prompt 튜닝으로는 한계(thrash 임계 도달, 추가 튜닝 금지).
-**시점:** 야간 4 (Task 1.4와 병행) 또는 3-A 구현 직후
+### 야간3-B — 잔여 미태깅 1건 (advanced-q1-reading)
+**상태(enum):** `blocked` (3-A 사람 편집에 의존)
+**의존성:** 야간3-A(편집→INSERT 경로). **모델 격상으로도 미해결** — gpt-4o 작성자+검수자조차 정확한 목표 framing 불일치(D-011). prompt·모델 튜닝 한계 확인.
+**시점:** 야간 4 (3-A 구현 시) 또는 시연 전
 
-**배경:** 1.3 실 INSERT **10/12** 후 잔여 2건(temp 0 결정적, 반복 동일):
-- `advanced-q1-reading`: mini가 어색한 하이브리드 목표 생성("의사소통 능력을 …읽을 수 있다" — 주제를 읽기 대상으로 오결합).
-- `beginner-q1-reading`: 콘텐츠 **장르 오인**(1인칭 일상 서술을 "안내문"으로). topic_tags도 본문 일부 편중.
-**해야 할 일:** 3-A로 사람이 2건 목표·장르·topic 교정 후 INSERT, 또는 작성자 모델 격상(gpt-4o)으로 재태깅. 낭독이라 통과 시 `pronunciation_focus` 채워짐.
+**배경:** 1.3 실 INSERT **11/12** 후 잔여 1건:
+- `beginner-q1-reading`: **해소됨**(gpt-4o 작성자가 장르 오인 교정 → INSERT, D-011).
+- `advanced-q1-reading`: **잔여** — 밀도 높은 추상 C1 메타텍스트라 자동 목표 추출이 본질적으로 어려움. gpt-4o로도 author/peer가 목표 framing 불일치.
+**해야 할 일:** 3-A로 사람이 1건 learning_objective를 직접 확정 후 INSERT. (낭독이라 통과 시 `pronunciation_focus` 채워짐)
+
+### BL-#3 — 콘텐츠 풀 1000건+ 작성자 모델 비용 재평가
+**상태(enum):** `pending`
+**의존성:** 콘텐츠 풀 규모 확대(현재 12건). D-011(gpt-4o 격상은 야간3 한정).
+**시점:** 풀 1000건+ 도달 시 (또는 대량 일괄 태깅 착수 전)
+
+**배경:** D-011로 야간3 한정 gpt-4o 작성자 사용(비용 5~10배). 12~100건 풀에선 무시 가능하나 1000건+에선 비용 유의.
+**해야 할 일:** 대량 풀에서 gpt-4o-mini 복귀 + per-item fail만 gpt-4o 재시도하는 2단 전략 검토, 또는 mini prompt 추가 보강. 비용/품질 트레이드오프 재측정.
 
 ### 야간3-C — prompt v3 미세조정
 **상태(enum):** `done` (2026-05-21)
