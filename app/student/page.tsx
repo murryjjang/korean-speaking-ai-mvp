@@ -18,6 +18,7 @@ import {
   type SubmissionRow,
 } from "./submissions-table";
 import { TodayTasks, type TodayTask } from "./today-tasks";
+import { DashboardBanner } from "./dashboard-banner";
 import { ScoreBreakdown } from "./score-breakdown";
 import { RecommendedActivity } from "./recommended-activity";
 
@@ -150,6 +151,7 @@ export default async function StudentDashboardPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <DashboardBanner vocabDueCount={vocabDueCount} />
         <TodayTasks tasks={todayTasks} vocabDueCount={vocabDueCount} />
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4">
           <StatCard
