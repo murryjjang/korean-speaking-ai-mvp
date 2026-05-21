@@ -333,7 +333,7 @@ M5 ┘
 - [ ] 라이브 배포 + e2e (본인 트리거)
 
 ### 야간 4-7: 본작업 (각 active 30-60분)
-- [ ] Task 1.4 자동 단어장 (SRS UI)
+- [x] Task 1.4 자동 단어장 (SRS) — SM-2(`src/lib/srs/sm2.ts`)·자동등록(`enroll.ts`)·gloss 다국어 캐시(M3-c·`vocabulary_glosses` 마이그레이션)·API(`app/api/vocab/*`)·UI(`app/student/vocab/*` recall 퀴즈)·e2e 2건. vitest 1290·build·lint·e2e 2/2 green. ⚠️ `vocabulary_glosses` 마이그레이션 적용은 본인 트리거(SQL Editor, M1 패턴) + 정식 학습자(auth.users)에서 동작(#18 후 파일럿).
 - [ ] Task 1.5 모범답안 (Azure TTS)
 - [ ] Task 1.6 UX 배너
 - [ ] Task 1.7 콘텐츠 admin
