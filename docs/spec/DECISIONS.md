@@ -1,0 +1,137 @@
+# Decisions — KDLI Korean MVP
+
+> **목적**: 결정의 휘발·재결정 방지. "왜 이렇게 결정했지?"를 다시 따지지 않도록, 확정/잠정 결정을 append-only로 기록한다.
+> 위치: `docs/spec/DECISIONS.md`
+> 작성일: 2026-05-21
+> 형식: 번호(D-NNN)·일자·상태(확정 lock-in / 잠정)·결정·근거·영향/적용·관련.
+
+규칙:
+- **append-only**. 기존 항목은 삭제·재번호 하지 않는다. 번복은 새 항목(D-NNN)으로 추가하고 이전 항목 상태를 `철회`로 갱신한다.
+- **상태**: `확정(lock-in)` = 코드·스키마·테스트의 권위 기준으로 굳음 / `잠정` = 실측·시연 피드백 후 조정 가능.
+- BACKLOG 항목(#N)·파일 경로를 "관련"에 명시해 추적 가능하게 한다.
+
+---
+
+## D-001 — prompt v3 lock-in (콘텐츠 태깅 출력 계약)
+
+- **일자**: 2026-05-20
+- **상태**: 확정 (lock-in)
+- **결정**: 콘텐츠 태깅 LLM(prompt v3)의 출력은 다음 **7필드**로 고정한다.
+  1. `topic_tags` — `text[]`
+  2. `cefr_level` — 6값 enum `{A1, A2, B1, B2, C1, C2}`
+  3. `register` — 5값 enum `{casual-banmal, polite-spoken, formal-spoken, formal-written, instructional}`
+  4. `register_consistency` — `{consistent, mixed}`
+  5. `learning_objective` — 정규식 `~할 수 있다\.?$` (한 문장, "~할 수 있다." 종결)
+  6. `vocabulary` — 3카테고리 `{basic, core, challenging}`
+  7. `pronunciation_focus` — 각 항목 `term(rule)` 형식 (정규식 `^.+\(.+\)$`)
+  - 반말 콘텐츠(`register=casual-banmal`)는 **표준 반말 경고 문구**를 일관되게 부착한다.
+- **근거**: `content_tags` 스키마의 check 제약과 **1:1** 매핑. 이 7필드·enum·정규식이 곧 검수 자동화(M4)의 정량 검증 권위 기준이 된다. 출력 계약을 코드(검증기)·스키마·테스트가 동일하게 참조 → drift 방지(설계 원칙 4).
+- **영향/적용**:
+  - `supabase/migrations/20260520_sprint1_new_tables.sql` — `content_tags`(register/cefr_level/register_consistency check), `vocabulary_terms`, `content_vocabulary`(category), `pronunciation_focus`.
+  - 검수 자동화 정량 규칙(M4 A단계): 7필드 존재 · register 5값 · cefr 6값 · `learning_objective` 정규식 · `pronunciation_focus` 정규식 · 반말 경고 일관성.
+  - 회귀 테스트(M3-b) `tests/llm-regression/prompt-v3-content-tagging.test.ts`(예정).
+- **관련**: AUTOMATION_DESIGN.md M3-b·M4 · `content_tags` 스키마 · BACKLOG "task 1.4 후속 자유대화 사후 태깅".
+
+---
+
+## D-002 — Sprint 1 신규 스키마 DB 매핑 4결정
+
+- **일자**: 2026-05-20
+- **상태**: 확정 (lock-in)
+- **결정**:
+  1. **user 매핑** — `user_id` FK는 `auth.users(id)` (인증 앱 모델). "ALTER users"가 가리키는 실제 작업은 `public.user_profiles`에 컬럼 ALTER.
+  2. **content 매핑** — `content_id` FK는 `public.questions(id)` [text PK]. "ALTER contents"가 가리키는 실제 작업은 `questions`에 `is_tagged`(boolean default false) · `last_tagged_at`(timestamptz) 추가.
+  3. **pause_count(#5)** — `speaking_submissions` 테이블에 적재.
+  4. **RLS** — 표준 `auth.uid()` 모델(`to authenticated`). 본인 데이터 + group instructor/admin + 전역 teacher/admin. `group_members` 자기참조로 인한 RLS 무한 재귀를 피하기 위해 **SECURITY DEFINER 헬퍼 4종**으로 권한 판정을 분리: `public.kdli_is_staff()` · `public.kdli_leads_user(target uuid)` · `public.kdli_in_group(g uuid)` · `public.kdli_group_admin(g uuid)`.
+- **근거**: 마이그레이션 헤더(`20260520_sprint1_new_tables.sql` lines 1-24)에 사용자 확정으로 명시. 낭독(qt-reading)·발표/자료설명(qt-material-desc)·듣고답하기·대화미션이 모두 `questions` 행(text PK)이라 content FK 대상. 자기참조 정책이 헬퍼 없이는 무한 재귀를 일으킴.
+- **영향/적용**:
+  - `supabase/migrations/20260520_sprint1_new_tables.sql` — 신규 10 테이블, `user_profiles`/`questions` ALTER, RLS 정책, 헬퍼 4종(lines 219-250).
+  - `supabase/migrations/20260521_sprint1_new_tables_rollback.sql` — 페어 롤백.
+  - `scripts/verify-migration.ts` / `scripts/verify-migration.sql` — 헬퍼·FK·RLS 점검.
+- **관련**: 마이그레이션 헤더 · BACKLOG #18(파일럿 계정 분리) · D-005.
+
+---
+
+## D-003 — #13 자유대화 주제이탈 점수 반영 (옵션 A, 3 세부)
+
+- **일자**: 2026-05-20
+- **상태**: 확정 (lock-in)
+- **결정**: 자유대화에서 주제 이탈 시 표현 quality뿐 아니라 **종합 점수**에도 반영한다(옵션 A). 3 세부:
+  1. **3단계 신호** — summary LLM이 `topic_adherence`를 `on / partial / off` 중 하나로 출력.
+  2. **멀티플라이어** — `on=1.0` · `partial=0.75` · `off=0.5` 를 종합 점수에 곱한다.
+  3. **DB 저장** — summary LLM 출력(`topic_adherence` 포함)을 DB에 저장.
+- **근거**: 기존엔 표현 quality만 평가 → 주제와 무관한 발화가 점수에 반영되지 않는 사각지대. 멀티플라이어 방식이 기존 점수 파이프라인에 최소 침습으로 끼어듦.
+- **영향/적용**:
+  - `tests/unit/free-conversation-score.test.ts` — 점수 헬퍼 결정론적 가드(#13 `≤50` 보증, D-006 참조).
+  - `e2e/scenarios/free-conversation-offtopic.spec.ts` — 라이브 e2e(M5).
+  - 종합 점수 카드에 `주제 반영 보정 ×0.5 (발음 평균 N)` 노출.
+- **관련**: BACKLOG #13 · #15(LLM 판정 실측) · #16(보정 안내 UI wording) · D-006(d).
+
+---
+
+## D-004 — 자유대화 태깅 제외
+
+- **일자**: 2026-05-20
+- **상태**: 확정 (lock-in)
+- **결정**: 자유대화는 콘텐츠 태깅(`content_tags` 등) 대상에서 **제외**한다.
+- **근거**: 자유대화 = persona(코드 상수) + 자유 입력 topic 구조라 **고정 content 행이 없다**. `content_tags` 등 태깅 테이블은 `questions(id)`에 FK로 연결되므로 FK 대상이 될 수 없음(사용자 확인 완료, 의도된 제외). 사후 태깅은 동적 콘텐츠 식별자 처리가 필요해 별도 설계로 분리.
+- **영향/적용**:
+  - `supabase/migrations/20260520_sprint1_new_tables.sql` 헤더 주석(자유대화 태깅 대상 아님).
+  - 사후 태깅 모델(통합 content 테이블 / personas·scenarios 태깅 / research_sessions 단위 라벨링)은 BACKLOG로 이관.
+- **관련**: BACKLOG "task 1.4 후속 — 자유대화 사후 태깅" · D-001.
+
+---
+
+## D-005 — 파일럿 #18 분리 (계정 마이그레이션 별건)
+
+- **일자**: 2026-05-20
+- **상태**: 확정 (lock-in)
+- **결정**: 파일럿 참여자(P060–P066)의 `auth.users` 계정 생성·연결은 Sprint 1 신규 스키마와 **별건**으로 분리한다. 신규 스키마는 forward-looking 상태로 둔다.
+- **근거**: P060–P066은 `research_participants` 테이블 기반이며 `auth.users` 계정이 없음. 신규 스키마는 전부 `auth.users(id)` 기반 RLS(`auth.uid()`)로 설계(D-002)되어, 계정 마이그레이션 전까지는 파일럿에 신규 기능을 노출할 수 없다. 스키마 적용과 계정 적재의 결합도를 낮춰 각각 독립 진행.
+- **영향/적용**:
+  - 별도 마이그레이션 + seed 스크립트로 분리 작성(미착수).
+  - `research_participants` ↔ `auth.users`/`students` 매핑 정책, 로그인 경로 정합성(`/research/login` 코드 기반 vs `/login` 이메일 기반) 결정 필요.
+- **관련**: BACKLOG #18 · D-002.
+
+---
+
+## D-006 — 야간 1 결정/정정 4건
+
+- **일자**: 2026-05-21
+- **상태**: 확정 (lock-in)
+- **결정**:
+  - **(a) clip.exe 인코딩 우회** — Windows clip.exe 한글 인코딩 깨짐을 우회하기 위해 파일 생성은 **VS Code**(직접 편집)를 사용한다.
+  - **(b) FK expected 12 → 11 자체 정정** — verify의 FK 기대치를 12에서 **11**로 자체 정정. 근거는 grep 자체검증(실제 마이그레이션 내 FK 카운트).
+  - **(c) supabase-js `head:true` 가짜 PASS 사각지대 수정** — `head:true`가 없는 테이블에 204+null을 반환해 가짜 PASS가 나는 사각지대를 발견. **non-head GET** `.select().limit(1)` 로 수정.
+  - **(d) #13 ≤50 보증을 위한 score 헬퍼 추출** — #13 "주제 이탈 → 점수 ≤50" 수치를 결정론적으로 가드하기 위해 score 계산 헬퍼를 `tests/unit/free-conversation-score.test.ts`로 추출.
+- **근거**: 야간 1 실작업 중 발견·정정. (b)·(c)는 자동 검증 자체의 false positive/negative를 잡은 것으로 설계 원칙 1·6에 해당. (d)는 헤드리스 마이크 한계로 e2e가 점수까지 못 가는 것을 단위 테스트로 보강.
+- **영향/적용**:
+  - `scripts/verify-migration.ts` / `scripts/verify-migration.sql` — FK expected 11, non-head GET.
+  - `tests/unit/free-conversation-score.test.ts` — #13 결정론적 가드(+6).
+  - 정책 24 · 인덱스 19 카운트 기준 확정.
+- **관련**: AUTOMATION_DESIGN.md "진행 상황 — 야간 1" · D-003 · BACKLOG "M5 후속".
+
+---
+
+## D-007 — 야간 2 결정 (M3-b·M4·M6 셋업)
+
+- **일자**: 2026-05-21
+- **상태**: 잠정 (야간 2 진입 시점 확정, 실측·셋업 후 일부 조정 가능)
+- **결정**:
+  - **(a) prompt v3 정식 모듈화** — prompt v3를 정식 모듈로 두고, **M3-b 회귀 테스트**(`prompt-v3-content-tagging.test.ts`)를 동행 작성한다.
+  - **(b) M4 peer review 모델 조합** — 검수자 `gpt-4o` ↔ 작성자 `gpt-4o-mini` 교차 검증. 기존 openai SDK + 동일 `OPENAI_API_KEY` 재사용, **신규 의존성 0**. 검수 모델 env는 **`PEER_REVIEW_MODEL`(기본 `gpt-4o`)** — 향후 모델 변경은 `.env`만 수정(코드는 `OPENAI_PEER_REVIEW_MODEL` 별칭도 허용).
+  - **(c) M4 검증 정책** — 정량 검증 **100% strict** / 통과 **샘플링 5%** 검토 / 한국어 NER은 **LLM-based**.
+  - **(d) M6 모니터링** — 알림 채널 **이메일** / **UptimeRobot + 노트북 cron** 백업 / **named tunnel** 도입은 **야간 2-3 사이**.
+  - **(e) 1.3b 적용 순서** — 1.3b는 **dry-run 기본**, 실 INSERT는 **Task 1.2 적용 후**.
+- **근거**: AUTOMATION_DESIGN.md "결정 사항 종합" 표의 권장 default를 그대로 채택. (b)는 동일 모델 자기검증의 false negative를 피하기 위한 cross-check(설계 원칙 3)이며 의존성 비용 0이라 채택. (e)는 신규 스키마 미적용 상태에서 실 INSERT 시 FK 오류를 피하기 위함.
+- **영향/적용**:
+  - `src/lib/prompts/content-tagging.ts` · `src/lib/tagging/{schema,validate-tagging}.ts` · `tests/llm-regression/prompt-v3-content-tagging.test.ts` · `scripts/validate-tagging.ts`(M4).
+  - `scripts/monitor.sh` · `scripts/get-current-tunnel-url.sh` · `docs/ops/MONITORING.md` · UptimeRobot · 노트북 cron(M6).
+  - 1.3b batch runner — dry-run → Task 1.2 적용 후 실 INSERT.
+- **관련**: AUTOMATION_DESIGN.md M3-b·M4·M6 · D-001 · D-002.
+
+---
+
+## 변경 이력
+
+- 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
