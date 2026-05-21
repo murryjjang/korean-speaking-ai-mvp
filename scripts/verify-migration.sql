@@ -118,13 +118,19 @@ report as (
          case when actual = expected then 'PASS' else 'FAIL' end as status
   from checks
 )
-select category, expected, actual, status from report
-union all
-select 'TOTAL',
-       (select sum(expected) from report),
-       (select sum(actual) from report),
-       case when (select bool_and(status = 'PASS') from report) then 'ALL PASS' else 'FAIL' end
-order by category = 'TOTAL', category;
+-- UNION 위에서는 ORDER BY 가 출력 컬럼명만 허용(expr 불가, ERROR 0A000) →
+-- sort_key(int) 를 각 branch 에 부여한 뒤 서브쿼리로 감싸 표시 컬럼만 노출.
+-- TOTAL 은 sort_key=999 로 항상 마지막, 그 외는 checks 정의 순서(1~7).
+select category, expected, actual, status
+from (
+  select sort_order as sort_key, category, expected, actual, status from report
+  union all
+  select 999, 'TOTAL',
+         (select sum(expected) from report),
+         (select sum(actual) from report),
+         case when (select bool_and(status = 'PASS') from report) then 'ALL PASS' else 'FAIL' end
+) grid
+order by sort_key, category;
 
 -- ── 드릴다운(특정 category FAIL 시 주석 해제해 항목별 누락 확인) ──────────
 -- 누락 테이블:
