@@ -155,9 +155,24 @@
 
 ---
 
+## D-009 — prompt v3 미세조정 (작성자 결정성 + 정확성 가이드, 야간 3-C)
+
+- **일자**: 2026-05-21
+- **상태**: 확정 (lock-in)
+- **결정**:
+  - **(a) 작성자 temperature 0.2 → 0.0** — 재실행 변동 제거(결정성). gpt-4o-mini 유지(비용·속도 동일).
+  - **(b) learning_objective 정확성** — 콘텐츠 핵심 행동·맥락 구체화, "의사소통할 수 있다" 류 막연 표현 금지. **낭독(qt-reading)은 글 주제가 아니라 "정확한 발음·억양으로 소리 내어 읽는 능력"을 기술**.
+  - **(c) topic_tags 정확성** — 본문(title·prompt)에 등장하는 핵심 주제어만, 본문 전체 대표, 추측·일반화 금지.
+- **근거**: 1.3 실 INSERT 후 잔여 4건(낭독 3 + 발표 1) per-item FAIL 원인 분석 — 낭독 목표가 글 주제로 오설정(advanced-q1-reading "의사소통할 수 있다"), topic_tags가 본문 일부/엉뚱(beginner-q1-reading 학교·수업 vs 병원). prompt 차원 정정으로 자동 통과 유도(3-A CLI 경로 구현보다 저비용).
+- **영향/적용**: `src/lib/prompts/content-tagging.ts`(가이드) · `scripts/tag-content-batch.ts`(temp 0) · M3-b fixture(잔여 4건 정정 의도 + 프롬프트 계약 가드).
+- **관련**: D-001(prompt v3) · D-007 · AUTOMATION_DESIGN 야간3-C · BACKLOG 야간3-C.
+
+---
+
 ## 변경 이력
 
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
 - 2026-05-21: D-008 추가 (야간 2 1.3a 실측 — Task 1.2 라이브 적용 확인·태깅 풀 12건).
 - 2026-05-21: D-001 보완 (1.3 dry-run drift 발견 — learning_objective 정규식을 능력표현 일반형 `[가-힣] 수 있다`로 정정 + 재발 방지 메모).
 - 2026-05-21: D-001 보완 2 (1.3 dry-run 재실행 drift — 낭독 pronunciation_focus 필수: prompt v3 유형별 지침 + 정량 rule 8 `reading_pron`).
+- 2026-05-21: D-009 추가 (야간 3-C — 작성자 temp 0.0 + learning_objective/topic_tags 정확성 가이드, 잔여 4건 정정).

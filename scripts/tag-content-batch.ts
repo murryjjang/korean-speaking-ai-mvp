@@ -208,7 +208,7 @@ async function main(): Promise<void> {
   console.log(`═══ Task 1.3b batch ${DRY ? '(DRY-RUN — DB 변경 없음)' : '(★ 실 INSERT)'} ═══`)
   console.log(`대상 ${pool.length}건  | 작성자=${AUTHOR_MODEL}  검수자=${PEER_MODEL}\n`)
 
-  const author = makeChatCaller(AUTHOR_MODEL, 0.2)
+  const author = makeChatCaller(AUTHOR_MODEL, 0) // temp 0 — 결정성(재실행 변동 제거), DECISIONS D-009
   const peer = makeChatCaller(PEER_MODEL, 0)
 
   type Outcome = { input: TaggingInput; result: ContentTagResult | null; verdict: Verdict | 'error'; quant_failures: string[]; peer: PeerReviewResult | null; error?: string }

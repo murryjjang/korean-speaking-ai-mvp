@@ -62,7 +62,7 @@ describe.skipIf(!REAL)('M3-b prompt v3 실측 — LLM 태깅이 정량 규칙 �
           { role: 'user', content: buildContentTaggingUserPrompt(f.input) },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.2,
+        temperature: 0, // 작성자 결정성 (DECISIONS D-009)
         max_tokens: 800,
       })
       const raw = res.choices[0]?.message?.content ?? '{}'

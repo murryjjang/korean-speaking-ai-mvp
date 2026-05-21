@@ -117,6 +117,87 @@ export const CONTENT_TAGGING_FIXTURES: TaggingFixture[] = [
       pronunciation_focus: ['만나기로(경음화)'],
     },
   },
+  // ── 야간 3-B 잔여 4건 (실제 questions 콘텐츠) — 정정 의도 반영 회귀 가드 ──
+  //    핵심: 낭독 learning_objective 는 글 "주제"가 아니라 "소리 내어 읽는 능력".
+  //    topic_tags 는 본문 전체를 대표. (DECISIONS D-009)
+  {
+    type: 'reading',
+    input: {
+      content_id: 'advanced-q1-reading',
+      type_id: 'qt-reading',
+      title: '설명문 낭독',
+      prompt: '다음 글을 소리 내어 읽으세요.\n\n최근 외국어 교육에서는 단순히 문법 지식을 암기하는 것보다 실제 상황에서 의사소통할 수 있는 능력을 더 중요하게 평가하고 있습니다. 특히 학습자가 자신의 생각을 논리적으로 말하고, 상대방의 의견에 적절히 반응하는 능력은 언어 숙달도를 판단하는 중요한 기준이 됩니다.',
+      difficulty: 'advanced',
+    },
+    valid: {
+      topic_tags: ['외국어 교육', '의사소통 능력', '언어 평가'],
+      cefr_level: 'C1',
+      register: 'formal-written',
+      register_consistency: 'consistent',
+      // 글 주제(의사소통)가 아니라 낭독 능력을 기술
+      learning_objective: '설명문을 정확한 발음과 억양으로 소리 내어 읽을 수 있다.',
+      vocabulary: { basic: ['문법'], core: ['의사소통', '평가'], challenging: ['숙달도'] },
+      pronunciation_focus: ['숙달도(경음화)', '논리적으로(유음화)'],
+    },
+  },
+  {
+    type: 'reading',
+    input: {
+      content_id: 'beginner-q1-reading',
+      type_id: 'qt-reading',
+      title: '낭독',
+      prompt: '다음 글을 소리 내어 읽으세요.\n\n안녕하세요. 저는 오늘 오후에 병원에 갑니다. 병원에 가기 전에 약국에 들를 예정입니다. 진료가 끝난 후에는 집에서 쉬려고 합니다. 내일은 학교에서 한국어 수업이 있어서 일찍 자려고 합니다.',
+      difficulty: 'beginner',
+    },
+    valid: {
+      // 본문 전체 대표 (학교/수업만이 아니라 일정·병원 포함)
+      topic_tags: ['일상 일정', '병원', '하루 계획'],
+      cefr_level: 'A2',
+      register: 'formal-spoken',
+      register_consistency: 'consistent',
+      learning_objective: '하루 일정을 설명하는 글을 정확한 발음으로 소리 내어 읽을 수 있다.',
+      vocabulary: { basic: ['병원', '약국', '학교'], core: ['진료', '예정'], challenging: [] },
+      pronunciation_focus: ['병원에(연음)', '학교에서(경음화)'],
+    },
+  },
+  {
+    type: 'reading',
+    input: {
+      content_id: 'intermediate-q1-reading',
+      type_id: 'qt-reading',
+      title: '안내문 낭독',
+      prompt: '다음 글을 소리 내어 읽으세요.\n\n이번 주부터 도서관 운영 시간이 변경됩니다. 평일에는 오전 9시부터 오후 8시까지 이용할 수 있으며, 토요일에는 오전 10시부터 오후 5시까지 문을 엽니다. 일요일과 공휴일에는 운영하지 않습니다. 이용자는 변경된 시간을 확인한 후 방문해 주시기 바랍니다.',
+      difficulty: 'intermediate',
+    },
+    valid: {
+      topic_tags: ['도서관', '운영 시간', '안내문'],
+      cefr_level: 'B1',
+      register: 'formal-written',
+      register_consistency: 'consistent',
+      learning_objective: '공공시설 안내문을 정확한 발음으로 소리 내어 읽을 수 있다.',
+      vocabulary: { basic: ['시간', '도서관'], core: ['운영', '변경', '이용'], challenging: ['공휴일'] },
+      pronunciation_focus: ['운영(연음)', '확인한(연음)'],
+    },
+  },
+  {
+    type: 'material-desc',
+    input: {
+      content_id: 'advanced-q2-material-description',
+      type_id: 'qt-material-desc',
+      title: '그래프 설명하기',
+      prompt: '최근 3년간 한국어 프로그램 등록 인원 변화를 보고 설명해 보세요.',
+      difficulty: 'advanced',
+    },
+    valid: {
+      topic_tags: ['등록 인원', '변화 추세', '그래프 설명'],
+      cefr_level: 'B2',
+      register: 'formal-spoken',
+      register_consistency: 'consistent',
+      learning_objective: '등록 인원의 3년간 변화 추세를 그래프를 보고 설명할 수 있다.',
+      vocabulary: { basic: ['변화'], core: ['등록', '인원', '추세'], challenging: ['증가하다'] },
+      pronunciation_focus: [],
+    },
+  },
   {
     type: 'listening-resp',
     input: {
