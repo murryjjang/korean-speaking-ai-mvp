@@ -2031,6 +2031,17 @@ export default async function SpeakingResultPage({
             >
               다시 도전하기
             </Link>
+            {/* Task 1.6 재설계(D-016): 모범답안은 배너 대신 학습 페이지 인-라인 진입.
+                답변 후 '내 답변과 비교'가 자연스러운 결과 화면에 노출. 낭독·대화미션은 모범답안 개념이 맞지 않아 제외. */}
+            {!isReadingQuestion && !isDialogueMission && (
+              <Link
+                href={`/student/model-answer/${questionId}`}
+                className="inline-flex items-center justify-center gap-2 font-medium transition-colors text-sm px-4 min-h-[44px] rounded-md bg-white text-text-primary hover:bg-slate-50 border border-border-strong w-full sm:w-auto"
+                data-testid="view-model-answer"
+              >
+                모범답안 보기
+              </Link>
+            )}
             {nextQuestion && nextIsActive ? (
               <Link
                 href={`/student/speaking/${nextQuestion.id}?setId=${set?.id ?? ''}${attemptId ? `&attemptId=${attemptId}` : ''}`}

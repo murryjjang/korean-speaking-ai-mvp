@@ -1,7 +1,11 @@
 'use client'
 
 // 대시보드 배너 (Task 1.6) — 오늘 진도·새 단어·모범답안 알림. 일자별 디스미스(localStorage).
-// 위치: today-tasks 상단(default). 본문 한국어 고정 + mother_tongue 보조 병기(진척 페이지 <Localized> 패턴).
+// 본문 한국어 고정 + mother_tongue 보조 병기(진척 페이지 <Localized> 패턴).
+//
+// ⚠️ D-016(Task 1.6 재설계): 배너 = 잉여로 판단되어 어느 화면에서도 wire-in 하지 않음
+//   (progress→학습시작 카드 중복 / model_answer→학습 페이지 인-라인 / vocab→통계 카드).
+//   컴포넌트·라벨·테스트는 유지 — BL-#10(배너 재설계, PMS 개편 BL-#9와 함께) 시 재도입 후보로 보존.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {

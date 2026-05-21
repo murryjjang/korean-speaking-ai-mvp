@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   PageHeader,
   StatCard,
@@ -18,7 +19,6 @@ import {
   type SubmissionRow,
 } from "./submissions-table";
 import { TodayTasks, type TodayTask } from "./today-tasks";
-import { DashboardBanner } from "./dashboard-banner";
 import { ScoreBreakdown } from "./score-breakdown";
 import { RecommendedActivity } from "./recommended-activity";
 
@@ -151,9 +151,20 @@ export default async function StudentDashboardPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <DashboardBanner vocabDueCount={vocabDueCount} />
-        <TodayTasks tasks={todayTasks} vocabDueCount={vocabDueCount} />
+        <TodayTasks tasks={todayTasks} />
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4">
+          {/* Task 1.6 재설계(D-016): 배너 제거 → vocab 복습 동적 알림을 통계 영역 카드로 통합.
+              SRS due>0 일 때만 노출(0/미적용 시 비표시). 단어장으로 이동. */}
+          {vocabDueCount != null && vocabDueCount > 0 && (
+            <Link href="/student/vocab" className="block rounded-lg">
+              <StatCard
+                label="오늘 복습"
+                value={vocabDueCount}
+                description="복습 대기 단어 · 복습하기 →"
+                className="hover:bg-surface transition-colors"
+              />
+            </Link>
+          )}
           <StatCard
             label="전체 제출"
             value={mySubmissions.length}
