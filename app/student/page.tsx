@@ -38,7 +38,23 @@ const languageGroupLabels: Record<string, string> = {
   other: "기타",
 };
 
-export default function StudentDashboardPage() {
+// Task 1.4: 로그인 학습자의 단어 복습 대기 수 (best-effort — 미인증/미적용 시 undefined).
+async function getVocabDueCount(): Promise<number | undefined> {
+  try {
+    const { createSupabaseServerClient } = await import("@/src/lib/supabase/server");
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return undefined;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return undefined;
+    const { getDueCount } = await import("@/src/lib/srs/due");
+    return await getDueCount(supabase);
+  } catch {
+    return undefined;
+  }
+}
+
+export default async function StudentDashboardPage() {
+  const vocabDueCount = await getVocabDueCount();
   const student = mockStudents.find((s) => s.id === DEMO_STUDENT_ID);
   const mySubmissions = mockSubmissions.filter(
     (s) => s.studentId === DEMO_STUDENT_ID
@@ -134,7 +150,7 @@ export default function StudentDashboardPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <TodayTasks tasks={todayTasks} />
+        <TodayTasks tasks={todayTasks} vocabDueCount={vocabDueCount} />
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4">
           <StatCard
             label="전체 제출"
