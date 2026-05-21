@@ -317,15 +317,19 @@ M5 ┘
 - [x] Task 1.3b batch runner + 검증 통합 (`scripts/tag-content-batch.ts`, **BATCH_DRY=1 기본**) — dry-run 스모크 2건 PASS(작성자 gpt-4o-mini ↔ 검수자 gpt-4o), DB 무변경 확인. 실 INSERT(BATCH_DRY=0)는 야간 3.
 - [x] M6 운영 모니터링 (`scripts/monitor.sh`·`scripts/get-current-tunnel-url.sh`·`docs/ops/MONITORING.md`, UptimeRobot+cron, 이메일)
 - [x] M7 DECISIONS.md 신규(D-001~D-007 백필) + BACKLOG 강화(상태 enum·의존성·시점)
-- [x] 검증: vitest 1183 → 1236(+53, real opt-in skip) · lint 0 error · build 통과
-- [ ] 야간 2 commit & push (모듈별 독립 → origin/feat/q4-llm-provider)
-- 다음 진입점: 야간 3 — 1.3b 전체 dry-run(12건) 검토 → BATCH_DRY=0 일괄 적용 → 라이브 배포 + e2e
+- [x] 검증: vitest 1183 → 1248 · lint 0 error · build 통과 (drift 2건 정정 포함)
+- [x] drift 정정 2건 (dry-run에서 발견): rule 4 정규식 능력표현 일반화 · 낭독 pronunciation_focus 필수(rule 8) — DECISIONS D-001 보완 1·2
+- [x] **1.3 실 INSERT (야간2 연장)** — content_tags 8 / vocabulary_terms 36 / content_vocabulary 42 / pronunciation_focus 0(낭독 미통과분) · questions is_tagged 8/4. 잔여 4건 → 야간3-B
+- [x] 야간 2 commit & push (모듈별 독립 + drift 정정 2건 + docs → origin/feat/q4-llm-provider)
+- 다음 진입점: 야간 3 — A(CLI edit→INSERT 경로) · B(잔여 4건 per-item) · C(prompt v3 미세조정) · 라이브 배포 + e2e
 
-### 야간 3: 1.3 일괄 적용 (목표 active 30-60분)
-- [ ] M4 dry-run 5-10건 (자동 검증 보고서 확인)
-- [ ] 전체 풀 일괄 적용 (M4 batch + DB INSERT)
-- [ ] 검토 큐 처리 (15-20건)
-- [ ] 라이브 배포 + e2e
+### 야간 3: 1.3 잔여 + 라이브 (목표 active 30-60분)
+- [x] M4 dry-run (12건, 야간2 연장) — 자동 검증 보고서 확인
+- [~] 전체 풀 일괄 적용 — **8/12 적용 완료**(야간2 연장), 잔여 4건 야간3-B
+- [ ] 야간3-A: CLI `--review` edit → DB INSERT 경로 구현 (현재 미구현)
+- [ ] 야간3-B: 잔여 미태깅 4건 per-item 처리 (낭독 통과 시 pronunciation_focus 채워짐)
+- [ ] 야간3-C: prompt v3 미세조정 (learning_objective 구체성·topic_tags 정확성·작성자 temp 0.0 검토)
+- [ ] 라이브 배포 + e2e (본인 트리거)
 
 ### 야간 4-7: 본작업 (각 active 30-60분)
 - [ ] Task 1.4 자동 단어장 (SRS UI)
@@ -333,7 +337,7 @@ M5 ┘
 - [ ] Task 1.6 UX 배너
 - [ ] Task 1.7 콘텐츠 admin
 - [ ] e2e 시나리오 추가 (각 task마다)
-- [ ] M3-b `prompt-v3-content-tagging.test.ts`
+- [x] M3-b `prompt-v3-content-tagging.test.ts` (야간 2 완료 — mock + real opt-in)
 - [ ] named tunnel 도입 (시연 1주 전 마지노선)
 
 ### 시연 직전 안전망

@@ -142,6 +142,34 @@ A1~C2 클램프)로 채운다 (D-001 보완).
 
 ---
 
+## 야간3 진입 항목 (1.3 후속 — 8/12 적용 완료, 잔여 4건)
+
+### 야간3-A — CLI `--review` edit → DB INSERT 경로 구현
+**상태(enum):** `pending`
+**의존성:** M4 CLI(`scripts/validate-tagging.ts`, 존재) + `tag-content-batch.ts persist()`(재사용 가능). 야간3-B의 전제.
+**시점:** 야간 3 (잔여 처리 착수 시점)
+
+**배경:** 현재 `validate-tagging.ts --review`는 `review-decisions.json`(approve/reject/edit)만 쓰고 **DB에 반영하지 않음**. `tag-content-batch.ts`는 자기 run의 pass만 INSERT. → 사람이 edit/approve한 결정을 `content_tags` 등에 적재하는 경로가 없다.
+**해야 할 일:** `review-decisions.json`의 approve/edit → `persist()` 재사용해 upsert + `questions.is_tagged` 갱신.
+
+### 야간3-B — 잔여 미태깅 4건 per-item 처리
+**상태(enum):** `pending`
+**의존성:** 야간3-A(편집 INSERT 경로) 또는 BATCH_DRY=0 재태깅. 비결정성으로 run마다 잔여 구성 변동.
+**시점:** 야간 3
+
+**배경:** 1.3 실 INSERT 8/12 후 잔여 4건은 per-item 품질 이슈(낭독 `advanced-q1-reading` 목표 구체성·`beginner-q1-reading` topic_tags 오태깅·발표류 태그 관련성 등). 낭독이 통과하면 `pronunciation_focus`가 채워진다(현재 0건).
+**해야 할 일:** CLI edit(목표 구체화·topic 정정) 또는 재태깅으로 12/12 완성.
+
+### 야간3-C — prompt v3 미세조정 후보
+**상태(enum):** `pending`
+**의존성:** 야간3-B 품질 관찰 결과. prompt v4(per-term CEFR)와 별개의 정확성 튜닝.
+**시점:** 야간 3 (B 관찰 후)
+
+**배경:** `learning_objective` 구체성·`topic_tags` 정확성에서 작성자(gpt-4o-mini) 비결정성. 작성자 모델은 유지(비용·속도) 결정.
+**해야 할 일:** 작성자 `temperature` 0.2 → 0.0 검토, learning_objective "콘텐츠 유형·주제 반영" 강화 문구, topic_tags 정확성 가이드. M3-b 회귀로 가드.
+
+---
+
 ## 의존성 그래프
 
 ```
