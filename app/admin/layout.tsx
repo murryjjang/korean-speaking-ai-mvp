@@ -7,7 +7,7 @@ const navItems: NavItem[] = [
   { label: "데이터 분석", href: "/admin/analytics" },
   { label: "반 관리", href: "/admin/classes", disabled: true },
   { label: "학생 관리", href: "/admin/students", disabled: true },
-  { label: "콘텐츠 관리", href: "/admin/content", disabled: true },
+  { label: "콘텐츠 관리", href: "/admin/content" },
 ];
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
