@@ -20,6 +20,7 @@ import {
   PROPER_NOUN_WHITELIST,
   REGISTER_VALUES,
   REQUIRED_TAG_FIELDS,
+  requiresPronunciationFocus,
   VOCAB_CATEGORIES,
 } from '@/src/lib/tagging/schema'
 
@@ -32,6 +33,10 @@ export type RuleId =
   | 'pronunciation'
   | 'vocabulary'
   | 'banmal'
+  | 'reading_pron'
+
+// 콘텐츠 컨텍스트 (유형별 차등 규칙용). 없으면 유형 무관 규칙만 적용.
+export type ValidateOpts = { typeId?: string | null }
 
 export type RuleResult = { rule: RuleId; ok: boolean; message: string }
 
@@ -119,14 +124,26 @@ function ruleBanmal(o: Record<string, unknown>): RuleResult {
   return { rule: 'banmal', ok: true, message: '반말/혼용 경고 일치' }
 }
 
-const RULES = [
-  ruleFields, ruleRegister, ruleCefr, ruleObjective, rulePronunciation, ruleVocabulary, ruleBanmal,
-]
+// ── 규칙 8: 낭독 유형 발음 포커스 필수 (유형별 차등) ───────────
+//    type_id='qt-reading'(소리 내어 읽기)이면 pronunciation_focus ≥1 필수.
+//    그 외 유형은 빈 배열 허용 → pass. (결정론적 — peer review 비결정성 보완)
+function ruleReadingPron(o: Record<string, unknown>, opts?: ValidateOpts): RuleResult {
+  if (!requiresPronunciationFocus(opts?.typeId)) {
+    return { rule: 'reading_pron', ok: true, message: '발음 포커스 필수 유형 아님' }
+  }
+  const arr = asStrArray(o.pronunciation_focus)
+  return arr.length > 0
+    ? { rule: 'reading_pron', ok: true, message: `낭독 발음 포커스 ${arr.length}건` }
+    : { rule: 'reading_pron', ok: false, message: '낭독(qt-reading)인데 pronunciation_focus 비어있음(≥1 필요)' }
+}
 
-/** A. 정량 검증 7규칙 — 결정론적 순수함수. */
-export function validateQuantitative(result: unknown): QuantResult {
+/** A. 정량 검증 — 결정론적 순수함수. 유형 무관 7규칙 + 유형별 rule 8. */
+export function validateQuantitative(result: unknown, opts?: ValidateOpts): QuantResult {
   const o = asObj(result)
-  const results = RULES.map((fn) => fn(o))
+  const results = [
+    ruleFields(o), ruleRegister(o), ruleCefr(o), ruleObjective(o),
+    rulePronunciation(o), ruleVocabulary(o), ruleBanmal(o), ruleReadingPron(o, opts),
+  ]
   const failures = results.filter((r) => !r.ok)
   return { ok: failures.length === 0, results, failures }
 }

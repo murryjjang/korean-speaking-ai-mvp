@@ -35,7 +35,12 @@
   - **원인**: spec 약식 표기 `~할 수 있다`의 실제 의도는 한국어 능력표현 일반형 `-(으)ㄹ 수 있다`. 코드가 약식 표기를 협소하게 받음 = drift.
   - **정정**: `LEARNING_OBJECTIVE_RE = /[가-힣] 수 있다\.?$/` (능력표현 일반화). prompt v3 문구·M3-b fixture(고유어 동사 활용형)·단위테스트 동반 갱신.
   - **재발 방지**: 약식 표기 spec은 반드시 코드/테스트에 **명시적 패턴 + 경계 케이스(하다 외 동사)**를 동반한다. M3-b "능력표현 일반형 회귀 가드"가 미래 prompt/정규식 변경 시 자동 차단.
-- **관련**: AUTOMATION_DESIGN.md M3-b·M4 · `content_tags` 스키마 · BACKLOG "task 1.4 후속 자유대화 사후 태깅" · `src/lib/tagging/schema.ts`(LEARNING_OBJECTIVE_RE).
+- **보완 2 (2026-05-21, 1.3 dry-run 재실행에서 두 번째 drift 발견·정정)**:
+  - **증상**: `pronunciation_focus`가 dry-run 12건 **전부 빈 배열**. 특히 낭독(qt-reading)은 발음이 핵심인데도 비어 작성자(gpt-4o-mini)가 "없으면 빈 배열" 문구로 회피.
+  - **원인**: "빈 배열 허용" 문구가 **유형 무관**으로 적용 = 유형별 차등 의도가 spec 본문에 없던 drift(rule 4와 동일 패턴).
+  - **정정**: ① prompt v3 본문에 유형별 지침 명시(qt-reading ⇒ pronunciation_focus ≥1 필수, 그 외 유형은 빈 배열 허용). ② **정량 rule 8(`reading_pron`)** 추가 — `type_id='qt-reading'` ∧ 빈 배열 ⇒ FAIL(결정론적, peer review 비결정성 보완). 발음 규칙 어휘에 유음화 포함.
+  - **재발 방지**: **유형별 차등 spec은 prompt v3 본문에 유형 분기로 명시**하고 정량 규칙으로 가드한다. M3-b "낭독 fixture pronunciation_focus ≥1" 가드.
+- **관련**: AUTOMATION_DESIGN.md M3-b·M4 · `content_tags` 스키마 · BACKLOG "task 1.4 후속 자유대화 사후 태깅" · `src/lib/tagging/schema.ts`(LEARNING_OBJECTIVE_RE · PRONUNCIATION_REQUIRED_TYPES) · rule 8 `reading_pron`.
 
 ---
 
@@ -155,3 +160,4 @@
 - 2026-05-21: 초안 작성 + 백필 D-001~D-007 (야간 2, M7 결정·백로그 추적). prompt v3 lock-in · DB 매핑 4결정 · #13 옵션 A · 자유대화 태깅 제외 · 파일럿 #18 분리 · 야간 1 결정/정정 4건 · 야간 2 결정.
 - 2026-05-21: D-008 추가 (야간 2 1.3a 실측 — Task 1.2 라이브 적용 확인·태깅 풀 12건).
 - 2026-05-21: D-001 보완 (1.3 dry-run drift 발견 — learning_objective 정규식을 능력표현 일반형 `[가-힣] 수 있다`로 정정 + 재발 방지 메모).
+- 2026-05-21: D-001 보완 2 (1.3 dry-run 재실행 drift — 낭독 pronunciation_focus 필수: prompt v3 유형별 지침 + 정량 rule 8 `reading_pron`).

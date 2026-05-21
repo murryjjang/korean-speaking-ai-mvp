@@ -72,9 +72,9 @@ describe('M3-b prompt v3 — user 프롬프트 (콘텐츠 매트릭스)', () => 
 
 describe('M3-b prompt v3 — 유효 fixture 정량 규칙 통과 (스펙↔fixture 정합)', () => {
   it.each(CONTENT_TAGGING_FIXTURES.map((f) => [f.input.content_id, f] as const))(
-    '유효 v3 출력이 7규칙 통과: %s',
+    '유효 v3 출력이 전 규칙 통과(유형 컨텍스트 포함): %s',
     (_id, f) => {
-      const q = validateQuantitative({ ...f.valid })
+      const q = validateQuantitative({ ...f.valid }, { typeId: f.input.type_id })
       expect(q.ok, `실패 규칙: ${q.failures.map((x) => x.rule).join(',')}`).toBe(true)
     },
   )
@@ -82,6 +82,12 @@ describe('M3-b prompt v3 — 유효 fixture 정량 규칙 통과 (스펙↔fixtu
   it('낭독/발표/듣고답하기 3유형 모두 fixture 보유', () => {
     const types = new Set(CONTENT_TAGGING_FIXTURES.map((f) => f.type))
     expect(types).toEqual(new Set(['reading', 'material-desc', 'listening-resp']))
+  })
+
+  it('낭독(qt-reading) fixture는 pronunciation_focus ≥1 (rule8 가드)', () => {
+    const readings = CONTENT_TAGGING_FIXTURES.filter((f) => f.input.type_id === 'qt-reading')
+    expect(readings.length).toBeGreaterThan(0)
+    for (const f of readings) expect(f.valid.pronunciation_focus.length).toBeGreaterThan(0)
   })
 })
 

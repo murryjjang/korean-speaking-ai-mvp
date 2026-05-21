@@ -135,7 +135,7 @@ async function runValidate(args: Record<string, string | boolean>): Promise<numb
 
   const items: ReviewItem[] = []
   for (const rec of records) {
-    const quant = validateQuantitative(rec.result)
+    const quant = validateQuantitative(rec.result, { typeId: rec.input.type_id })
     let peer: PeerReviewResult | null = null
     if (peerCall && quant.ok) {
       // 정량 통과 항목만 교차 검수 (정량 fail 은 어차피 fail).

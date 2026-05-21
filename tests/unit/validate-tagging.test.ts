@@ -30,12 +30,12 @@ function validResult(): ContentTagResult {
   }
 }
 
-describe('M4 정량 — 기준 객체는 7규칙 통과', () => {
-  it('valid → ok=true, 실패 0', () => {
+describe('M4 정량 — 기준 객체는 전 규칙 통과', () => {
+  it('valid → ok=true, 실패 0, 규칙 8개', () => {
     const q = validateQuantitative(validResult())
     expect(q.ok).toBe(true)
     expect(q.failures).toHaveLength(0)
-    expect(q.results).toHaveLength(7)
+    expect(q.results).toHaveLength(8)
   })
 })
 
@@ -134,6 +134,26 @@ describe('M4 정량 — 규칙별 fail 가드', () => {
     expect(validateQuantitative(null).ok).toBe(false)
     expect(validateQuantitative('nope').ok).toBe(false)
     expect(validateQuantitative(undefined).ok).toBe(false)
+  })
+})
+
+describe('M4 정량 — 규칙8 낭독 발음 포커스 필수 (유형별 차등)', () => {
+  it('qt-reading + pronunciation_focus 비어있음 → reading_pron fail', () => {
+    const q = validateQuantitative({ ...validResult(), pronunciation_focus: [] }, { typeId: 'qt-reading' })
+    expect(q.failures.some((f) => f.rule === 'reading_pron')).toBe(true)
+  })
+
+  it('qt-reading + pronunciation_focus ≥1 → 통과', () => {
+    const q = validateQuantitative(validResult(), { typeId: 'qt-reading' })
+    expect(q.ok).toBe(true)
+  })
+
+  it('비-낭독 유형 + 빈 배열 → 통과 (rule8 무관)', () => {
+    expect(validateQuantitative({ ...validResult(), pronunciation_focus: [] }, { typeId: 'qt-material-desc' }).ok).toBe(true)
+  })
+
+  it('typeId 미지정 + 빈 배열 → 통과 (유형 모를 때 강제 안 함)', () => {
+    expect(validateQuantitative({ ...validResult(), pronunciation_focus: [] }).ok).toBe(true)
   })
 })
 

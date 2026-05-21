@@ -53,12 +53,18 @@ export const PRONUNCIATION_FOCUS_RE = /^.+\(.+\)$/
 // 발음 규칙 어휘 (프롬프트 주입 + 참고용). rule 텍스트는 자유지만 권장 집합.
 export const PRONUNCIATION_RULES = [
   '연음',
+  '경음화',
   '격음화',
   '구개음화',
-  '경음화',
   '비음화',
-  'ㅎ 약화',
+  '유음화',
 ] as const
+
+// 발음 포커스가 필수인 콘텐츠 유형 (낭독 = 소리 내어 읽기, 발음이 핵심) — D-001 보완 2.
+export const PRONUNCIATION_REQUIRED_TYPES = new Set<string>(['qt-reading'])
+export function requiresPronunciationFocus(typeId: string | null | undefined): boolean {
+  return !!typeId && PRONUNCIATION_REQUIRED_TYPES.has(typeId)
+}
 
 // ── 반말 경고 표준 문구 (검수 규칙 7의 권위 기준) ──────────────
 // register='casual-banmal' 콘텐츠는 학습자에게 비격식임을 알리는 표준 문구를
