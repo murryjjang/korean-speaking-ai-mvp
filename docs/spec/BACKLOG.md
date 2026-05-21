@@ -142,7 +142,7 @@ A1~C2 클램프)로 채운다 (D-001 보완).
 
 ---
 
-## 야간3 진입 항목 (1.3 후속 — 8/12 적용 완료, 잔여 4건)
+## 야간3 진입 항목 (1.3 후속 — 10/12 적용 완료, 잔여 2건)
 
 ### 야간3-A — CLI `--review` edit → DB INSERT 경로 구현
 **상태(enum):** `pending`
@@ -152,21 +152,20 @@ A1~C2 클램프)로 채운다 (D-001 보완).
 **배경:** 현재 `validate-tagging.ts --review`는 `review-decisions.json`(approve/reject/edit)만 쓰고 **DB에 반영하지 않음**. `tag-content-batch.ts`는 자기 run의 pass만 INSERT. → 사람이 edit/approve한 결정을 `content_tags` 등에 적재하는 경로가 없다.
 **해야 할 일:** `review-decisions.json`의 approve/edit → `persist()` 재사용해 upsert + `questions.is_tagged` 갱신.
 
-### 야간3-B — 잔여 미태깅 4건 per-item 처리
-**상태(enum):** `pending`
-**의존성:** 야간3-A(편집 INSERT 경로) 또는 BATCH_DRY=0 재태깅. 비결정성으로 run마다 잔여 구성 변동.
-**시점:** 야간 3
+### 야간3-B — 잔여 미태깅 2건 per-item 처리
+**상태(enum):** `blocked` (3-A 또는 강한 작성자 모델에 의존)
+**의존성:** 야간3-A(편집→INSERT 경로) 또는 작성자 모델 격상. **rubric 충돌은 D-010로 종식** — 잔여는 mini의 per-item 품질 미스라 prompt 튜닝으로는 한계(thrash 임계 도달, 추가 튜닝 금지).
+**시점:** 야간 4 (Task 1.4와 병행) 또는 3-A 구현 직후
 
-**배경:** 1.3 실 INSERT 8/12 후 잔여 4건은 per-item 품질 이슈(낭독 `advanced-q1-reading` 목표 구체성·`beginner-q1-reading` topic_tags 오태깅·발표류 태그 관련성 등). 낭독이 통과하면 `pronunciation_focus`가 채워진다(현재 0건).
-**해야 할 일:** CLI edit(목표 구체화·topic 정정) 또는 재태깅으로 12/12 완성.
+**배경:** 1.3 실 INSERT **10/12** 후 잔여 2건(temp 0 결정적, 반복 동일):
+- `advanced-q1-reading`: mini가 어색한 하이브리드 목표 생성("의사소통 능력을 …읽을 수 있다" — 주제를 읽기 대상으로 오결합).
+- `beginner-q1-reading`: 콘텐츠 **장르 오인**(1인칭 일상 서술을 "안내문"으로). topic_tags도 본문 일부 편중.
+**해야 할 일:** 3-A로 사람이 2건 목표·장르·topic 교정 후 INSERT, 또는 작성자 모델 격상(gpt-4o)으로 재태깅. 낭독이라 통과 시 `pronunciation_focus` 채워짐.
 
-### 야간3-C — prompt v3 미세조정 후보
-**상태(enum):** `pending`
-**의존성:** 야간3-B 품질 관찰 결과. prompt v4(per-term CEFR)와 별개의 정확성 튜닝.
-**시점:** 야간 3 (B 관찰 후)
-
-**배경:** `learning_objective` 구체성·`topic_tags` 정확성에서 작성자(gpt-4o-mini) 비결정성. 작성자 모델은 유지(비용·속도) 결정.
-**해야 할 일:** 작성자 `temperature` 0.2 → 0.0 검토, learning_objective "콘텐츠 유형·주제 반영" 강화 문구, topic_tags 정확성 가이드. M3-b 회귀로 가드.
+### 야간3-C — prompt v3 미세조정
+**상태(enum):** `done` (2026-05-21)
+**배경/결과:** D-009(작성자 temp 0.0 + learning_objective/topic_tags 정확성) + D-010(낭독 목표 하이브리드 + peer rubric 유형별 정렬). 효과: material-desc 회귀 수정·작성자↔검수자 충돌 종식·낭독 `pronunciation_focus` end-to-end 작동(intermediate-q1-reading: 운영(연음)·변경된(경음화)). 1.3 8/12 → 10/12.
+**잔여:** per-item 품질(야간3-B)은 prompt 차원 한계 — 더 튜닝하지 않음(thrash 임계).
 
 ---
 
