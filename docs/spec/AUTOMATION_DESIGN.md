@@ -304,7 +304,7 @@ M5 ┘
 - [x] M5 e2e 시나리오 3건 (research-login / free-conv-basic / free-conv-offtopic) (2026-05-21)
   - 로컬 3/3 PASS · LIVE_URL 게이트 경로=research-login만 실행+free-conv 2 skip 확인
   - #13 ≤50 수치는 `tests/unit/free-conversation-score.test.ts`(+6)로 결정론적 가드(score 헬퍼 추출)
-- [~] 야간 1 commit (M1·M2·M3-a·M5 + doc, 모듈별 독립) — **push 대기**(본인 승인 후)
+- [x] 야간 1 commit & push (M1·M2·M3-a·M5 + doc, 모듈별 독립 → origin/feat/q4-llm-provider)
 - [x] AUTOMATION_DESIGN.md 진행 체크박스 업데이트 (이 커밋)
 - 다음 진입점: Task 1.2 적용(SQL Editor) → verify → deploy.sh 라이브(#13) → 야간 2(M4·M6·M7)
 
