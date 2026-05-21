@@ -294,7 +294,9 @@ M5 ┘
   - FK expected 11 (12 아님 — grep 자체검증으로 drift 정정), 정책 24, 인덱스 19
   - ⚠️ supabase-js `head:true` 가 없는 테이블에 204+null 반환(가짜 PASS) → non-head GET 으로 수정
 - [ ] Task 1.2 적용 (Supabase SQL Editor 수동 실행) + verify 실행
-- [ ] M2 `deploy.sh` + `smoke-test.sh` + `/api/healthz` 작성
+- [x] M2 `deploy.sh` + `smoke-test.sh` + `rollback-deploy.sh` + `/api/healthz` 작성 (2026-05-21)
+  - 로컬 검증: build 통과 · healthz 200(db.ok 49ms·buildId 일치·cloudflared best-effort) · smoke 5/5 PASS
+  - 실제 라이브 배포는 본인 트리거 (deploy.sh, #13 P060-P066 영향 검토 후)
 - [ ] #13 fix 라이브 배포 (M2 첫 사용)
 - [ ] M3-a `free-conversation-summary.test.ts` (15 cases × 3+ lang)
 - [ ] M5 e2e 시나리오 1-3건 (research-login / free-conv-basic / free-conv-offtopic)
