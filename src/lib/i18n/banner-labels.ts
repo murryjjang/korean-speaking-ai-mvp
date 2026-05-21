@@ -6,6 +6,8 @@
 // ⚠️ 기본 문안 — 본인 wording 검토 대상(위치·종류·디스미스는 default).
 // ============================================================
 
+import { inferDisplayLanguageFromMotherTongue } from './display-language'
+
 export const BANNER_TYPES = ['progress', 'vocab', 'model_answer'] as const
 export type BannerType = (typeof BANNER_TYPES)[number]
 
@@ -56,10 +58,13 @@ export function isBannerLang(v: unknown): v is BannerLang {
   return typeof v === 'string' && (BANNER_LANGS as readonly string[]).includes(v)
 }
 
-/** 표시 언어 결정 — 지원 언어면 그대로, 아니면 ko 폴백.
- *  (research 흐름의 mother_tongue 가 7언어 밖일 때도 안전.) */
+/** 표시 언어 결정 — 지원 코드(en/vi/…)면 그대로, 자연어 모국어("Vietnamese"·"베트남어"·
+ *  "العربية" 등)면 추론, 그 외/누락은 ko 폴백.
+ *  진척 페이지의 <Localized>(inferDisplayLanguageFromMotherTongue) 와 동일 추론 →
+ *  배너↔다른 요소 표시 언어 일관성 보장. DisplayLanguage 코드 == BannerLang 7종이라 캐스트 안전. */
 export function resolveBannerLang(lang?: string | null): BannerLang {
-  return isBannerLang(lang) ? lang : 'ko'
+  if (isBannerLang(lang)) return lang
+  return (inferDisplayLanguageFromMotherTongue(lang) as BannerLang | null) ?? 'ko'
 }
 
 export type BannerItem = { type: BannerType; n?: number; href: string | null }

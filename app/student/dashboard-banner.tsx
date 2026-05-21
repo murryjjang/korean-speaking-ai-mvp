@@ -1,7 +1,7 @@
 'use client'
 
 // 대시보드 배너 (Task 1.6) — 오늘 진도·새 단어·모범답안 알림. 일자별 디스미스(localStorage).
-// 위치: today-tasks 상단(default). 기본 렌더 언어 ko(다국어 라벨은 i18n-ready).
+// 위치: today-tasks 상단(default). 본문 한국어 고정 + mother_tongue 보조 병기(진척 페이지 <Localized> 패턴).
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
@@ -12,6 +12,16 @@ import {
   resolveBannerLang,
   type BannerType,
 } from '@/src/lib/i18n/banner-labels'
+
+// '#anchor' href → 같은 페이지 부드러운 스크롤. 학습 시작 영역은 모바일/데스크톱 두 인스턴스
+// (progress page 단계19.13·19.14)라 id 대신 data-scroll-target 으로 표시하고, 화면에 보이는
+// (offsetParent!=null) 인스턴스로 스크롤한다.
+function scrollToSamePageTarget(key: string): void {
+  if (typeof document === 'undefined') return
+  const targets = Array.from(document.querySelectorAll<HTMLElement>(`[data-scroll-target="${key}"]`))
+  const target = targets.find((el) => el.offsetParent !== null) ?? targets[0]
+  target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 export function DashboardBanner({
   vocabDueCount = 0,
@@ -24,6 +34,9 @@ export function DashboardBanner({
   hrefs?: Partial<Record<BannerType, string | null>>
 }) {
   const bl = resolveBannerLang(lang)
+  // 병기: 본문 ko 고정 + bl≠ko 일 때만 모국어 보조(진척 페이지 <Localized> 와 동일 규칙).
+  const showSupplement = bl !== 'ko'
+  const rtl = bl === 'ar'
   const [dismissed, setDismissed] = useState<Record<string, boolean>>({})
 
   // 클라이언트에서 오늘 디스미스 상태 로드.
@@ -58,25 +71,55 @@ export function DashboardBanner({
   return (
     <div className="flex flex-col gap-2" data-testid="dashboard-banner">
       {visible.map((it) => {
-        const label = BANNER_LABELS[bl][it.type]
+        const koLabel = BANNER_LABELS.ko[it.type]
+        const supLabel = showSupplement ? BANNER_LABELS[bl][it.type] : null
         const inner = (
           <>
-            <span className="text-sm font-medium text-primary-700">{label.title}</span>
-            <span className="text-xs text-text-muted">{bannerBody(label, it.n)}</span>
+            <span className="text-sm font-medium text-primary-700" lang="ko">
+              {koLabel.title}
+            </span>
+            <span className="text-xs text-text-muted" lang="ko">
+              {bannerBody(koLabel, it.n)}
+            </span>
+            {/* mother_tongue 보조 병기 — 작고 muted (진척 페이지 보조 영역과 동일 톤). ar 은 RTL 격리. */}
+            {supLabel && (
+              <span
+                className="block mt-0.5 text-xs text-text-muted opacity-80 leading-snug"
+                dir={rtl ? 'rtl' : undefined}
+                lang={bl}
+                style={rtl ? { unicodeBidi: 'isolate', textAlign: 'start' } : { unicodeBidi: 'isolate' }}
+                data-bilingual-supplement={bl}
+              >
+                {supLabel.title} · {bannerBody(supLabel, it.n)}
+              </span>
+            )}
           </>
         )
+        const href = it.href
+        const anchorKey = href && href.startsWith('#') ? href.slice(1) : null
         return (
           <div
             key={it.type}
             className="flex items-center justify-between gap-3 rounded border border-primary-100 bg-primary-50 px-4 py-2"
           >
-            {/* href=null(예: research 흐름 progress)면 클릭 비활성 — 단순 안내 텍스트. */}
-            {it.href ? (
-              <Link href={it.href} className="flex flex-col">
+            {/* href: null=클릭 비활성 / '#…'=같은 페이지 앵커(smooth scroll) / 그 외=라우트 이동. */}
+            {href == null ? (
+              <div className="flex flex-col">{inner}</div>
+            ) : anchorKey ? (
+              <a
+                href={href}
+                onClick={(e) => {
+                  e.preventDefault()
+                  scrollToSamePageTarget(anchorKey)
+                }}
+                className="flex flex-col"
+              >
+                {inner}
+              </a>
+            ) : (
+              <Link href={href} className="flex flex-col">
                 {inner}
               </Link>
-            ) : (
-              <div className="flex flex-col">{inner}</div>
             )}
             <button
               type="button"

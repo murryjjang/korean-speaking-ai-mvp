@@ -56,6 +56,12 @@ describe('resolveBannerLang (research mother_tongue 폴백)', () => {
     expect(resolveBannerLang('vi')).toBe('vi')
     expect(resolveBannerLang('ar')).toBe('ar')
   })
+  it('자연어 모국어도 추론 (진척 페이지 <Localized> 와 동일)', () => {
+    expect(resolveBannerLang('Vietnamese')).toBe('vi')
+    expect(resolveBannerLang('베트남어')).toBe('vi')
+    expect(resolveBannerLang('العربية')).toBe('ar')
+    expect(resolveBannerLang('Khmer')).toBe('km')
+  })
   it('미지원/누락은 ko 폴백', () => {
     expect(resolveBannerLang('ja')).toBe('ko') // 7언어 밖
     expect(resolveBannerLang('zz')).toBe('ko')
@@ -79,9 +85,13 @@ describe('buildBannerItems', () => {
     expect(items.find((i) => i.type === 'progress')?.href).toBe('/student')
     expect(items.find((i) => i.type === 'model_answer')?.href).toBe('/student')
   })
-  it('hrefs 주입 — 지정 키만 덮어쓰고 미지정 키는 기본값 (research 흐름)', () => {
-    const items = buildBannerItems(0, { progress: null, model_answer: '/student/speaking' })
-    expect(items.find((i) => i.type === 'progress')?.href).toBeNull() // 클릭 비활성
+  it('hrefs 주입 — 지정 키만 덮어쓰고 미지정 키는 기본값 (research 흐름, D-015)', () => {
+    const items = buildBannerItems(0, { progress: '#start-learning', model_answer: '/student/speaking' })
+    expect(items.find((i) => i.type === 'progress')?.href).toBe('#start-learning') // 같은 페이지 앵커
     expect(items.find((i) => i.type === 'model_answer')?.href).toBe('/student/speaking')
+  })
+  it('hrefs 명시적 null 은 그대로 (클릭 비활성 지원 유지)', () => {
+    const items = buildBannerItems(0, { progress: null })
+    expect(items.find((i) => i.type === 'progress')?.href).toBeNull()
   })
 })

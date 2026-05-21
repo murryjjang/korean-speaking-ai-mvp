@@ -172,15 +172,16 @@ export default async function StudentProgressPage() {
         </div>
       </header>
 
-      {/* Task 1.6 [야간5]: UX 배너 — research 흐름 wire-in (D-013 A안).
+      {/* Task 1.6 [야간5]: UX 배너 — research 흐름 wire-in (D-013 A안 · D-015 보정).
           헤더 아래·학습 시작 카드 위(모바일/데스크톱 공통). PDF 대상(research-progress-pdf-target)
-          밖에 둬 내보내기에서 제외. lang=mother_tongue(7언어, 미지원 시 ko 폴백).
+          밖에 둬 내보내기에서 제외. lang=mother_tongue → 본문 ko + 모국어 병기(7언어, 미지원 시 ko).
           vocabDueCount=0 → research 흐름엔 SRS 미적용으로 vocab 배너 자동 숨김(progress·model_answer 2종).
-          progress 는 현재 페이지라 클릭 비활성(null), model_answer 는 말하기 진입(/student/speaking)으로 매핑. */}
+          progress 는 현재 페이지 내 학습 시작 영역으로 부드러운 스크롤(#start-learning),
+          model_answer 는 말하기 진입(/student/speaking)으로 매핑. */}
       <DashboardBanner
         lang={participant.motherTongue ?? 'ko'}
         vocabDueCount={0}
-        hrefs={{ progress: null, model_answer: '/student/speaking' }}
+        hrefs={{ progress: '#start-learning', model_answer: '/student/speaking' }}
       />
 
       {/* v1.1 단계 19.13 [페이즈 3]: 모바일에서 학습 시작 CTA를 첫 viewport 안으로
@@ -191,7 +192,7 @@ export default async function StudentProgressPage() {
           모바일 하단 fixed 내비가 md:hidden이므로 640~767px 구간에서 mobile-top이
           숨고 데스크톱 instance가 노출되면 사용자에게는 "맨 아래로" 보이는 회귀가
           발생. 두 인스턴스의 breakpoint를 동일하게 맞춘다. */}
-      <div className="md:hidden" data-testid="start-learning-mobile-top">
+      <div className="md:hidden" data-testid="start-learning-mobile-top" data-scroll-target="start-learning">
         <StartLearningSection
           motherTongueHint={participant.motherTongue}
           hideTestIds
@@ -379,8 +380,9 @@ export default async function StudentProgressPage() {
       </div>{/* /research-progress-pdf-target */}
 
       {/* v1.1 단계 19.14 [R2]: 데스크톱 하단 instance도 mobile-top과 같은 md
-          breakpoint로 정렬해 640~767px 회귀 차단. */}
-      <div className="hidden md:block">
+          breakpoint로 정렬해 640~767px 회귀 차단.
+          D-015: 배너 '오늘의 학습' 앵커 스크롤 타깃(데스크톱에서 보이는 인스턴스). */}
+      <div className="hidden md:block" data-scroll-target="start-learning">
         <StartLearningSection motherTongueHint={participant.motherTongue} />
       </div>
 
