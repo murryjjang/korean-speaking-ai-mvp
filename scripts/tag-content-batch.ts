@@ -20,7 +20,6 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
-import type { SupabaseClient } from '@supabase/supabase-js'
 
 import {
   buildContentTaggingSystemPrompt,
@@ -34,15 +33,8 @@ import {
   type PeerReviewResult,
   type Verdict,
 } from '@/src/lib/tagging/validate-tagging'
-import {
-  CEFR_VALUES,
-  CONTENT_TAGGING_PROMPT_VERSION,
-  parsePronunciationFocus,
-  type CefrLevel,
-  type ContentTagResult,
-  type TaggingInput,
-  type VocabCategory,
-} from '@/src/lib/tagging/schema'
+import { persistTag } from '@/src/lib/tagging/persist'
+import { type ContentTagResult, type TaggingInput } from '@/src/lib/tagging/schema'
 
 const DRY = !(process.env.BATCH_DRY === '0' || process.env.BATCH_DRY === 'false')
 
@@ -82,15 +74,6 @@ function writeJson(path: string, data: unknown): void {
   writeFileSync(resolve(path), JSON.stringify(data, null, 2), 'utf-8')
 }
 
-// vocabulary 분류(content-상대 난이도) → 어휘 절대 CEFR 근사.
-// basic=콘텐츠-1, core=콘텐츠, challenging=콘텐츠+1 (A1~C2 클램프).
-// 주의: prompt v3 는 per-term CEFR 를 출력하지 않음 → 근사. (BACKLOG: prompt v4 per-term CEFR)
-function cefrForCategory(contentCefr: CefrLevel, cat: VocabCategory): CefrLevel {
-  const idx = CEFR_VALUES.indexOf(contentCefr)
-  const off = cat === 'basic' ? -1 : cat === 'challenging' ? 1 : 0
-  return CEFR_VALUES[Math.max(0, Math.min(CEFR_VALUES.length - 1, idx + off))]
-}
-
 // 검수자(peer) 모델 — Q2 확정: 기본 gpt-4o, 동일 OPENAI_API_KEY 재사용.
 //   env 이름은 PEER_REVIEW_MODEL(권장). OPENAI_ 접두 별칭도 허용(프로젝트 관행).
 const PEER_MODEL = process.env.PEER_REVIEW_MODEL ?? process.env.OPENAI_PEER_REVIEW_MODEL ?? 'gpt-4o'
@@ -115,63 +98,6 @@ function makeChatCaller(model: string, temperature: number): ChatCaller {
     })
     return res.choices[0]?.message?.content ?? '{}'
   }
-}
-
-// pass 항목을 4테이블에 idempotent INSERT.
-async function persist(supabase: SupabaseClient, input: TaggingInput, result: ContentTagResult): Promise<void> {
-  const cid = input.content_id
-  // 1) content_tags (unique content_id → upsert)
-  const { error: ctErr } = await supabase.from('content_tags').upsert(
-    {
-      content_id: cid,
-      topic_tags: result.topic_tags,
-      cefr_level: result.cefr_level,
-      register: result.register,
-      register_consistency: result.register_consistency,
-      learning_objective: result.learning_objective,
-      prompt_version: CONTENT_TAGGING_PROMPT_VERSION,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'content_id' },
-  )
-  if (ctErr) throw new Error(`content_tags: ${ctErr.message}`)
-
-  // 2) vocabulary_terms (unique term → upsert) + 3) content_vocabulary (unique 3키 → ignore)
-  for (const cat of ['basic', 'core', 'challenging'] as VocabCategory[]) {
-    for (const term of result.vocabulary[cat]) {
-      const { data: vt, error: vtErr } = await supabase
-        .from('vocabulary_terms')
-        .upsert({ term, cefr_level: cefrForCategory(result.cefr_level, cat) }, { onConflict: 'term' })
-        .select('id')
-        .single()
-      if (vtErr) throw new Error(`vocabulary_terms(${term}): ${vtErr.message}`)
-      const { error: cvErr } = await supabase
-        .from('content_vocabulary')
-        .upsert(
-          { content_id: cid, term_id: vt.id, category: cat },
-          { onConflict: 'content_id,term_id,category', ignoreDuplicates: true },
-        )
-      if (cvErr) throw new Error(`content_vocabulary(${term}): ${cvErr.message}`)
-    }
-  }
-
-  // 4) pronunciation_focus (자연 unique 없음 → content_id 단위 replace)
-  await supabase.from('pronunciation_focus').delete().eq('content_id', cid)
-  const pf = result.pronunciation_focus
-    .map(parsePronunciationFocus)
-    .filter((x): x is { term: string; rule: string } => x !== null)
-    .map((x) => ({ content_id: cid, term: x.term, rule: x.rule }))
-  if (pf.length) {
-    const { error: pfErr } = await supabase.from('pronunciation_focus').insert(pf)
-    if (pfErr) throw new Error(`pronunciation_focus: ${pfErr.message}`)
-  }
-
-  // 5) questions.is_tagged 플래그
-  const { error: qErr } = await supabase
-    .from('questions')
-    .update({ is_tagged: true, last_tagged_at: new Date().toISOString() })
-    .eq('id', cid)
-  if (qErr) throw new Error(`questions.is_tagged: ${qErr.message}`)
 }
 
 async function main(): Promise<void> {
@@ -230,7 +156,7 @@ async function main(): Promise<void> {
       const quant = validateQuantitative(result, { typeId: input.type_id })
       const peerRes = quant.ok ? await runPeerReview(peer, result, `content_id: ${input.content_id}\ntype: ${input.type_id ?? ''}\ntitle: ${input.title}\nprompt: ${input.prompt}`) : null
       const verdict = classify(quant, peerRes)
-      if (verdict === 'pass' && !DRY) await persist(supabase, input, result)
+      if (verdict === 'pass' && !DRY) await persistTag(supabase, input, result)
       outcomes.push({ input, result, verdict, quant_failures: quant.failures.map((f) => `${f.rule}: ${f.message}`), peer: peerRes })
       console.log(`  ${input.content_id.padEnd(16)} ${verdict.toUpperCase()}${!DRY && verdict === 'pass' ? ' (INSERT)' : ''}`)
     } catch (e) {
